@@ -1,0 +1,1890 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Our Tasks</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: one calm column of nested tasks; editor slides in from the right (bottom sheet on phones). */
+:root {
+  --bg: #f4f6f9; --surface: #ffffff; --ink: #1b2230; --muted: #5d6678; --line: #e1e5ec;
+  --accent: #2f5bd3; --accent-ink: #ffffff; --accent-soft: #e8eefc;
+  --todo: #8a93a6; --doing: #c97d0c; --done: #2b9460; --danger: #c93838; --danger-soft: #fbeaea;
+  --warn-soft: #fdf2e0; --hover: #f0f3f8; --shadow: 0 10px 40px rgba(20, 30, 60, .16);
+  --f-display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --f-body: "Figtree", -apple-system, "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #10131a; --surface: #181c25; --ink: #e6e9ef; --muted: #9aa3b5; --line: #2a303c;
+  --accent: #7d9cff; --accent-ink: #0e1220; --accent-soft: #1e2946;
+  --todo: #7f889c; --doing: #f0a63a; --done: #4cc285; --danger: #ff6f6f; --danger-soft: #3a1d20;
+  --warn-soft: #3a2c14; --hover: #1f2430; --shadow: 0 10px 40px rgba(0, 0, 0, .5); color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --bg: #10131a; --surface: #181c25; --ink: #e6e9ef; --muted: #9aa3b5; --line: #2a303c;
+  --accent: #7d9cff; --accent-ink: #0e1220; --accent-soft: #1e2946;
+  --todo: #7f889c; --doing: #f0a63a; --done: #4cc285; --danger: #ff6f6f; --danger-soft: #3a1d20;
+  --warn-soft: #3a2c14; --hover: #1f2430; --shadow: 0 10px 40px rgba(0, 0, 0, .5); color-scheme: dark;
+}
+* { box-sizing: border-box; }
+/* Base rules the claude.ai viewer also adds, so the page works the same opened as a plain file or on other hosting. */
+:root { color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+[hidden] { display: none !important; }
+img { max-width: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 var(--f-body); }
+body.is-dragging { user-select: none; -webkit-user-select: none; cursor: grabbing; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.app { max-width: 860px; margin: 0 auto; padding-block: 28px 80px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 18px; }
+
+header.top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h1 { font: 700 34px/1.05 var(--f-display); letter-spacing: -.02em; margin: 0; text-wrap: balance; }
+.summary { margin: 6px 0 0; color: var(--muted); font-size: 14px; display: flex; gap: 6px 14px; flex-wrap: wrap; align-items: baseline; }
+.summary b { font: 500 13px var(--f-mono); color: var(--ink); font-variant-numeric: tabular-nums; }
+.summary .over b { color: var(--danger); }
+.summary .linkish { border: 0; background: none; padding: 0; color: var(--accent); font-size: 14px; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+.summary .linkish b { color: inherit; }
+.top-actions { display: flex; gap: 8px; }
+
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 8px 14px; font-weight: 600; font-size: 14px; }
+.btn:hover { background: var(--hover); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.primary:hover { filter: brightness(1.07); }
+.btn.danger { color: var(--danger); }
+.btn.danger.solid { background: var(--danger); border-color: var(--danger); color: #fff; }
+.btn.done { background: var(--done); border-color: var(--done); color: #fff; }
+.btn.small { padding: 5px 10px; font-size: 13px; }
+
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.tabs button { border: 0; background: none; padding: 8px 12px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.tabs button[aria-pressed="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+
+.toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.seg { display: inline-flex; flex-wrap: wrap; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 3px; gap: 2px; }
+.seg button { border: 0; background: none; border-radius: 7px; padding: 5px 11px; font-size: 13.5px; font-weight: 500; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--ink); font-weight: 600; }
+.check { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--muted); }
+.sort { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 7px 10px; font-size: 13.5px; }
+.search { flex: 1 1 180px; min-width: 0; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 7px 12px; }
+
+.banner { border-radius: 10px; padding: 10px 14px; font-size: 14px; background: var(--warn-soft); }
+.banner.link { background: var(--accent-soft); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.banner.link span { flex: 1 1 260px; }
+
+.list { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 6px; }
+.row { display: grid; grid-template-columns: 0 24px 28px minmax(0, 1fr) 32px; align-items: center; gap: 2px;
+  padding-left: calc(min(var(--d), 6) * 22px); border-radius: 9px; min-height: 44px; }
+.can-drag .row { grid-template-columns: 22px 24px 28px minmax(0, 1fr) 32px; }
+.row:hover { background: var(--hover); }
+.row:hover .add, .add:focus-visible { opacity: 1; }
+.caret, .add, .st, .handle { border: 0; background: none; padding: 0; display: grid; place-items: center; border-radius: 6px; }
+.handle { visibility: hidden; overflow: hidden; width: 22px; height: 32px; color: var(--muted); cursor: grab; touch-action: none; opacity: .45; }
+.can-drag .handle { visibility: visible; }
+.row:hover .handle, .handle:focus-visible { opacity: 1; }
+.dragging > .row { background: var(--accent-soft); box-shadow: 0 3px 14px rgba(20, 30, 60, .18); }
+.caret { width: 24px; height: 28px; color: var(--muted); }
+.caret svg { transition: transform .15s; }
+.caret.open svg { transform: rotate(90deg); }
+.st { width: 28px; height: 32px; }
+.st:disabled { cursor: default; }
+.st[data-s="todo"] { color: var(--todo); }
+.st[data-s="doing"] { color: var(--doing); }
+.st[data-s="done"] { color: var(--done); }
+.main { border: 0; background: none; text-align: left; padding: 8px 6px; min-width: 0; display: flex; flex-direction: column; gap: 2px; border-radius: 6px; }
+.title { font-weight: 500; overflow-wrap: anywhere; }
+.row[data-depth="0"] .title { font-weight: 600; }
+.is-done .title { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--line); }
+.ctx { opacity: .55; }
+.meta { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12.5px; color: var(--muted); align-items: center; }
+.meta:empty { display: none; }
+.chip { border-radius: 999px; padding: 1px 8px; background: var(--hover); border: 1px solid var(--line); font-weight: 500; }
+.chip.doing, .chip.unfinished { background: var(--warn-soft); border-color: transparent; color: var(--doing); }
+.chip.new { background: var(--accent); border-color: transparent; color: var(--accent-ink); font-weight: 600; }
+.chip.private { background: var(--ink); border-color: transparent; color: var(--bg); }
+.private-check { font-size: 14px; color: var(--ink); }
+.private-check input { width: 17px; height: 17px; margin: 0; }
+.crumb { overflow-wrap: anywhere; }
+.date { font: 500 12px var(--f-mono); }
+.date.over { color: var(--danger); }
+.date.today { color: var(--doing); }
+.prio-high { color: var(--danger); font-weight: 600; }
+.prio-low { opacity: .8; }
+.progress { font: 500 12px var(--f-mono); font-variant-numeric: tabular-nums; }
+.add { width: 32px; height: 32px; font-size: 20px; color: var(--muted); opacity: 0; }
+@media (hover: none) { .add { opacity: .7; } .handle { opacity: .8; } }
+.group-head { display: flex; gap: 8px; align-items: baseline; padding: 14px 10px 4px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.group-head:first-child { padding-top: 6px; }
+.group-head.over { color: var(--danger); }
+.group-head .n { font-family: var(--f-mono); font-weight: 500; }
+.act { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 2px 12px; width: 100%; text-align: left; border: 0; background: none; padding: 9px 10px; border-radius: 9px; }
+.act:hover { background: var(--hover); }
+.act:disabled { cursor: default; }
+.act:disabled:hover { background: none; }
+.act.is-new { background: var(--accent-soft); }
+.act-time { grid-row: span 2; font: 500 12px var(--f-mono); color: var(--muted); padding-top: 2px; font-variant-numeric: tabular-nums; }
+.act-text { overflow-wrap: anywhere; }
+.act-task { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+.shop-bar { display: flex; flex-direction: column; gap: 10px; }
+.shop-lists { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.shop-lists .spacer { flex: 1; }
+.shop-form { display: flex; gap: 8px; }
+.shop-form input { flex: 1; min-width: 0; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 10px 12px; font-size: 16px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.chips .lbl { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-right: 2px; }
+.chip-btn { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 11px; font-size: 13.5px; }
+.chip-btn:hover { background: var(--hover); }
+.item { display: grid; grid-template-columns: minmax(0, 1fr) 40px; align-items: center; border-radius: 9px; }
+.item:hover { background: var(--hover); }
+.item.is-new { background: var(--accent-soft); }
+.item-main { display: flex; gap: 12px; align-items: center; border: 0; background: none; text-align: left; padding: 8px 10px; min-height: 48px; min-width: 0; }
+.item .box { display: grid; flex: none; color: var(--todo); }
+.item.checked .box { color: var(--done); }
+.item-text { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; min-width: 0; }
+.item-name { font-weight: 500; overflow-wrap: anywhere; }
+.item.checked .item-name { color: var(--muted); text-decoration: line-through; }
+.qty { font: 500 12.5px var(--f-mono); background: var(--hover); border: 1px solid var(--line); border-radius: 6px; padding: 0 6px; }
+.item-meta { flex-basis: 100%; font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+.item-meta:empty { display: none; }
+.item-more { border: 0; background: none; width: 40px; height: 40px; border-radius: 8px; color: var(--muted); font-size: 18px; }
+.item-more:hover { background: var(--line); }
+.basket-head .btn { margin-left: auto; text-transform: none; letter-spacing: 0; }
+.mode-bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--bg); padding-block: 6px; }
+.mode-bar b { font: 700 24px/1.1 var(--f-display); }
+.mode-bar span { color: var(--muted); margin-left: 8px; }
+body.shop-mode header.top, body.shop-mode .tabs, body.shop-mode #shop-lists, body.shop-mode #link-banner { display: none; }
+body.shop-mode .item-main { min-height: 62px; font-size: 18px; }
+body.shop-mode .item .box svg { width: 26px; height: 26px; }
+.list-row { display: flex; gap: 8px; align-items: center; }
+.list-row input { flex: 1; min-width: 0; border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 9px 11px; }
+.task-shop-row { display: flex; gap: 8px; font-size: 14px; align-items: baseline; padding: 3px 0; }
+.task-shop-row > span:first-child { overflow-wrap: anywhere; min-width: 0; }
+.task-shop-row.bought > span:first-child { color: var(--muted); text-decoration: line-through; }
+.task-shop-row .st-text { color: var(--muted); font-size: 12.5px; margin-left: auto; text-align: right; }
+.task-shop-add { display: flex; gap: 6px; flex-wrap: wrap; }
+.field .task-shop-add input { flex: 1 1 150px; width: auto; }
+.field .task-shop-add select { flex: 0 1 150px; width: auto; }
+#imp-preview { display: flex; flex-direction: column; gap: 10px; }
+.imp-row { border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.imp-row.off { opacity: .5; }
+.imp-head { display: flex; gap: 8px; align-items: center; }
+.imp-head input[type=checkbox] { width: 18px; height: 18px; flex: none; margin: 0; }
+.imp-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.imp-meta .wide { grid-column: 1 / -1; }
+.imp-row input[type=text], .imp-row input[type=date], .imp-row select {
+  border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 7px 9px; width: 100%; min-width: 0; font-size: 14px; }
+.imp-head input[type=text] { font-weight: 600; }
+.imp-notes { margin: 0; font-size: 12.5px; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.imp-section { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-top: 6px; }
+.empty { text-align: center; padding: 40px 16px; color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.empty strong { color: var(--ink); font: 600 18px var(--f-display); }
+
+.scrim { position: fixed; inset: 0; background: rgba(10, 14, 25, .35); z-index: 20; }
+.scrim.top { z-index: 24; }
+.panel { position: fixed; z-index: 21; top: 0; right: 0; bottom: 0; width: min(460px, 100%); background: var(--surface);
+  box-shadow: var(--shadow); display: flex; flex-direction: column;
+  padding-top: env(safe-area-inset-top, 0px); padding-right: env(safe-area-inset-right, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+@media (max-width: 600px) {
+  .panel { top: auto; left: 0; width: 100%; max-height: 92%; border-radius: 16px 16px 0 0;
+    padding-left: env(safe-area-inset-left, 0px); }
+}
+.panel form { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.panel-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px 8px; }
+.panel-head h2 { font: 600 20px var(--f-display); margin: 0; }
+.x { border: 0; background: none; font-size: 22px; color: var(--muted); width: 36px; height: 36px; border-radius: 8px; }
+.x:hover { background: var(--hover); }
+.fields { padding: 8px 20px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+.field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.field > label, .field > .lbl, details.history summary { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.field input[type=text], .field input[type=date], .field select, .field textarea {
+  border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 9px 11px; width: 100%; min-width: 0; }
+.field textarea { min-height: 96px; resize: vertical; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.status-pick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.status-pick label { border: 1px solid var(--line); border-radius: 9px; padding: 8px 6px; text-align: center; font-size: 13.5px; font-weight: 500; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 6px; }
+.status-pick input { position: absolute; opacity: 0; pointer-events: none; }
+.status-pick input:checked + label { border-color: currentColor; background: var(--hover); font-weight: 600; }
+.status-pick input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
+.status-pick input:disabled + label { cursor: default; }
+.status-pick .s-todo { color: var(--todo); } .status-pick .s-doing { color: var(--doing); } .status-pick .s-done { color: var(--done); }
+.status-pick label span { color: var(--ink); }
+.hint { font-size: 13px; color: var(--muted); margin: 0; }
+.extras { display: flex; flex-direction: column; gap: 14px; border-top: 1px solid var(--line); padding-top: 14px; }
+.comments { display: flex; flex-direction: column; gap: 8px; }
+.comment { background: var(--bg); border-radius: 9px; padding: 8px 10px; font-size: 14px; }
+.comment .who { display: flex; gap: 8px; align-items: baseline; font-size: 12px; color: var(--muted); }
+.comment .who b { color: var(--ink); font-weight: 600; }
+.comment .who button { margin-left: auto; border: 0; background: none; padding: 0; font-size: 12px; color: var(--muted); text-decoration: underline; }
+.comment p { margin: 3px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.comment-new { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+.field .comment-new textarea { min-height: 64px; }
+details.history summary { cursor: pointer; }
+details.history ol { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; }
+details.history li { overflow-wrap: anywhere; }
+details.history li span { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.link-state { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--muted); }
+.link-state button { border: 0; background: none; padding: 0; font-size: 13px; color: var(--accent); text-decoration: underline; }
+.panel-foot { border-top: 1px solid var(--line); padding: 12px 20px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.panel-foot .spacer { flex: 1; }
+.confirm { background: var(--danger-soft); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; width: 100%; font-size: 14px; }
+.confirm div { display: flex; gap: 8px; }
+
+.modal { position: fixed; z-index: 25; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(420px, calc(100% - 32px));
+  max-height: calc(100% - 48px); overflow-y: auto; background: var(--surface); border-radius: 14px; box-shadow: var(--shadow);
+  padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+.modal h2 { font: 600 19px/1.25 var(--f-display); margin: 0; text-wrap: balance; overflow-wrap: anywhere; }
+.modal p { margin: 0; color: var(--muted); }
+.modal .step { font: 500 11.5px var(--f-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.affected { margin: 0; padding: 10px 12px 10px 30px; background: var(--bg); border-radius: 9px; font-size: 14px; display: flex; flex-direction: column; gap: 3px; }
+.affected li { overflow-wrap: anywhere; }
+.affected .st-doing { color: var(--doing); font-size: 12px; }
+.affected .more { list-style: none; margin-left: -18px; color: var(--muted); }
+.modal .actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+
+.toast { display: flex; gap: 14px; align-items: center; position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); z-index: 30;
+  background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px; max-width: calc(100% - 32px); }
+.toast button { border: 0; background: none; padding: 2px 0; font-weight: 600; text-decoration: underline; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="app">
+  <div class="mode-bar" id="mode-bar" hidden>
+    <div><b id="mode-list">Groceries</b><span id="mode-left"></span></div>
+    <button class="btn primary" type="button" id="mode-done">Done shopping</button>
+  </div>
+  <header class="top">
+    <div>
+      <h1>Our Tasks</h1>
+      <p class="summary" id="summary"></p>
+    </div>
+    <div class="top-actions">
+      <button class="btn" id="import-btn" type="button" hidden>From text</button>
+      <button class="btn" id="people-btn" type="button">People</button>
+      <button class="btn primary" id="new-btn" type="button">+ New task</button>
+    </div>
+  </header>
+
+  <div class="banner link" id="link-banner" hidden></div>
+
+  <nav class="tabs" id="view-tabs" aria-label="View"></nav>
+
+  <section class="shop-bar" id="shop-bar" hidden>
+    <div class="shop-lists" id="shop-lists"></div>
+    <form class="shop-form" id="shop-form" autocomplete="off">
+      <input type="text" id="shop-input" placeholder="Add items, e.g. 2 milk, bread, eggs" aria-label="Add items" enterkeyhint="done">
+      <button class="btn primary" type="submit">Add</button>
+      <button class="btn" type="button" id="smart-btn" hidden title="Type or dictate a normal sentence; Claude splits it into items">Smart add</button>
+    </form>
+    <p class="hint" id="smart-hint" hidden>Tip: tap the keyboard microphone and just say what you need, e.g. “we need two milks, bread and a dozen eggs”, then tap Smart add.</p>
+    <div class="chips" id="shop-chips" hidden></div>
+  </section>
+
+  <div class="toolbar" id="toolbar">
+    <div class="seg" id="who" role="group" aria-label="Show tasks for"></div>
+    <label class="check" id="hide-done-wrap"><input type="checkbox" id="hide-done"> Hide done</label>
+    <select class="sort" id="sort" aria-label="Sort">
+      <option value="manual">My order</option>
+      <option value="due">By due date</option>
+      <option value="priority">By priority</option>
+    </select>
+    <input class="search" id="search" type="search" placeholder="Search tasks and notes" aria-label="Search">
+  </div>
+
+  <div class="banner" id="banner" hidden></div>
+  <main class="list" id="list"><div class="empty">Loading your tasks…</div></main>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+
+<aside class="panel" id="editor" hidden aria-labelledby="ed-title">
+  <form id="ed-form" autocomplete="off">
+    <div class="panel-head"><h2 id="ed-title">Task</h2><button class="x" type="button" data-close aria-label="Close">×</button></div>
+    <div class="fields">
+      <div class="field"><label for="f-title">Title</label><input type="text" id="f-title" required maxlength="200"></div>
+      <label class="check private-check" id="private-wrap"><input type="checkbox" id="f-private"> Private: only you can see it (and its subtasks)</label>
+      <div class="field"><span class="lbl">Status</span>
+        <div class="status-pick" role="radiogroup" aria-label="Status">
+          <input type="radio" name="status" id="s-todo" value="todo"><label for="s-todo" class="s-todo"></label>
+          <input type="radio" name="status" id="s-doing" value="doing"><label for="s-doing" class="s-doing"></label>
+          <input type="radio" name="status" id="s-done" value="done"><label for="s-done" class="s-done"></label>
+        </div>
+      </div>
+      <div class="two">
+        <div class="field" id="assignee-field"><label for="f-assignee">Assigned to</label><select id="f-assignee"></select></div>
+        <div class="field"><label for="f-priority">Priority</label>
+          <select id="f-priority"><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option></select></div>
+      </div>
+      <p class="hint" id="assigned-by" hidden></p>
+      <div class="two">
+        <div class="field"><label for="f-due">Due date</label><input type="date" id="f-due"></div>
+        <div class="field"><label for="f-repeat">Repeats</label><select id="f-repeat"></select></div>
+      </div>
+      <p class="hint" id="repeat-hint" hidden>When you close it, the next one is created with the due date moved forward.</p>
+      <div class="field"><label for="f-parent">Belongs under</label><select id="f-parent"></select></div>
+      <div class="field"><label for="f-notes">Notes</label><textarea id="f-notes" maxlength="5000"></textarea></div>
+      <div class="extras" id="extras">
+        <div class="field"><span class="lbl">To buy</span>
+          <div id="task-shop-list"></div>
+          <div class="task-shop-add" id="task-shop-add">
+            <input type="text" id="ts-input" maxlength="200" placeholder="Add items, e.g. 3 cement bags" aria-label="Item to buy for this task">
+            <select id="ts-list" aria-label="Shopping list"></select>
+            <button class="btn small" type="button" id="ts-add">Add</button>
+          </div>
+        </div>
+        <p class="hint" id="private-note" hidden>Private tasks have no comments and don't appear in Activity. Items you add to buy still go on the shared shopping list.</p>
+        <div class="field" id="comments-field"><span class="lbl">Comments</span>
+          <div class="comments" id="comment-list"></div>
+          <div class="comment-new" id="comment-new">
+            <textarea id="f-comment" maxlength="2000" placeholder="Write a comment" aria-label="New comment"></textarea>
+            <button class="btn small" type="button" id="comment-add">Add comment</button>
+          </div>
+        </div>
+        <details class="history" id="history"><summary>History</summary><ol id="history-list"></ol></details>
+      </div>
+    </div>
+    <div class="panel-foot" id="ed-foot"></div>
+  </form>
+</aside>
+
+<aside class="panel" id="people" hidden aria-labelledby="pp-title">
+  <form id="pp-form" autocomplete="off">
+    <div class="panel-head"><h2 id="pp-title">People</h2><button class="x" type="button" data-close aria-label="Close">×</button></div>
+    <div class="fields">
+      <p class="hint">The two of you. Each name is linked to the claude.ai account of the person who picked it, so the app knows whose tasks are whose.</p>
+      <div class="field"><label for="p-a">First person</label><input type="text" id="p-a" required maxlength="40"><div class="link-state" id="p-a-link"></div></div>
+      <div class="field"><label for="p-b">Second person</label><input type="text" id="p-b" required maxlength="40"><div class="link-state" id="p-b-link"></div></div>
+    </div>
+    <div class="panel-foot"><span class="spacer"></span>
+      <button class="btn" type="button" data-close>Cancel</button>
+      <button class="btn primary" type="submit">Save names</button>
+    </div>
+  </form>
+</aside>
+
+<aside class="panel" id="item-panel" hidden aria-labelledby="it-title">
+  <form id="it-form" autocomplete="off">
+    <div class="panel-head"><h2 id="it-title">Edit item</h2><button class="x" type="button" data-close aria-label="Close">×</button></div>
+    <div class="fields">
+      <div class="field"><label for="it-name">Item</label><input type="text" id="it-name" required maxlength="120"></div>
+      <div class="two">
+        <div class="field"><label for="it-qty">Quantity</label><input type="text" id="it-qty" maxlength="20" placeholder="2, 500g, 1l"></div>
+        <div class="field"><label for="it-section">Section</label><select id="it-section"></select></div>
+      </div>
+      <div class="field"><label for="it-list">List</label><select id="it-list"></select></div>
+      <div class="field"><label for="it-task">For task</label><select id="it-task"></select></div>
+      <p class="hint" id="it-added"></p>
+      <p class="hint">Changing the section is remembered for next time you add this item.</p>
+    </div>
+    <div class="panel-foot">
+      <button class="btn danger" type="button" id="it-delete">Remove</button>
+      <span class="spacer"></span>
+      <button class="btn" type="button" data-close>Cancel</button>
+      <button class="btn primary" type="submit">Save</button>
+    </div>
+  </form>
+</aside>
+
+<aside class="panel" id="lists-panel" hidden aria-labelledby="ls-title">
+  <div class="panel-head"><h2 id="ls-title">Shopping lists</h2><button class="x" type="button" data-close aria-label="Close">×</button></div>
+  <div class="fields">
+    <p class="hint">Rename a list by editing its name. Groceries is the default list and can't be deleted.</p>
+    <div class="field" id="lists-rows"></div>
+    <form class="shop-form" id="list-new" autocomplete="off">
+      <input type="text" id="list-new-name" maxlength="40" placeholder="New list, e.g. Drugstore" aria-label="New list name">
+      <button class="btn" type="submit">Add list</button>
+    </form>
+  </div>
+</aside>
+
+<aside class="panel" id="import-panel" hidden aria-labelledby="imp-title">
+  <div class="panel-head"><h2 id="imp-title">Create tasks from text</h2><button class="x" type="button" data-close aria-label="Close">×</button></div>
+  <div class="fields">
+    <div class="field" id="imp-step1">
+      <label for="imp-text">Paste a chat, notes or an email</label>
+      <textarea id="imp-text" maxlength="30000" placeholder="For example, copy the part of a Claude chat where you planned the garage, or ask Claude for “a list of the to-dos from this conversation” and paste that."></textarea>
+      <p class="hint">Claude suggests tasks, where they belong, who does them, due dates and things to buy. You review everything before it's added.</p>
+    </div>
+    <div id="imp-preview" hidden></div>
+  </div>
+  <div class="panel-foot" id="imp-foot"></div>
+</aside>
+
+<div class="scrim top" id="scrim2" hidden></div>
+<div class="modal" id="cascade" role="alertdialog" aria-modal="true" hidden></div>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+const STATUS = { todo: "Not started", doing: "In progress", done: "Done" };
+const NEXT_STATUS = { todo: "doing", doing: "done", done: "todo" };
+const PRIORITY = { low: "Low", normal: "Normal", high: "High" };
+const PRIO_RANK = { high: 0, normal: 1, low: 2 };
+const REPEAT = { "": "Doesn't repeat", "1d": "Every day", "1w": "Every week", "2w": "Every 2 weeks", "1m": "Every month", "3m": "Every 3 months", "6m": "Every 6 months", "1y": "Every year" };
+// Placeholder names until the two of you set your own under People (stored in the database, not in the code).
+const DEFAULT_PEOPLE = { a: "Person 1", b: "Person 2" };
+
+let tasks = new Map();
+let comments = new Map();
+let people = { ...DEFAULT_PEOPLE };
+let seen = {};
+let activity = [];
+let activitySeenAt = 0, activityHighlightSince = 0;
+let items = new Map(), lists = new Map(), catalog = new Map(), toBuyBy = new Map();
+let shoppingSeenAt = 0, shoppingHighlightSince = 0;
+let meId = null;
+let loaded = false;
+let byParent = new Map(), byParentAll = new Map(), commentsBy = new Map();
+let editingId = null;
+let view = "tasks";
+const filter = { who: "all", hideDone: false, q: "" };
+let sortMode = "manual";
+try { sortMode = localStorage.getItem("sort") || "manual"; } catch {}
+
+const $ = (s) => document.querySelector(s);
+function h(tag, props, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (v == null || v === false) continue;
+    if (k === "class") el.className = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v === true ? "" : v);
+  }
+  for (const c of kids.flat()) if (c != null && c !== false) el.append(c.nodeType ? c : document.createTextNode(c));
+  return el;
+}
+function svg(markup, size = 18) {
+  const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  s.setAttribute("viewBox", "0 0 18 18"); s.setAttribute("width", size); s.setAttribute("height", size);
+  s.setAttribute("aria-hidden", "true"); s.innerHTML = markup; return s;
+}
+const ICON = {
+  todo: '<circle cx="9" cy="9" r="7" fill="none" stroke="currentColor" stroke-width="2"/>',
+  doing: '<circle cx="9" cy="9" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9 4.5a4.5 4.5 0 0 1 0 9z" fill="currentColor"/>',
+  done: '<circle cx="9" cy="9" r="8" fill="currentColor"/><path d="M5.4 9.3l2.4 2.4 4.8-5" fill="none" stroke="var(--surface)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+  chevron: '<path d="M7 4.5L11.5 9 7 13.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
+  grip: '<g fill="currentColor"><circle cx="6.5" cy="4.5" r="1.4"/><circle cx="11.5" cy="4.5" r="1.4"/><circle cx="6.5" cy="9" r="1.4"/><circle cx="11.5" cy="9" r="1.4"/><circle cx="6.5" cy="13.5" r="1.4"/><circle cx="11.5" cy="13.5" r="1.4"/></g>',
+};
+
+// ---- per-viewer conveniences (collapsed rows, sort) ----
+let collapsed = new Set();
+try { collapsed = new Set(JSON.parse(localStorage.getItem("collapsed") || "[]")); } catch {}
+function saveCollapsed() { try { localStorage.setItem("collapsed", JSON.stringify([...collapsed])); } catch {} }
+
+// ---- storage: shared db in the artifact viewer, browser storage when opened as a plain file ----
+const store = {
+  db: null, mode: "loading", local: null, subs: {},
+  async init() {
+    if (!window.claude?.use) return this.initLocal();
+    const [db, user] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
+    if (!db) {
+      this.mode = "off"; loaded = true;
+      showBanner("Your shared tasks couldn't load. Make sure you're signed in to claude.ai and have been invited to this page as an editor.");
+      render(); return;
+    }
+    this.db = db; this.mode = "remote";
+    meId = user ? await user.id() : null;
+    startListening();
+  },
+  initLocal() {
+    this.mode = "local";
+    try { this.local = JSON.parse(localStorage.getItem("local-db") || "null"); } catch {}
+    this.local ||= { tasks: {}, comments: {}, history: {}, docs: {} };
+    meId = "local-user";
+    showBanner("Preview mode: tasks are saved only in this browser.");
+    startListening();
+  },
+  persist(key) {
+    try { localStorage.setItem("local-db", JSON.stringify(this.local)); } catch {}
+    this.subs[key]?.();
+  },
+  listen(coll, cb) {
+    if (this.mode === "remote") return this.db.collection(coll).onSnapshot((s) => cb(new Map(s.docs.map((d) => [d.id, { id: d.id, ...d.data() }]))), connectionLost);
+    const fire = () => cb(new Map(Object.entries(this.local[coll] || {}).map(([id, d]) => [id, { ...d, id }])));
+    this.subs[coll] = fire; fire();
+  },
+  listenRecent(coll, field, n, cb) {
+    if (this.mode === "remote") return this.db.collection(coll).orderBy(field, "desc").limit(n).onSnapshot((s) => cb(s.docs.map((d) => ({ id: d.id, ...d.data() }))), connectionLost);
+    const fire = () => cb(Object.entries(this.local[coll] || {}).map(([id, d]) => ({ ...d, id })).sort((a, b) => (b[field] || 0) - (a[field] || 0)).slice(0, n));
+    this.subs[coll] = fire; fire();
+  },
+  listenDoc(path, cb) {
+    if (this.mode === "remote") return this.db.doc(path).onSnapshot((s) => cb(s.exists ? s.data() : null), connectionLost);
+    const fire = () => cb(this.local.docs[path] || null);
+    this.subs["doc:" + path] = fire; fire();
+  },
+  async add(coll, data) {
+    if (this.mode === "remote") return (await this.db.collection(coll).add(data)).id;
+    const id = "x" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    (this.local[coll] ||= {})[id] = data; this.persist(coll); return id;
+  },
+  async update(coll, id, patch) {
+    if (this.mode === "remote") return this.db.doc(coll + "/" + id).update(patch);
+    const c = (this.local[coll] ||= {}); c[id] = { ...c[id], ...patch }; this.persist(coll);
+  },
+  async put(coll, id, data) {
+    if (this.mode === "remote") return this.db.doc(coll + "/" + id).set(data);
+    (this.local[coll] ||= {})[id] = data; this.persist(coll);
+  },
+  async remove(coll, id) {
+    if (this.mode === "remote") return this.db.doc(coll + "/" + id).delete();
+    delete this.local[coll]?.[id]; this.persist(coll);
+  },
+  async setDoc(path, data) {
+    if (this.mode === "remote") return this.db.doc(path).set(data);
+    this.local.docs[path] = data; this.persist("doc:" + path);
+  },
+  async query(coll, field, value) {
+    if (this.mode === "remote") return (await this.db.collection(coll).where(field, "==", value).get()).docs.map((d) => ({ id: d.id, ...d.data() }));
+    return Object.entries(this.local[coll] || {}).map(([id, d]) => ({ ...d, id })).filter((d) => d[field] === value);
+  },
+};
+const canWrite = () => store.mode === "remote" || store.mode === "local";
+function connectionLost(e) { showBanner("Lost connection to your shared tasks (" + (e?.code || "error") + "). Reload the page to try again."); }
+
+// Private tasks live in your own area of the database (data/users/<you>/…), which nobody else can read, the owner included.
+// They keep the same ids when moved between shared and private, so parents and shopping links keep working.
+let sharedTasks = new Map(), privateTasks = new Map();
+function mergeTasks() { tasks = new Map([...sharedTasks, ...[...privateTasks].map(([k, v]) => [k, { ...v, private: true }])]); }
+const privColl = () => meId ? `data/users/${meId}/private/tasks` : null;
+const taskColl = (id) => tasks.get(id)?.private ? privColl() : "tasks";
+const updTask = (id, patch) => store.update(taskColl(id), id, patch);
+const removeTask = (id) => store.remove(taskColl(id), id);
+function addTask(data) {
+  const { private: isPrivate, ...rest } = data;
+  return isPrivate && privColl() ? store.add(privColl(), { ...rest, private: true }) : store.add("tasks", rest);
+}
+async function setPrivacy(id, makePrivate, rootData) {
+  for (const i of [id, ...descendantsAll(id)]) {
+    const cur = i === id ? { ...tasks.get(i), ...rootData } : tasks.get(i);
+    if (!cur || (i !== id && !!cur.private === makePrivate)) continue;
+    const { id: _id, private: _p, ...rest } = cur;
+    await store.put(makePrivate ? privColl() : "tasks", i, makePrivate ? { ...rest, private: true, assignee: "" } : rest);
+    await store.remove(makePrivate ? "tasks" : privColl(), i);
+  }
+}
+
+function startListening() {
+  store.listen("tasks", (m) => { sharedTasks = m; mergeTasks(); loaded = true; render(); });
+  if (privColl()) store.listen(privColl(), (m) => { privateTasks = m; mergeTasks(); render(); });
+  store.listen("comments", (m) => { comments = m; render(); if (editingId) renderComments(); });
+  store.listenDoc("config/people", (d) => { people = { ...DEFAULT_PEOPLE, ...(d || {}) }; render(); });
+  store.listenRecent("history", "at", 150, (arr) => { activity = arr; render(); });
+  store.listen("items", (m) => { items = m; render(); if (editingId) renderTaskShop(); });
+  store.listen("lists", (m) => { lists = m; render(); if (!$("#lists-panel").hidden && !$("#lists-panel").contains(document.activeElement)) renderListsPanel(); });
+  store.listen("catalog", (m) => { catalog = m; if (view === "shopping") renderChips(); });
+  if (meId) store.listenDoc("data/users/" + meId + "/seen", (d) => { seen = d?.map || {}; activitySeenAt = d?.activityAt || 0; shoppingSeenAt = d?.shoppingAt || 0; render(); });
+}
+
+// ---- people and identity ----
+const mySlot = () => meId && people.aUser === meId ? "a" : meId && people.bUser === meId ? "b" : null;
+const slotName = (s) => s === "a" ? people.a : s === "b" ? people.b : "";
+const assigneeName = (a) => a === "both" ? "Both" : slotName(a);
+const cleanPeople = () => ({ a: people.a, b: people.b, aUser: people.aUser || null, bUser: people.bUser || null });
+const isMine = (t, me = mySlot()) => !!me && (t.assignee === me || t.assignee === "both");
+// "New for you": assigned to you by the other person, and you haven't opened it since.
+const isNew = (t) => { const me = mySlot(); return isMine(t, me) && !t.archived && t.status !== "done" && !!t.assignedBy && t.assignedBy !== me && seen[t.id] !== t.assignedAt; };
+async function markSeen(ids) {
+  if (!meId || !ids.length) return;
+  const map = {};
+  for (const [k, v] of Object.entries(seen)) if (tasks.has(k)) map[k] = v;
+  for (const id of ids) map[id] = tasks.get(id)?.assignedAt || 0;
+  seen = map; render();
+  saveSeen();
+}
+function saveSeen() {
+  if (meId) store.setDoc("data/users/" + meId + "/seen", { map: seen, activityAt: activitySeenAt, shoppingAt: shoppingSeenAt }).catch(() => {});
+}
+// Activity and Shopping highlight what the other person did since you last looked at them.
+function switchView(k) {
+  if (k === view) return;
+  const now = Date.now(), tracked = ["activity", "shopping"];
+  if (k === "activity") activityHighlightSince = activitySeenAt;
+  if (k === "shopping") shoppingHighlightSince = shoppingSeenAt;
+  if (k === "activity" || view === "activity") activitySeenAt = now;
+  if (k === "shopping" || view === "shopping") shoppingSeenAt = now;
+  if (tracked.includes(k) || tracked.includes(view)) saveSeen();
+  if (view === "shopping") exitShopMode();
+  view = k; render();
+}
+
+// ---- activity feed: recent changes and comments from both of you ----
+function feed() {
+  const fromComments = [...comments.values()].map((c) => ({ id: "c" + c.id, taskId: c.taskId, by: c.by, at: c.at || 0, text: `commented: “${c.text}”`, mine: !!meId && c.byUser === meId }));
+  const me = mySlot();
+  return [...activity.map((e) => ({ ...e, mine: !!me && e.by === me })), ...fromComments].sort((a, b) => b.at - a.at).slice(0, 150);
+}
+const newActivityCount = () => mySlot() ? feed().filter((e) => !e.mine && e.at > activitySeenAt).length : 0;
+function dayLabel(ms) {
+  const d = toDateStr(new Date(ms)), today = todayStr();
+  return d === today ? "Today" : d === addDays(today, -1) ? "Yesterday" : new Date(ms).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "short" });
+}
+function renderActivity(list) {
+  const items = feed().filter((e) => {
+    const t = tasks.get(e.taskId);
+    return !filter.q || (e.text + " " + (t?.title || e.title || "")).toLowerCase().includes(filter.q);
+  });
+  if (!items.length) {
+    list.replaceChildren(filter.q
+      ? h("div", { class: "empty" }, h("span", {}, "Nothing matches this search."), h("button", { type: "button", class: "btn", onclick: clearFilters }, "Clear search"))
+      : h("div", { class: "empty" }, h("strong", {}, "No activity yet"), h("span", {}, "Changes and comments from both of you show up here, newest first.")));
+    return;
+  }
+  const out = [];
+  let lastDay = "";
+  for (const e of items) {
+    const day = dayLabel(e.at);
+    if (day !== lastDay) { out.push(h("div", { class: "group-head" }, day)); lastDay = day; }
+    const t = tasks.get(e.taskId), from = t ? pathOf(t) : "";
+    const label = t ? (t.title || "Untitled") + (from ? " · in " + from : "") + (t.archived ? " · archived" : "") : `“${e.title || "Untitled"}” (deleted)`;
+    out.push(h("button", { type: "button", class: "act" + (!e.mine && e.at > activityHighlightSince && activityHighlightSince ? " is-new" : ""), disabled: !t, onclick: () => t && openEditor(t.id) },
+      h("span", { class: "act-time" }, new Date(e.at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })),
+      h("span", { class: "act-text" }, h("b", {}, slotName(e.by) || "Someone"), " " + e.text),
+      h("span", { class: "act-task" }, label)));
+  }
+  list.replaceChildren(...out);
+}
+async function linkMe(slot) {
+  try { await store.setDoc("config/people", { ...cleanPeople(), [slot + "User"]: meId }); toast(`Welcome, ${slotName(slot)}`); }
+  catch (err) { writeFailed(err); }
+}
+
+// ---- history ----
+// Private tasks are never written to the shared history.
+function log(taskId, text, title) { if (tasks.get(taskId)?.private) return; store.add("history", { taskId, text, title: title || tasks.get(taskId)?.title || "", by: mySlot() || "", at: Date.now() }).catch(() => {}); }
+const FIELD_LOG = {
+  title: (v) => `renamed it to “${v}”`,
+  status: (v) => `changed the status to ${STATUS[v]}`,
+  assignee: (v) => v ? `assigned it to ${assigneeName(v)}` : "removed the assignee",
+  due: (v) => v ? `set the due date to ${fmtDate(v)}` : "removed the due date",
+  priority: (v) => `set the priority to ${PRIORITY[v]}`,
+  repeat: (v) => v ? `set it to repeat ${REPEAT[v].toLowerCase()}` : "stopped it repeating",
+  parentId: (v) => v ? `moved it under “${tasks.get(v)?.title || "another task"}”` : "moved it to the top level",
+  notes: () => "edited the notes",
+};
+function describeChanges(before, data) {
+  const b = { status: "todo", priority: "normal", ...before };
+  return Object.keys(FIELD_LOG).filter((k) => (b[k] || "") !== (data[k] || "")).map((k) => FIELD_LOG[k](data[k])).join("; ");
+}
+
+// ---- tree helpers ----
+// byParent holds the active tree; byParentAll also includes archived tasks.
+function buildIndex() {
+  byParent = new Map(); byParentAll = new Map(); commentsBy = new Map();
+  const push = (map, p, t) => { if (!map.has(p)) map.set(p, []); map.get(p).push(t); };
+  for (const t of tasks.values()) {
+    const parent = tasks.get(t.parentId);
+    push(byParentAll, parent ? t.parentId : "", t);
+    if (!t.archived) push(byParent, parent && !parent.archived ? t.parentId : "", t);
+  }
+  for (const map of [byParent, byParentAll]) for (const arr of map.values()) arr.sort((a, b) => (a.order || 0) - (b.order || 0));
+  for (const c of comments.values()) push(commentsBy, c.taskId, c);
+  toBuyBy = new Map();
+  for (const i of items.values()) if (i.taskId && !i.bought) toBuyBy.set(i.taskId, (toBuyBy.get(i.taskId) || 0) + 1);
+  for (const arr of commentsBy.values()) arr.sort((a, b) => (a.at || 0) - (b.at || 0));
+}
+const childrenOf = (id) => byParent.get(id || "") || [];
+const childrenAll = (id) => byParentAll.get(id || "") || [];
+const parentKey = (t) => { const p = tasks.get(t.parentId); return p && !p.archived ? t.parentId : ""; };
+const kidsInView = (id) => view === "archive" ? childrenAll(id).filter((c) => c.archived) : view === "upcoming" ? [] : childrenOf(id);
+const archiveRoots = () => [...tasks.values()].filter((t) => t.archived && !tasks.get(t.parentId)?.archived);
+function descendants(id, out = []) { for (const c of childrenOf(id)) { out.push(c.id); descendants(c.id, out); } return out; }
+function descendantsAll(id, out = []) { for (const c of childrenAll(id)) { out.push(c.id); descendantsAll(c.id, out); } return out; }
+const openDescendants = (id) => descendants(id).map((i) => tasks.get(i)).filter((d) => d.status !== "done");
+function pathOf(t) { const names = []; for (let p = tasks.get(t.parentId); p; p = tasks.get(p.parentId)) names.unshift(p.title || "Untitled"); return names.join(" › "); }
+function sortTasks(arr) {
+  const a = [...arr], byOrder = (x, y) => (x.order || 0) - (y.order || 0);
+  if (sortMode === "due") a.sort((x, y) => (x.due || "9999").localeCompare(y.due || "9999") || byOrder(x, y));
+  else if (sortMode === "priority") a.sort((x, y) => (PRIO_RANK[x.priority] ?? 1) - (PRIO_RANK[y.priority] ?? 1) || byOrder(x, y));
+  return a;
+}
+
+// ---- dates ----
+const parseDate = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+const toDateStr = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+const todayStr = () => toDateStr(new Date());
+function addDays(s, n) { const d = parseDate(s); d.setDate(d.getDate() + n); return toDateStr(d); }
+function addInterval(s, code) {
+  const n = parseInt(code, 10), unit = code.slice(-1);
+  if (unit === "d") return addDays(s, n);
+  if (unit === "w") return addDays(s, 7 * n);
+  const d = parseDate(s), day = d.getDate();
+  const target = new Date(d.getFullYear(), d.getMonth() + (unit === "y" ? 12 * n : n), 1);
+  target.setDate(Math.min(day, new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate()));
+  return toDateStr(target);
+}
+function fmtDate(s) {
+  const dt = parseDate(s), opts = { day: "numeric", month: "short" };
+  if (dt.getFullYear() !== new Date().getFullYear()) opts.year = "numeric";
+  return dt.toLocaleDateString(undefined, opts);
+}
+const fmtStamp = (ms) => new Date(ms).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+
+// ---- recurring tasks: closing one creates the next, with its subtasks ----
+async function spawnNext(t) {
+  const parent = tasks.get(t.parentId);
+  if (!t.repeat || (parent && (parent.status === "done" || parent.archived))) return null;
+  const today = todayStr();
+  let due = addInterval(t.due || today, t.repeat);
+  while (due < today) due = addInterval(due, t.repeat);
+  const shift = t.due ? Math.round((parseDate(due) - parseDate(t.due)) / 864e5) : null;
+  const copy = async (src, parentId, isRoot) => {
+    const id = await addTask({
+      title: src.title, status: "todo", assignee: src.assignee || "", priority: src.priority || "normal", notes: src.notes || "", parentId,
+      due: isRoot ? due : src.due && shift != null ? addDays(src.due, shift) : "",
+      repeat: isRoot ? src.repeat : "", order: isRoot ? (src.order || 0) + 0.5 : src.order || 0, createdAt: Date.now(),
+      assignedBy: "", assignedAt: 0, private: !!src.private,
+    });
+    for (const c of childrenOf(src.id)) await copy(c, id, false);
+    return id;
+  };
+  const id = await copy(t, parentKey(t), true);
+  if (!t.private) log(id, `created it automatically (repeats ${REPEAT[t.repeat].toLowerCase()})`, t.title);
+  return due;
+}
+
+// ---- filtering ----
+const filterActive = () => filter.who !== "all" || filter.hideDone || filter.q;
+function matches(t) {
+  if (filter.who === "a" && !isMine(t, "a")) return false;
+  if (filter.who === "b" && !isMine(t, "b")) return false;
+  if (filter.who === "new" && !isNew(t)) return false;
+  if (filter.who === "private" && !t.private) return false;
+  if (filter.hideDone && view === "tasks" && t.status === "done") return false;
+  if (filter.q && !((t.title || "") + " " + (t.notes || "")).toLowerCase().includes(filter.q)) return false;
+  return true;
+}
+let visMemo = new Map();
+function visible(t) {
+  if (visMemo.has(t.id)) return visMemo.get(t.id);
+  const v = matches(t) || kidsInView(t.id).some(visible);
+  visMemo.set(t.id, v); return v;
+}
+const canDrag = () => view === "tasks" && sortMode === "manual" && !filterActive() && canWrite();
+
+// ---- rendering ----
+function renderTabs() {
+  const n = archiveRoots().length;
+  const fresh = view === "activity" ? 0 : newActivityCount(), freshItems = view === "shopping" ? 0 : newItemsCount();
+  $("#view-tabs").replaceChildren(...[["tasks", "Tasks"], ["upcoming", "Upcoming"], ["shopping", freshItems ? `Shopping (${freshItems} new)` : "Shopping"],
+    ["activity", fresh ? `Activity (${fresh} new)` : "Activity"], ["archive", n ? `Archive (${n})` : "Archive"]].map(([k, label]) =>
+    h("button", { type: "button", "aria-pressed": String(view === k), onclick: () => switchView(k) }, label)));
+}
+function renderWho() {
+  const me = mySlot(), you = (s) => slotName(s) + (me === s ? " (me)" : "");
+  const opts = [["all", "Everyone"], ["a", you("a")], ["b", you("b")]];
+  if ([...tasks.values()].some((t) => t.private && !t.archived)) opts.push(["private", "Private"]);
+  if (filter.who === "new") opts.push(["new", "New for me"]);
+  $("#who").replaceChildren(...opts.map(([k, label]) =>
+    h("button", { type: "button", "aria-pressed": String(filter.who === k), onclick: () => { filter.who = k; render(); } }, label)));
+}
+function renderLinkBanner() {
+  const el = $("#link-banner"), free = ["a", "b"].filter((s) => !people[s + "User"]);
+  if (!loaded || !meId || mySlot() || !free.length || !canWrite()) { el.hidden = true; return; }
+  el.replaceChildren(h("span", {}, "Which one are you? Then the app can show your tasks, who assigned them, and what's new for you."),
+    ...free.map((s) => h("button", { class: "btn small", type: "button", onclick: () => linkMe(s) }, "I'm " + slotName(s))));
+  el.hidden = false;
+}
+function renderSummary() {
+  const all = [...tasks.values()].filter((t) => !t.archived), today = todayStr();
+  const open = all.filter((t) => t.status !== "done").length;
+  const doing = all.filter((t) => t.status === "doing").length;
+  const over = all.filter((t) => t.status !== "done" && t.due && t.due < today).length;
+  const fresh = all.filter(isNew);
+  const el = $("#summary"); el.replaceChildren();
+  if (!loaded || !all.length) return;
+  if (fresh.length) el.append(
+    h("button", { type: "button", class: "linkish", onclick: () => { filter.who = "new"; if (view === "archive") view = "tasks"; render(); } }, h("b", {}, String(fresh.length)), " new for you"),
+    h("button", { type: "button", class: "linkish", onclick: () => { if (filter.who === "new") filter.who = "all"; markSeen(fresh.map((t) => t.id)); } }, "Mark as seen"));
+  el.append(h("span", {}, h("b", {}, String(open)), " open"), h("span", {}, h("b", {}, String(doing)), " in progress"));
+  if (over) el.append(h("span", { class: "over" }, h("b", {}, String(over)), " overdue"));
+}
+function renderTask(t, depth) {
+  const archived = view === "archive", flat = view === "upcoming";
+  const kids = kidsInView(t.id), counted = archived ? kids : childrenOf(t.id);
+  const shown = sortTasks(kids.filter(visible));
+  const isCollapsed = !filterActive() && collapsed.has(t.id);
+  const status = STATUS[t.status] ? t.status : "todo";
+  const today = todayStr();
+
+  const meta = h("span", { class: "meta" });
+  if (t.private) meta.append(h("span", { class: "chip private", title: "Only you can see this task" }, "Private"));
+  if (isNew(t)) meta.append(h("span", { class: "chip new" }, "New from " + slotName(t.assignedBy)));
+  if ((archived && depth === 0) || flat) { const from = pathOf(t); if (from) meta.append(h("span", { class: "crumb" }, (flat ? "In " : "From ") + from)); }
+  if (archived && depth === 0 && t.archivedAt) meta.append(h("span", { class: "date" }, "Archived " + new Date(t.archivedAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })));
+  if (archived && status !== "done") meta.append(h("span", { class: "chip unfinished" }, "Not finished"));
+  if (status === "doing" && !archived) meta.append(h("span", { class: "chip doing" }, "In progress"));
+  if (t.priority === "high") meta.append(h("span", { class: "prio-high" }, "High priority"));
+  if (t.priority === "low") meta.append(h("span", { class: "prio-low" }, "Low priority"));
+  if (t.assignee) meta.append(h("span", { class: "chip" }, assigneeName(t.assignee)));
+  if (t.due) {
+    const cls = archived ? "" : status !== "done" && t.due < today ? " over" : status !== "done" && t.due === today ? " today" : "";
+    meta.append(h("span", { class: "date" + cls }, (cls === " over" ? "Overdue · " : cls === " today" ? "Today · " : "Due ") + fmtDate(t.due)));
+  }
+  if (t.repeat) meta.append(h("span", {}, "↻ " + REPEAT[t.repeat]));
+  if (counted.length) meta.append(h("span", { class: "progress" }, counted.filter((k) => k.status === "done").length + "/" + counted.length + " done"));
+  const nb = toBuyBy.get(t.id) || 0;
+  if (nb) meta.append(h("span", {}, nb + " to buy"));
+  const nc = (commentsBy.get(t.id) || []).length;
+  if (nc) meta.append(h("span", {}, nc + (nc === 1 ? " comment" : " comments")));
+  if (t.notes) meta.append(h("span", { title: "Has notes" }, "Notes"));
+
+  const row = h("div", { class: "row" + (matches(t) ? "" : " ctx") + (status === "done" ? " is-done" : ""), style: "--d:" + depth, "data-depth": depth },
+    h("button", { type: "button", class: "handle", title: "Drag to reorder (or use the arrow keys)", "aria-label": "Reorder " + t.title,
+      onpointerdown: (e) => startDrag(e), onkeydown: (e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); moveBy(t, e.key === "ArrowUp" ? -1 : 1); } } }, svg(ICON.grip, 16)),
+    kids.length
+      ? h("button", { type: "button", class: "caret" + (isCollapsed ? "" : " open"), "aria-expanded": String(!isCollapsed), "aria-label": (isCollapsed ? "Expand " : "Collapse ") + t.title,
+          onclick: () => { collapsed.has(t.id) ? collapsed.delete(t.id) : collapsed.add(t.id); saveCollapsed(); render(); } }, svg(ICON.chevron, 16))
+      : h("span"),
+    archived
+      ? h("button", { type: "button", class: "st", "data-s": status, disabled: true, title: STATUS[status], "aria-label": "Status: " + STATUS[status] }, svg(ICON[status]))
+      : h("button", { type: "button", class: "st", "data-s": status, title: STATUS[status] + " (click to change)", "aria-label": "Status: " + STATUS[status] + ". Change to " + STATUS[NEXT_STATUS[status]],
+          onclick: () => canWrite() && changeStatus(t, NEXT_STATUS[status]) }, svg(ICON[status])),
+    h("button", { type: "button", class: "main", onclick: () => openEditor(t.id) }, h("span", { class: "title" }, t.title || "Untitled"), meta),
+    canWrite() && !archived && !flat && status !== "done"
+      ? h("button", { type: "button", class: "add", title: "Add subtask", "aria-label": "Add subtask under " + t.title, onclick: () => openEditor(null, t.id) }, "+")
+      : h("span"));
+
+  const node = h("div", { class: "node", "data-id": t.id }, row);
+  if (shown.length && !isCollapsed) node.append(h("div", { class: "kids" }, shown.map((k) => renderTask(k, depth + 1))));
+  return node;
+}
+function render() {
+  if (drag) { renderQueued = true; return; }
+  buildIndex(); visMemo = new Map();
+  renderTabs(); renderWho(); renderSummary(); renderLinkBanner();
+  $("#new-btn").hidden = !canWrite() || view === "archive" || view === "activity";
+  // Claude features exist only on claude.ai (not in preview mode from a plain file).
+  const claudeHere = store.mode === "remote";
+  $("#import-btn").hidden = !claudeHere || !canWrite();
+  $("#smart-btn").hidden = $("#smart-hint").hidden = !claudeHere;
+  $("#hide-done-wrap").hidden = view !== "tasks";
+  $("#sort").hidden = view !== "tasks";
+  $("#who").hidden = view === "activity";
+  $("#toolbar").hidden = view === "shopping";
+  $("#shop-bar").hidden = view !== "shopping";
+  const list = $("#list");
+  list.classList.toggle("can-drag", canDrag());
+  if (!loaded) return;
+  if (view === "activity") return renderActivity(list);
+  if (view === "shopping") { renderShopBar(); return renderShopping(list); }
+  const noMatch = () => h("div", { class: "empty" }, h("span", {}, "Nothing matches these filters."),
+    h("button", { type: "button", class: "btn", onclick: clearFilters }, "Clear filters"));
+
+  if (view === "archive") {
+    const all = archiveRoots().sort((a, b) => (b.archivedAt || 0) - (a.archivedAt || 0)), shown = all.filter(visible);
+    if (!all.length) list.replaceChildren(h("div", { class: "empty" }, h("strong", {}, "Nothing archived yet"),
+      h("span", {}, "Tasks you move to the archive appear here, with everything below them. You can restore them anytime.")));
+    else if (!shown.length) list.replaceChildren(noMatch());
+    else list.replaceChildren(...shown.map((t) => renderTask(t, 0)));
+    return;
+  }
+
+  if (view === "upcoming") {
+    const today = todayStr(), week = addDays(today, 7);
+    const dated = [...tasks.values()].filter((t) => !t.archived && t.status !== "done" && t.due);
+    const items = dated.filter(matches).sort((x, y) => x.due.localeCompare(y.due) || (PRIO_RANK[x.priority] ?? 1) - (PRIO_RANK[y.priority] ?? 1));
+    const groups = [["Overdue", (t) => t.due < today, true], ["Today", (t) => t.due === today], ["Next 7 days", (t) => t.due > today && t.due <= week], ["Later", (t) => t.due > week]];
+    if (!dated.length) list.replaceChildren(h("div", { class: "empty" }, h("strong", {}, "Nothing due"),
+      h("span", {}, "Open tasks with a due date show up here, soonest first, wherever they sit in the hierarchy.")));
+    else if (!items.length) list.replaceChildren(noMatch());
+    else list.replaceChildren(...groups.flatMap(([label, test, over]) => {
+      const g = items.filter(test);
+      return g.length ? [h("div", { class: "group-head" + (over ? " over" : "") }, label, h("span", { class: "n" }, String(g.length))), ...g.map((t) => renderTask(t, 0))] : [];
+    }));
+    return;
+  }
+
+  const roots = sortTasks(childrenOf("").filter(visible));
+  if (!tasks.size) {
+    list.replaceChildren(h("div", { class: "empty" },
+      h("strong", {}, "No tasks yet"),
+      h("span", {}, "Start with a big area like “Home” or “Holiday 2027”, then add subtasks under it with the + button."),
+      canWrite() && h("button", { type: "button", class: "btn primary", onclick: () => openEditor(null) }, "+ Add your first task")));
+  } else if (!roots.length) {
+    list.replaceChildren(noMatch());
+  } else {
+    list.replaceChildren(...roots.map((t) => renderTask(t, 0)));
+  }
+}
+function clearFilters() { filter.who = "all"; filter.hideDone = false; filter.q = ""; $("#hide-done").checked = false; $("#search").value = ""; render(); }
+
+// ---- reordering: drag the handle, or focus it and use the arrow keys ----
+let drag = null, renderQueued = false;
+function startDrag(e) {
+  if (e.button > 0 || !canDrag()) return;
+  e.preventDefault();
+  // Listen on the window: moving the row in the DOM would drop a pointer capture taken on the handle.
+  const node = e.currentTarget.closest(".node");
+  drag = { node, container: node.parentElement };
+  node.classList.add("dragging"); document.body.classList.add("is-dragging");
+  window.addEventListener("pointermove", onDragMove);
+  window.addEventListener("pointerup", endDrag);
+  window.addEventListener("pointercancel", endDrag);
+  window.addEventListener("blur", endDrag);
+}
+function onDragMove(e) {
+  if (!drag) return;
+  const { node, container } = drag;
+  for (const s of container.children) {
+    if (s === node) continue;
+    const r = s.firstElementChild.getBoundingClientRect();
+    if (e.clientY < r.top + r.height / 2) { if (node.nextElementSibling !== s) container.insertBefore(node, s); return; }
+  }
+  if (container.lastElementChild !== node) container.append(node);
+}
+async function endDrag() {
+  if (!drag) return;
+  const { node, container } = drag;
+  window.removeEventListener("pointermove", onDragMove);
+  window.removeEventListener("pointerup", endDrag);
+  window.removeEventListener("pointercancel", endDrag);
+  window.removeEventListener("blur", endDrag);
+  node.classList.remove("dragging"); document.body.classList.remove("is-dragging");
+  const ids = [...container.children].map((n) => n.dataset.id).filter(Boolean);
+  drag = null;
+  await saveOrder(ids);
+  if (renderQueued) { renderQueued = false; render(); }
+}
+async function saveOrder(ids) {
+  try {
+    for (const [i, id] of ids.entries()) { const o = (i + 1) * 1000; if (tasks.get(id) && tasks.get(id).order !== o) await updTask(id, { order: o }); }
+  } catch (err) { writeFailed(err); }
+}
+async function moveBy(t, delta) {
+  if (!canDrag()) return;
+  const ids = childrenOf(parentKey(t)).map((s) => s.id), i = ids.indexOf(t.id), j = i + delta;
+  if (j < 0 || j >= ids.length) return;
+  [ids[i], ids[j]] = [ids[j], ids[i]];
+  await saveOrder(ids);
+  setTimeout(() => document.querySelector(`.node[data-id="${t.id}"] .handle`)?.focus(), 60);
+}
+
+// ---- dialogs ----
+// Shows the in-page dialog: build(m, finish) fills it, finish(value) closes it and resolves with value.
+function showModal(build) {
+  return new Promise((resolve) => {
+    const m = $("#cascade"), back = document.activeElement;
+    const finish = (value) => {
+      m.hidden = true; $("#scrim2").hidden = true;
+      document.removeEventListener("keydown", onKey, true);
+      back?.focus?.(); resolve(value);
+    };
+    const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); finish(false); } };
+    document.addEventListener("keydown", onKey, true);
+    m.setAttribute("aria-labelledby", "modal-title");
+    $("#scrim2").hidden = false; m.hidden = false;
+    build(m, finish);
+  });
+}
+const cancelBtn = (finish) => h("button", { class: "btn", type: "button", onclick: () => finish(false) }, "Cancel");
+
+// Resolves false (cancelled), "close" or "archive".
+function confirmCascade(title, open) {
+  return showModal((m, finish) => {
+    const n = open.length, plural = n === 1 ? "subtask" : "subtasks";
+    const step2 = () => {
+      m.replaceChildren(
+        h("span", { class: "step" }, "Step 2 of 2"),
+        h("h2", { id: "modal-title" }, "Are you sure?"),
+        h("p", {}, `These ${n} ${plural} will be marked as done:`),
+        h("ul", { class: "affected" },
+          open.slice(0, 8).map((d) => h("li", {}, d.title || "Untitled", d.status === "doing" ? h("span", { class: "st-doing" }, " · in progress") : null)),
+          open.length > 8 && h("li", { class: "more" }, `and ${open.length - 8} more`)),
+        h("div", { class: "actions" }, cancelBtn(finish),
+          h("button", { class: "btn", type: "button", onclick: () => finish("archive") }, "Close all and archive"),
+          h("button", { class: "btn done", type: "button", id: "modal-yes", onclick: () => finish("close") }, `Yes, close all ${n + 1}`)));
+      m.querySelector("#modal-yes").focus();
+    };
+    m.replaceChildren(
+      h("span", { class: "step" }, "Step 1 of 2"),
+      h("h2", { id: "modal-title" }, `Close “${title}”?`),
+      h("p", {}, `It still has ${n} unfinished ${plural}. Closing it will mark ${n === 1 ? "it" : "all of them"} as done too.`),
+      h("div", { class: "actions" }, cancelBtn(finish), h("button", { class: "btn primary", type: "button", id: "modal-next", onclick: step2 }, "Continue")));
+    m.querySelector("#modal-next").focus();
+  });
+}
+function confirmArchiveUnfinished(t, openCount) {
+  return showModal((m, finish) => {
+    const subs = openCount ? `${openCount} open subtask${openCount > 1 ? "s" : ""}` : "";
+    const why = t.status !== "done"
+      ? `“${t.title}” isn't finished${subs ? " and has " + subs : ""}.`
+      : `“${t.title}” still has ${subs}.`;
+    m.replaceChildren(
+      h("h2", { id: "modal-title" }, "Archive an unfinished task?"),
+      h("p", {}, why + " Everything keeps its status in the archive, and you can restore it anytime."),
+      h("div", { class: "actions" }, cancelBtn(finish), h("button", { class: "btn primary", type: "button", id: "modal-yes", onclick: () => finish(true) }, "Archive anyway")));
+    m.querySelector("#modal-yes").focus();
+  });
+}
+
+// ---- status changes: closing a parent closes everything below it ----
+async function closeSubtasks(open, parentTitle) {
+  for (const d of open) { await updTask(d.id, { status: "done" }); log(d.id, `closed it by closing “${parentTitle}”`); }
+}
+// A task that is open again (reopened, added or moved) can't sit under a closed parent: reopen the parents as "In progress".
+async function reopenAncestors(parentId) {
+  for (let p = tasks.get(parentId); p; p = tasks.get(p.parentId)) {
+    if (p.status === "done") { await updTask(p.id, { status: "doing" }); log(p.id, "reopened it because a subtask was opened"); }
+  }
+}
+async function changeStatus(t, next) {
+  try {
+    if (next === "done") {
+      const open = openDescendants(t.id);
+      const choice = open.length ? await confirmCascade(t.title || "Untitled", open) : "close";
+      if (!choice) return;
+      await closeSubtasks(open, t.title);
+      await updTask(t.id, { status: "done" });
+      log(t.id, open.length ? `closed it together with ${open.length} subtask${open.length > 1 ? "s" : ""}` : "changed the status to Done");
+      await afterClose(t, choice);
+    } else {
+      await updTask(t.id, { status: next });
+      log(t.id, `changed the status to ${STATUS[next]}`);
+      await reopenAncestors(t.parentId);
+    }
+  } catch (err) { writeFailed(err); }
+}
+async function afterClose(t, choice) {
+  const next = t.repeat ? await spawnNext(t) : null;
+  if (choice === "archive") return archiveTask(t.id);
+  toast(next ? `Closed. The next one is due ${fmtDate(next)}` : `Closed “${t.title || "task"}”`, { label: "Move to archive", run: () => archiveTask(t.id) });
+}
+
+// ---- archive: a task moves there together with everything below it ----
+async function archiveTask(id) {
+  try {
+    const at = Date.now();
+    for (const i of [id, ...descendants(id)]) await updTask(i, { archived: true, archivedAt: at });
+    log(id, "moved it to the archive");
+    toast("Moved to archive", { label: "Undo", run: () => restoreTask(id) });
+  } catch (err) { writeFailed(err); }
+}
+async function askArchive(id) {
+  const t = tasks.get(id), openCount = openDescendants(id).length;
+  if ((t.status !== "done" || openCount) && !(await confirmArchiveUnfinished(t, openCount))) return;
+  closePanels();
+  await archiveTask(id);
+}
+// Brings back the task and whatever was archived together with it. If its parent is archived or deleted, it returns at the top level.
+async function restoreTask(id) {
+  try {
+    const t = tasks.get(id); if (!t) return;
+    const ids = [id, ...descendantsAll(id).filter((i) => tasks.get(i).archived && tasks.get(i).archivedAt === t.archivedAt)];
+    const parent = tasks.get(t.parentId), toTop = !!t.parentId && (!parent || parent.archived);
+    for (const i of ids) await updTask(i, i === id && toTop ? { archived: false, archivedAt: null, parentId: "" } : { archived: false, archivedAt: null });
+    log(id, "restored it from the archive");
+    if (!toTop && t.status !== "done") await reopenAncestors(t.parentId);
+    toast(toTop ? "Restored to the top level, because its parent is archived or deleted" : "Restored");
+  } catch (err) { writeFailed(err); }
+}
+
+// ---- editor ----
+let lastFocus = null;
+function openPanel(el) { lastFocus = document.activeElement; $("#scrim").hidden = false; el.hidden = false; }
+function closePanels() {
+  $("#scrim").hidden = true;
+  for (const p of document.querySelectorAll(".panel")) p.hidden = true;
+  editingId = null; editingItem = null; resetFoot(); lastFocus?.focus?.();
+}
+function openEditor(id, parentId = "") {
+  const t = id ? tasks.get(id) : { status: "todo", priority: "normal", assignee: "", repeat: "", parentId, private: !!tasks.get(parentId)?.private };
+  if (!t) return;
+  editingId = id;
+  $("#ed-title").textContent = id ? (t.archived ? "Archived task" : "Edit task") : parentId ? "New subtask" : "New task";
+  $("#f-title").value = t.title || "";
+  for (const s of Object.keys(STATUS)) { $("#s-" + s).checked = (t.status || "todo") === s; $("label[for=s-" + s + "]").replaceChildren(svg(ICON[s], 16), h("span", {}, STATUS[s])); }
+  const asg = $("#f-assignee");
+  asg.replaceChildren(...[["", "No one"], ["a", people.a], ["b", people.b], ["both", "Both"]].map(([v, l]) => h("option", { value: v }, l)));
+  asg.value = t.assignee || "";
+  const ab = $("#assigned-by");
+  ab.hidden = !(t.assignee && t.assignedBy && t.assignedAt);
+  if (!ab.hidden) ab.textContent = `Assigned by ${slotName(t.assignedBy)} on ${fmtStamp(t.assignedAt)}`;
+  $("#f-priority").value = t.priority || "normal";
+  $("#f-due").value = t.due || "";
+  $("#f-repeat").replaceChildren(...Object.entries(REPEAT).map(([v, l]) => h("option", { value: v }, l)));
+  $("#f-repeat").value = t.repeat || "";
+  $("#repeat-hint").hidden = !t.repeat;
+  $("#f-notes").value = t.notes || "";
+  $("#f-private").checked = !!t.private;
+  $("#private-wrap").hidden = !privColl();
+  fillParents(t, id, !!t.private, t.parentId);
+  for (const el of $("#editor .fields").querySelectorAll("input, select, textarea")) el.disabled = !canWrite() || !!t.archived;
+  applyPrivateUI(!!t.private);
+  $("#extras").hidden = !id;
+  if (id) {
+    $("#f-comment").value = "";
+    $("#ts-input").value = "";
+    renderTaskShop();
+    renderComments();
+    $("#history").open = false;
+    loadHistory(id);
+    if (isNew(t)) markSeen([id]);
+  }
+  resetFoot();
+  openPanel($("#editor"));
+  setTimeout(() => { if (!id) $("#f-title").focus(); }, 30);
+}
+$("#f-repeat").addEventListener("change", (e) => { $("#repeat-hint").hidden = !e.target.value; });
+// Parent choices: open tasks in tree order, never this task or anything below it. Closed tasks take no new subtasks,
+// and a shared task can't sit under a private one (the other person couldn't see its parent).
+function fillParents(t, id, isPrivate, keep) {
+  const banned = new Set(id ? [id, ...descendantsAll(id)] : []);
+  const opts = [h("option", { value: "" }, "Top level")];
+  (function walk(pid, depth) {
+    for (const c of childrenOf(pid)) {
+      if (banned.has(c.id) || (!isPrivate && c.private)) continue;
+      if (c.status !== "done" || c.id === keep) opts.push(h("option", { value: c.id }, " ".repeat(depth) + (c.title || "Untitled") + (c.status === "done" ? " (done)" : "") + (c.private ? " (private)" : "")));
+      walk(c.id, depth + 1);
+    }
+  })("", 1);
+  if (keep && tasks.has(keep) && !banned.has(keep) && (isPrivate || !tasks.get(keep).private) && !opts.some((o) => o.value === keep)) opts.push(h("option", { value: keep }, pathOf(t) || tasks.get(keep).title));
+  const par = $("#f-parent");
+  par.replaceChildren(...opts);
+  par.value = opts.some((o) => o.value === keep) ? keep : "";
+}
+function applyPrivateUI(isPrivate) {
+  $("#assignee-field").hidden = isPrivate;
+  if (isPrivate) $("#assigned-by").hidden = true;
+  $("#comments-field").hidden = isPrivate;
+  $("#history").hidden = isPrivate;
+  $("#private-note").hidden = !isPrivate;
+}
+$("#f-private").addEventListener("change", (e) => {
+  const t = editingId ? tasks.get(editingId) : { parentId: $("#f-parent").value };
+  fillParents(t, editingId, e.target.checked, $("#f-parent").value);
+  applyPrivateUI(e.target.checked);
+});
+$("#ed-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!canWrite()) return;
+  const data = {
+    title: $("#f-title").value.trim(),
+    status: $("#ed-form").elements.status.value || "todo",
+    assignee: $("#f-assignee").value,
+    priority: $("#f-priority").value,
+    due: $("#f-due").value,
+    repeat: $("#f-repeat").value,
+    parentId: $("#f-parent").value,
+    notes: $("#f-notes").value.trim(),
+    private: $("#f-private").checked && !!privColl(),
+  };
+  if (!data.title) { $("#f-title").focus(); return; }
+  const id = editingId, before = id ? tasks.get(id) : null;
+  if (before?.archived) return;
+  if (data.private) data.assignee = "";
+  else { let p = data.parentId; while (p && tasks.get(p)?.private) p = tasks.get(p).parentId || ""; data.parentId = p; }
+  if ((before?.assignee || "") !== data.assignee) Object.assign(data, data.assignee ? { assignedBy: mySlot() || "", assignedAt: Date.now() } : { assignedBy: "", assignedAt: 0 });
+  const open = id && data.status === "done" ? openDescendants(id) : [];
+  const choice = open.length ? await confirmCascade(data.title, open) : "close";
+  if (!choice) return;
+  closePanels();
+  if (data.parentId) { collapsed.delete(data.parentId); saveCollapsed(); }
+  try {
+    await closeSubtasks(open, data.title);
+    if (id) {
+      const changes = describeChanges(before, data);
+      if (!!before.private !== data.private) {
+        await setPrivacy(id, data.private, data);
+        toast(data.private ? "Now private: only you can see it" : "Now shared with " + (slotName(mySlot() === "a" ? "b" : "a") || "the other person"));
+      } else {
+        const { private: _p, ...patch } = data;
+        await updTask(id, patch);
+      }
+      if (changes && !data.private) log(id, changes + (open.length ? ` (and closed ${open.length} subtask${open.length > 1 ? "s" : ""})` : ""), data.title);
+    } else {
+      const newId = await addTask({ ...data, order: Date.now(), createdAt: Date.now() });
+      if (!data.private) log(newId, "created it" + (data.assignee ? ` and assigned it to ${assigneeName(data.assignee)}` : ""), data.title);
+      toast("Task added");
+    }
+    if (data.status !== "done") await reopenAncestors(data.parentId);
+    else if (id && (before.status !== "done" || choice === "archive")) await afterClose({ ...before, ...data, id }, choice);
+  } catch (err) { writeFailed(err); }
+});
+function resetFoot() {
+  const t = editingId && tasks.get(editingId), w = canWrite();
+  const del = w && t && h("button", { class: "btn danger", type: "button", onclick: askDelete }, "Delete");
+  const buttons = t?.archived
+    ? [del, h("span", { class: "spacer" }),
+       h("button", { class: "btn", type: "button", onclick: closePanels }, "Close"),
+       w && h("button", { class: "btn primary", type: "button", onclick: () => { const id = editingId; closePanels(); restoreTask(id); } }, "Restore")]
+    : [del, w && t && h("button", { class: "btn", type: "button", onclick: () => askArchive(editingId) }, "Move to archive"),
+       h("span", { class: "spacer" }),
+       h("button", { class: "btn", type: "button", onclick: closePanels }, "Cancel"),
+       w && h("button", { class: "btn primary", type: "submit" }, "Save")];
+  $("#ed-foot").replaceChildren(...buttons.filter(Boolean));
+}
+function askDelete() {
+  const id = editingId, n = descendantsAll(id).length;
+  $("#ed-foot").replaceChildren(h("div", { class: "confirm" },
+    h("span", {}, n ? `Delete “${tasks.get(id).title}” and its ${n} subtask${n > 1 ? "s" : ""}? This can't be undone.` : `Delete “${tasks.get(id).title}”? This can't be undone.`),
+    h("div", {},
+      h("button", { class: "btn danger solid", type: "button", onclick: async () => {
+        const ids = [...descendantsAll(id).reverse(), id]; closePanels();
+        try {
+          // History entries stay so the Activity feed still shows what happened; comments go with the task.
+          log(id, n ? `deleted it with ${n} subtask${n > 1 ? "s" : ""}` : "deleted it", tasks.get(id).title);
+          for (const i of ids) {
+            for (const c of commentsBy.get(i) || []) await store.remove("comments", c.id);
+            // Items still to buy stay on their shopping list, just no longer linked; bought ones go.
+            for (const it of [...items.values()].filter((x) => x.taskId === i)) await (it.bought ? store.remove("items", it.id) : store.update("items", it.id, { taskId: "" }));
+            await removeTask(i);
+          }
+          toast("Deleted");
+        } catch (err) { writeFailed(err); } } }, "Delete"),
+      h("button", { class: "btn", type: "button", onclick: resetFoot }, "Keep it"))));
+}
+
+// ---- comments ----
+function renderComments() {
+  const id = editingId; if (!id) return;
+  const t = tasks.get(id), items = commentsBy.get(id) || [];
+  $("#comment-list").replaceChildren(...(items.length ? items.map((c) => h("div", { class: "comment" },
+    h("div", { class: "who" }, h("b", {}, slotName(c.by) || "Someone"), h("span", {}, fmtStamp(c.at)),
+      c.byUser && c.byUser === meId && canWrite() && !t?.archived && h("button", { type: "button", onclick: () => store.remove("comments", c.id).catch(writeFailed) }, "Delete")),
+    h("p", {}, c.text))) : [h("p", { class: "hint" }, "No comments yet.")]));
+  $("#comment-new").hidden = !canWrite() || !!t?.archived;
+}
+$("#comment-add").addEventListener("click", async () => {
+  const text = $("#f-comment").value.trim();
+  if (!text || !editingId) return;
+  $("#f-comment").value = "";
+  try { await store.add("comments", { taskId: editingId, text, by: mySlot() || "", byUser: meId || "", at: Date.now() }); }
+  catch (err) { writeFailed(err); }
+});
+
+// ---- history ----
+async function loadHistory(id) {
+  const ol = $("#history-list");
+  ol.replaceChildren(h("li", {}, "Loading…"));
+  try {
+    const items = (await store.query("history", "taskId", id)).sort((a, b) => (b.at || 0) - (a.at || 0));
+    if (editingId !== id) return;
+    ol.replaceChildren(...(items.length
+      ? items.map((e) => h("li", {}, h("b", {}, slotName(e.by) || "Someone"), " " + e.text + " · ", h("span", {}, fmtStamp(e.at))))
+      : [h("li", {}, "No changes recorded yet.")]));
+  } catch { ol.replaceChildren(h("li", {}, "Couldn't load the history.")); }
+}
+
+// ---- shopping ----
+// Sections in the order you usually walk through a shop.
+const SECTIONS = ["Fruit & veg", "Bakery", "Dairy & eggs", "Meat & fish", "Deli", "Pantry", "Frozen", "Snacks & sweets", "Drinks", "Household", "Drugstore", "Pets & baby", "DIY & garden", "Other"];
+// Keywords (English and Polish, without diacritics), checked in this order so e.g. "frozen peas" lands in Frozen
+// and "peanut butter" in Pantry. Keywords of 3 letters or fewer must match a whole word; longer ones match a word start.
+const SECTION_WORDS = [
+  ["Frozen", ["frozen", "ice cream", "mrozon", "lody", "fries", "frytki", "pizza"]],
+  ["Drugstore", ["toothpaste", "pasta do zebow", "toothbrush", "szczoteczk", "shampoo", "szampon", "conditioner", "odzywk", "soap", "mydl", "shower gel", "zel pod prysznic", "deodorant", "dezodorant", "antyperspirant", "razor", "maszynk", "hand cream", "face cream", "krem", "tissue", "chusteczk", "cotton", "wacik", "patyczk", "pads", "podpask", "tampon", "plaster", "vitamin", "witamin", "medicine", "lek", "leki", "ibuprofen", "paracetamol", "apap", "floss", "nitk", "sunscreen"]],
+  ["Household", ["toilet paper", "papier toalet", "paper towel", "recznik papier", "kitchen roll", "detergent", "proszek do prania", "plyn", "washing", "dish", "zmywark", "sponge", "gabk", "trash bag", "bin bag", "worki", "bleach", "domestos", "cleaner", "srodek czysz", "foil", "folia", "batter", "bateri", "light bulb", "zarowk", "candle", "swiec", "cif", "ludwik", "vanish", "perwoll", "fairy"]],
+  ["Pets & baby", ["cat food", "dog food", "pet food", "karma", "zwirek", "litter", "diaper", "nappies", "pieluch", "baby"]],
+  ["Pantry", ["peanut butter", "maslo orzech", "black pepper", "pieprz", "rice", "ryz", "pasta", "makaron", "flour", "maka", "sugar", "cukier", "salt", "sol", "oil", "olej", "oliw", "vinegar", "ocet", "sauce", "sos", "ketchup", "mayo", "majonez", "mustard", "musztard", "beans", "fasol", "lentil", "soczewic", "chickpea", "ciecierzyc", "cereal", "platki", "oats", "owsian", "muesli", "musli", "granola", "honey", "miod", "jam", "dzem", "spice", "przypraw", "tea", "herbat", "coffee", "kawa", "kawy", "kawe", "canned", "konserw", "puszk", "kasz", "stock", "bulion", "yeast", "drozdz", "tomato paste", "koncentrat", "passata", "tuna", "tunczyk"]],
+  ["Snacks & sweets", ["chocolate", "czekolad", "chips", "crisps", "chipsy", "cookie", "ciastk", "biscuit", "herbatnik", "candy", "sweets", "cukierk", "slodycz", "nuts", "orzech", "orzeszk", "popcorn", "paluszk", "baton", "zelk", "gummy", "wafel", "wafl", "krakers", "crackers"]],
+  ["Deli", ["ham", "szynk", "salami", "pate", "pasztet", "parowk", "kabanos", "wedlin", "hot dog", "prosciutto"]],
+  ["Meat & fish", ["chicken", "kurczak", "kurczk", "beef", "wolowin", "pork", "wieprzow", "turkey", "indyk", "mince", "mielon", "steak", "stek", "sausage", "kielbas", "bacon", "boczek", "schab", "karkowk", "piers", "udka", "udko", "fish", "ryba", "ryby", "salmon", "losos", "cod", "dorsz", "shrimp", "prawn", "krewetk", "fillet", "filet", "meat", "mieso"]],
+  ["Dairy & eggs", ["milk", "mleko", "mleka", "butter", "maslo", "masla", "cheese", "ser", "sera", "serek", "cheddar", "mozzarell", "parmesan", "parmezan", "feta", "yogurt", "yoghurt", "jogurt", "cream", "smietan", "egg", "eggs", "jajk", "jaja", "kefir", "twarog", "maslank", "quark"]],
+  ["Bakery", ["bread", "chleb", "roll", "rolls", "bulk", "bagel", "baguette", "bagiet", "croissant", "rogal", "bun", "buns", "toast", "tost", "cake", "ciasto", "muffin", "donut", "paczk", "drozdzowk", "pieczyw", "chalk", "tortill", "wrap"]],
+  ["Drinks", ["water", "woda", "wody", "wode", "juice", "sok", "soki", "soda", "cola", "pepsi", "sprite", "fanta", "beer", "piwo", "piwa", "wine", "wino", "wina", "lemonade", "lemoniad", "napoj", "napoje", "energy drink", "tonic", "prosecco", "vodka", "wodk", "whisky", "gin"]],
+  ["Fruit & veg", ["apple", "jablk", "banana", "banan", "orange", "pomarancz", "lemon", "cytryn", "lime", "limonk", "grape", "winogron", "pear", "grusz", "plum", "sliwk", "strawberr", "truskawk", "raspberr", "malin", "blueberr", "borowk", "jagod", "cherr", "wisni", "czeresn", "peach", "brzoskwin", "apricot", "morel", "melon", "arbuz", "kiwi", "mango", "pineapple", "ananas", "avocado", "awokado", "tomato", "pomidor", "cucumber", "ogor", "pepper", "papryk", "lettuce", "salat", "salad", "spinach", "szpinak", "onion", "cebul", "garlic", "czosn", "potato", "ziemniak", "kartofl", "carrot", "marchew", "marchw", "beet", "burak", "cabbage", "kapust", "broccoli", "brokul", "cauliflower", "kalafior", "zucchini", "cukini", "mushroom", "pieczark", "grzyb", "celery", "seler", "leek", "por", "pory", "parsley", "pietruszk", "dill", "koper", "herbs", "radish", "rzodkiew", "chive", "szczypior", "fruit", "owoc", "vegetable", "warzyw", "ginger", "imbir", "berries"]],
+  ["DIY & garden", ["cement", "concrete", "beton", "piasek", "sand", "zapraw", "mortar", "wylewk", "klej", "glue", "silikon", "silicone", "farb", "paint", "screw", "wkret", "gwozdz", "nail", "drill", "wiert", "tasm", "tape", "desk", "drewn", "wood", "plank", "plyt", "tile", "fug", "grout", "rur", "pipe", "kabel", "cable", "gips", "bloczk", "cegl", "brick", "styropian", "rekawic", "gloves", "nasion", "seeds", "ziemi", "soil", "nawoz", "fertili"]],
+];
+const norm = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ł/g, "l").replace(/\s+/g, " ").trim();
+function guessSection(name) {
+  const n = " " + norm(name) + " ";
+  for (const [section, words] of SECTION_WORDS) {
+    for (const w of words) {
+      if (w.includes(" ") ? n.includes(" " + w) : w.length <= 3 ? n.includes(" " + w + " ") : n.includes(" " + w)) return section;
+    }
+  }
+  return "Other";
+}
+function catalogId(name) {
+  let h32 = 2166136261;
+  for (const ch of norm(name)) { h32 ^= ch.codePointAt(0); h32 = Math.imul(h32, 16777619); }
+  return "k" + (h32 >>> 0).toString(36);
+}
+// A section you picked yourself wins over the keyword guess.
+function sectionFor(name) { const c = catalog.get(catalogId(name)); return c?.manual && c.section ? c.section : guessSection(name); }
+// "2 milk", "milk 2", "eggs x10", "3x bread", "water 1.5l" → { name, qty }
+const UNIT = "(?:x|szt\\.?|pcs|kg|g|dag|l|ml|pack|packs|pkt)?";
+function parseEntry(raw) {
+  let s = String(raw).trim().replace(/\s+/g, " "), qty = "", m;
+  if (!s) return null;
+  if ((m = s.match(new RegExp("^(\\d+(?:[.,]\\d+)?\\s*" + UNIT + ")\\s+(.+)$", "i")))) { qty = m[1]; s = m[2]; }
+  else if ((m = s.match(new RegExp("^(.+?)\\s+[x×]?(\\d+(?:[.,]\\d+)?\\s*" + UNIT + ")$", "i")))) { qty = m[2]; s = m[1]; }
+  else if ((m = s.match(/^[x×](\d+)\s+(.+)$/i))) { qty = m[1]; s = m[2]; }
+  qty = qty.replace(/\s+/g, "").replace(/x$/i, "");
+  return { name: s.charAt(0).toUpperCase() + s.slice(1), qty };
+}
+const isNum = (q) => /^\d+(?:[.,]\d+)?$/.test(q);
+const toNum = (q) => parseFloat(String(q).replace(",", "."));
+
+let currentList = "groceries", editingItem = null, wakeLock = null;
+try { currentList = localStorage.getItem("shopList") || "groceries"; } catch {}
+function allLists() {
+  const arr = [...lists.values()];
+  if (!lists.has("groceries")) arr.push({ id: "groceries", name: "Groceries", order: 0 });
+  return arr.sort((a, b) => (a.order || 0) - (b.order || 0));
+}
+const listName = (id) => allLists().find((l) => l.id === (id || "groceries"))?.name || "Groceries";
+const currentListId = () => allLists().some((l) => l.id === currentList) ? currentList : "groceries";
+const openItems = (listId) => [...items.values()].filter((i) => !i.bought && (i.listId || "groceries") === listId);
+function selectList(id) { currentList = id; try { localStorage.setItem("shopList", id); } catch {} render(); }
+const isNewItem = (i, since) => { const me = mySlot(); return !!me && !!since && !i.bought && !i.checked && !!i.addedBy && i.addedBy !== me && (i.addedAt || 0) > since; };
+const newItemsCount = () => [...items.values()].filter((i) => isNewItem(i, shoppingSeenAt)).length;
+
+// Adds one or more comma-separated entries. An item already on the list gets its quantity added up instead of a duplicate.
+function addItems(text, listId, taskId = "") { return addEntries(String(text).split(/[,;\n]/).map(parseEntry).filter(Boolean), listId, taskId); }
+// Your own section choice wins, then the keyword guess, then the section Claude suggested (smart add).
+function pickSection(e) {
+  const c = catalog.get(catalogId(e.name)), guess = guessSection(e.name);
+  if (c?.manual && c.section) return c.section;
+  return guess === "Other" && SECTIONS.includes(e.section) ? e.section : guess;
+}
+async function addEntries(entries, listId, taskId = "") {
+  const added = [];
+  try {
+    for (const e of entries) {
+      const key = norm(e.name);
+      const existing = openItems(listId).find((i) => norm(i.name) === key);
+      if (existing) {
+        const patch = {};
+        if (existing.checked) Object.assign(patch, { checked: false, checkedAt: null, qty: e.qty || existing.qty || "" });
+        else if (isNum(existing.qty || "1") && isNum(e.qty || "1")) patch.qty = String(Math.round((toNum(existing.qty || "1") + toNum(e.qty || "1")) * 100) / 100);
+        else { toast(`${existing.name} is already on the list`); continue; }
+        if (taskId && !existing.taskId) patch.taskId = taskId;
+        await store.update("items", existing.id, patch);
+      } else {
+        await store.add("items", { listId, name: e.name, qty: e.qty, section: pickSection(e), checked: false, bought: false, taskId,
+          addedBy: mySlot() || "", addedByUser: meId || "", addedAt: Date.now() });
+      }
+      added.push(e.name);
+      const cid = catalogId(e.name), c = catalog.get(cid);
+      store.put("catalog", cid, { name: e.name, section: pickSection(e), manual: !!c?.manual, count: (c?.count || 0) + 1, lastAt: Date.now() }).catch(() => {});
+      if (taskId) log(taskId, `added “${e.name}”${e.qty ? " (" + e.qty + ")" : ""} to the ${listName(listId)} list`);
+    }
+  } catch (err) { writeFailed(err); }
+  return added;
+}
+function toggleItem(i) {
+  store.update("items", i.id, i.checked ? { checked: false, checkedAt: null } : { checked: true, checkedAt: Date.now() }).catch(writeFailed);
+}
+// Clears the basket. Items bought for a task are kept (marked bought) so the task shows what was bought.
+async function finishShopping() {
+  const done = openItems(currentListId()).filter((i) => i.checked);
+  if (!done.length) return;
+  try {
+    for (const i of done) {
+      if (i.taskId && tasks.has(i.taskId)) {
+        await store.update("items", i.id, { bought: true, boughtAt: Date.now() });
+        log(i.taskId, `bought “${i.name}”${i.qty ? " (" + i.qty + ")" : ""}`);
+      } else await store.remove("items", i.id);
+    }
+    toast(`Done: ${done.length} item${done.length > 1 ? "s" : ""} bought`, { label: "Undo", run: async () => {
+      for (const { id, ...rest } of done) {
+        if (items.has(id)) await store.update("items", id, { bought: false, boughtAt: null });
+        else await store.put("items", id, rest);
+      }
+    } });
+  } catch (err) { writeFailed(err); }
+}
+
+function renderShopBar() {
+  const cur = currentListId();
+  $("#shop-lists").replaceChildren(
+    h("div", { class: "seg", role: "group", "aria-label": "Shopping lists" }, allLists().map((l) => {
+      const n = openItems(l.id).filter((i) => !i.checked).length;
+      return h("button", { type: "button", "aria-pressed": String(l.id === cur), onclick: () => selectList(l.id) }, l.name + (n ? ` · ${n}` : ""));
+    })),
+    canWrite() && h("button", { type: "button", class: "btn small", onclick: openListsPanel }, "Edit lists"),
+    h("span", { class: "spacer" }),
+    h("button", { type: "button", class: "btn primary", onclick: enterShopMode }, "Start shopping"));
+  $("#shop-form").hidden = !canWrite();
+  renderChips();
+  const left = openItems(cur).filter((i) => !i.checked).length;
+  $("#mode-list").textContent = listName(cur);
+  $("#mode-left").textContent = left ? `${left} left` : "All done";
+}
+// Empty input: your most frequent items. While typing: matching items you've bought before.
+function renderChips() {
+  const el = $("#shop-chips");
+  if (!canWrite()) { el.hidden = true; return; }
+  const cur = currentListId(), last = ($("#shop-input").value.split(/[,;]/).pop() || "").trim();
+  const pq = last.match(/^(\d+\S*)\s+(.*)$/), qtyPrefix = pq ? pq[1] + " " : "", seg = norm(pq ? pq[2] : last);
+  const onList = new Set(openItems(cur).filter((i) => !i.checked).map((i) => norm(i.name)));
+  let pool = [...catalog.values()].filter((c) => c.name && !onList.has(norm(c.name)));
+  if (seg) pool = pool.filter((c) => norm(c.name).includes(seg))
+    .sort((a, b) => (norm(a.name).startsWith(seg) ? 0 : 1) - (norm(b.name).startsWith(seg) ? 0 : 1) || (b.count || 0) - (a.count || 0)).slice(0, 8);
+  else pool = pool.sort((a, b) => (b.count || 0) - (a.count || 0)).slice(0, 12);
+  el.hidden = !pool.length;
+  el.replaceChildren(h("span", { class: "lbl" }, seg ? "Suggestions" : "Frequent"), ...pool.map((c) => h("button", { type: "button", class: "chip-btn", onclick: async () => {
+    const inp = $("#shop-input"), parts = inp.value.split(/[,;]/);
+    parts.pop();
+    inp.value = parts.length ? parts.join(",") + ", " : "";
+    await addItems(qtyPrefix + c.name, cur);
+    renderChips();
+  } }, c.name)));
+}
+function renderItem(i) {
+  const t = i.taskId && tasks.get(i.taskId), fresh = isNewItem(i, shoppingHighlightSince);
+  const meta = [fresh && "New", t && "For " + (t.title || "a task"), i.addedBy && "Added by " + slotName(i.addedBy)].filter(Boolean).join(" · ");
+  return h("div", { class: "item" + (i.checked ? " checked" : "") + (fresh ? " is-new" : "") },
+    h("button", { type: "button", class: "item-main", "aria-pressed": String(!!i.checked), "aria-label": (i.checked ? "Put back: " : "In the basket: ") + i.name,
+      onclick: () => canWrite() && toggleItem(i) },
+      h("span", { class: "box" }, svg(i.checked ? ICON.done : ICON.todo, 22)),
+      h("span", { class: "item-text" }, h("span", { class: "item-name" }, i.name), i.qty && h("span", { class: "qty" }, i.qty), h("span", { class: "item-meta" }, meta))),
+    canWrite() ? h("button", { type: "button", class: "item-more", title: "Edit item", "aria-label": "Edit " + i.name, onclick: () => openItemEditor(i.id) }, "⋯") : h("span"));
+}
+function renderShopping(list) {
+  const all = openItems(currentListId());
+  const open = all.filter((i) => !i.checked), basket = all.filter((i) => i.checked).sort((a, b) => (b.checkedAt || 0) - (a.checkedAt || 0));
+  if (!all.length) {
+    list.replaceChildren(h("div", { class: "empty" }, h("strong", {}, "Your list is empty"),
+      h("span", {}, "Type items above, several at once with commas, e.g. “2 milk, bread, eggs”. Items you buy often show up as one-tap suggestions.")));
+    return;
+  }
+  const out = [];
+  for (const s of SECTIONS) {
+    const g = open.filter((i) => (SECTIONS.includes(i.section) ? i.section : "Other") === s).sort((a, b) => a.name.localeCompare(b.name));
+    if (g.length) out.push(h("div", { class: "group-head" }, s, h("span", { class: "n" }, String(g.length))), ...g.map(renderItem));
+  }
+  if (!open.length) out.push(h("div", { class: "empty" }, h("strong", {}, "Everything's in the basket")));
+  if (basket.length) out.push(h("div", { class: "group-head basket-head" }, "In the basket", h("span", { class: "n" }, String(basket.length)),
+    canWrite() && h("button", { type: "button", class: "btn small done", onclick: finishShopping }, "Finish shopping")), ...basket.map(renderItem));
+  list.replaceChildren(...out);
+}
+$("#shop-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const v = $("#shop-input").value;
+  if (!v.trim()) return;
+  $("#shop-input").value = "";
+  const added = await addItems(v, currentListId());
+  renderChips();
+  if (added.length > 1) toast(`Added ${added.length} items`);
+});
+$("#shop-input").addEventListener("input", renderChips);
+
+// Smart add: Claude turns a natural (often dictated) sentence into separate items. Runs on the viewer's own Claude usage.
+let sampleFn = null, permsApi = null;
+async function initSmartAdd() {
+  if (!window.claude?.use) return;
+  [sampleFn, permsApi] = await Promise.all([window.claude.use("sample"), window.claude.use("permissions")]);
+  render();
+}
+// The buttons stay visible on claude.ai; when Claude access is blocked (e.g. "Don't allow" was chosen once,
+// which claude.ai remembers), clicking explains it and opens the page's Permissions settings.
+async function ensureClaude(what) {
+  if (sampleFn) {
+    const st = permsApi ? await permsApi.state("sample").catch(() => null) : null;
+    if (st !== "denied" && st !== "unavailable") return true;
+  }
+  showClaudeBlocked(what);
+  return false;
+}
+function showClaudeBlocked(what) {
+  showModal((m, finish) => {
+    m.replaceChildren(
+      h("h2", { id: "modal-title" }, `${what} needs access to Claude`),
+      h("p", {}, "This page isn't allowed to use Claude right now, usually because “Don't allow” was chosen once and claude.ai remembers it. Allow Claude for this page in its Permissions settings, then reload the page."),
+      h("div", { class: "actions" }, cancelBtn(finish),
+        permsApi && h("button", { class: "btn primary", type: "button", id: "modal-yes", onclick: async () => {
+          finish(false);
+          try { await permsApi.manage(); toast("Reload the page after allowing Claude."); }
+          catch { toast("Open this page's Permissions menu on claude.ai, allow Claude, then reload."); }
+        } }, "Open permissions")));
+    m.querySelector("#modal-yes")?.focus();
+  });
+}
+function sampleFailed(e, what) {
+  if (e?.code === "not_granted") showClaudeBlocked(what);
+  else if (e?.code === "rate_limited") toast("Too many requests right now. Try again in a minute.");
+  else if (e?.code !== "cancelled") toast(`${what} didn't work this time. Your text is still there, so you can try again.`);
+}
+
+// ---- create tasks from text (a pasted chat, notes, an email) ----
+let impData = null;
+function openImport() {
+  impData = null;
+  $("#imp-step1").hidden = false; $("#imp-preview").hidden = true;
+  renderImportFoot();
+  openPanel($("#import-panel"));
+  setTimeout(() => $("#imp-text").focus(), 30);
+}
+function renderImportFoot(busy) {
+  const foot = $("#imp-foot");
+  if (!impData) {
+    foot.replaceChildren(h("span", { class: "spacer" }),
+      h("button", { class: "btn", type: "button", onclick: closePanels }, "Cancel"),
+      h("button", { class: "btn primary", type: "button", disabled: !!busy, onclick: suggestTasks }, busy ? "Thinking…" : "Suggest tasks"));
+    return;
+  }
+  const nt = impData.tasks.filter((t) => t.on && t.title.trim()).length + (impData.group?.on && impData.group.title.trim() ? 1 : 0);
+  const ni = impData.items.filter((x) => x.on && x.text.trim()).length;
+  const label = [nt && `${nt} task${nt > 1 ? "s" : ""}`, ni && `${ni} item${ni > 1 ? "s" : ""}`].filter(Boolean).join(" and ");
+  foot.replaceChildren(
+    h("button", { class: "btn", type: "button", onclick: () => { impData = null; $("#imp-step1").hidden = false; $("#imp-preview").hidden = true; renderImportFoot(); } }, "Back"),
+    h("span", { class: "spacer" }),
+    h("button", { class: "btn primary", type: "button", disabled: !label, onclick: importAdd }, label ? "Add " + label : "Nothing selected"));
+}
+async function suggestTasks() {
+  const text = $("#imp-text").value.trim();
+  if (!text) { $("#imp-text").focus(); return; }
+  if (!(await ensureClaude("Creating tasks from text"))) return;
+  renderImportFoot(true);
+  const me = mySlot(), today = todayStr();
+  const tree = [];
+  (function walk(pid) { for (const c of childrenOf(pid)) { if (c.status !== "done") tree.push(c.id + " | " + (pathOf(c) ? pathOf(c) + " › " : "") + (c.title || "Untitled")); walk(c.id); } })("");
+  const listLines = allLists().map((l) => l.id + " | " + l.name);
+  const prompt =
+    `You help a couple turn text into tasks for their shared task app. Person "a" is ${people.a}, person "b" is ${people.b}.\n` +
+    (me ? `The person pasting this is ${slotName(me)} ("${me}"), so "I" and "me" in the text mean them.\n` : "") +
+    `Today is ${new Date().toLocaleDateString("en-GB", { weekday: "long" })}, ${today}.\n\n` +
+    `Existing open tasks (id | path):\n${tree.slice(0, 300).join("\n") || "(none)"}\n\n` +
+    `Shopping lists (id | name):\n${listLines.join("\n")}\n\n` +
+    "From the text below, extract only concrete to-dos and things to buy. Skip ideas that were rejected, questions and general discussion.\n" +
+    "Reply with only JSON in this shape:\n" +
+    '{"group":{"title":"short, specific name for one new task that groups all the tasks below","parentId":"id of an existing task to put the group under, or \\"\\""},' +
+    '"tasks":[{"title":"short action title","parentIndex":null,"assignee":"a, b, both or \\"\\"","due":"YYYY-MM-DD or \\"\\"","priority":"low, normal or high","notes":"useful details from the text, or \\"\\"","toBuy":["3 cement bags"],"buyList":"shopping list id"}],' +
+    '"items":[{"text":"2 milk","list":"shopping list id"}]}\n' +
+    "Rules:\n" +
+    "- Write titles in the language of the text.\n" +
+    "- Always propose a group: name what the tasks have in common, specific rather than generic (e.g. \"Garage floor screed\", \"Weekend trip to Gdańsk\", not \"Tasks\" or \"To-dos\"). " +
+    "All tasks go under the group. Put the group under an existing task only when the whole topic clearly belongs there.\n" +
+    "- Use parentIndex (0-based position of an earlier task in your array) only for a task that is a step of another new task; otherwise null.\n" +
+    "- Assign only when the text says who will do it. Turn relative dates into dates using today's date.\n" +
+    "- Every purchase must appear: things needed for a specific task go in that task's toBuy (with quantity if known) and its buyList; any other purchases go in items.\n" +
+    "- Return empty arrays where there is nothing.\n\n" +
+    `Text:\n"""\n${text.slice(0, 30000)}\n"""`;
+  try {
+    const r = await sampleFn.json(prompt, { modelTier: "quick" });
+    const listIds = allLists().map((l) => l.id);
+    const validParent = (id) => { const p = tasks.get(id); return p && !p.archived && p.status !== "done" ? id : ""; };
+    const rawTasks = Array.isArray(r?.tasks) ? r.tasks.slice(0, 40) : [];
+    // Several tasks always get one new parent task; a single task can still go straight under an existing one.
+    const groupTitle = String(r?.group?.title || "").trim().slice(0, 200) || `Tasks from ${fmtDate(today)}`;
+    const group = { on: rawTasks.length > 1, title: groupTitle, parent: validParent(String(r?.group?.parentId || "")) };
+    const items = [];
+    const parsedTasks = rawTasks.map((t, i) => {
+      const title = String(t?.title || "").trim().slice(0, 200);
+      const buyList = listIds.includes(t?.buyList) ? t.buyList : currentListId();
+      for (const x of Array.isArray(t?.toBuy) ? t.toBuy : []) {
+        const text = String(x).trim().slice(0, 200);
+        if (text) items.push({ on: true, text, list: buyList, task: "new:" + i });
+      }
+      return {
+        on: !!title, title,
+        parent: Number.isInteger(t?.parentIndex) && t.parentIndex >= 0 && t.parentIndex < i ? "new:" + t.parentIndex : "group",
+        assignee: ["a", "b", "both"].includes(t?.assignee) ? t.assignee : "",
+        due: /^\d{4}-\d{2}-\d{2}$/.test(t?.due || "") ? t.due : "",
+        priority: ["low", "high"].includes(t?.priority) ? t.priority : "normal",
+        notes: String(t?.notes || "").trim().slice(0, 2000),
+      };
+    });
+    for (const x of Array.isArray(r?.items) ? r.items.slice(0, 60) : []) {
+      const text = String(x?.text || "").trim().slice(0, 200);
+      if (text) items.push({ on: true, text, list: listIds.includes(x?.list) ? x.list : "groceries", task: "" });
+    }
+    impData = { group, tasks: parsedTasks, items };
+    if (!impData.tasks.some((t) => t.on) && !impData.items.length) { impData = null; renderImportFoot(); toast("Claude didn't find any to-dos or purchases in that text."); return; }
+    $("#imp-step1").hidden = true; $("#imp-preview").hidden = false;
+    renderImportPreview();
+  } catch (e) { impData = null; renderImportFoot(); sampleFailed(e, "Creating tasks from text"); }
+}
+function renderImportPreview() {
+  const box = $("#imp-preview"), out = [];
+  const listOpts = () => allLists().map((l) => h("option", { value: l.id }, l.name));
+  const select = (opts, value, onchange, label) => { const s = h("select", { "aria-label": label, onchange }, opts); s.value = value; return s; };
+  const existing = [];
+  (function walk(pid, depth) { for (const c of childrenOf(pid)) { if (c.status !== "done") existing.push(h("option", { value: c.id }, " ".repeat(depth) + (c.title || "Untitled"))); walk(c.id, depth + 1); } })("", 0);
+  const g = impData.group;
+  const newLabel = (p) => "New: " + (p.title.trim() || "Untitled");
+  if (impData.tasks.length) {
+    out.push(h("div", { class: "imp-section" }, "New parent task"));
+    out.push(h("div", { class: "imp-row" + (g.on ? "" : " off") },
+      h("div", { class: "imp-head" },
+        h("input", { type: "checkbox", checked: g.on, "aria-label": "Put the tasks under one new task", onchange: (e) => { g.on = e.target.checked; renderImportPreview(); } }),
+        h("input", { type: "text", value: g.title, maxlength: "200", "aria-label": "Name of the new parent task", oninput: (e) => { g.title = e.target.value; renderImportFoot(); } })),
+      h("div", { class: "imp-meta" },
+        h("div", { class: "wide" }, select([h("option", { value: "" }, "Top level"), ...existing.map((o) => o.cloneNode(true))], g.parent, (e) => { g.parent = e.target.value; }, "Parent task belongs under"))),
+      h("p", { class: "imp-notes" }, g.on ? "The tasks below go under this new task. Untick to add them without it." : "Not created: tasks set to go under it go where it would have gone.")));
+    out.push(h("div", { class: "imp-section" }, "Tasks"));
+  }
+  impData.tasks.forEach((t, i) => {
+    const parentOpts = [h("option", { value: "group" }, g.on ? newLabel(g) : "Same place as the parent task would go"),
+      h("option", { value: "" }, "Top level"),
+      ...impData.tasks.slice(0, i).map((p, j) => h("option", { value: "new:" + j }, newLabel(p))),
+      ...existing.map((o) => o.cloneNode(true))];
+    out.push(h("div", { class: "imp-row" + (t.on ? "" : " off") },
+      h("div", { class: "imp-head" },
+        h("input", { type: "checkbox", checked: t.on, "aria-label": "Include " + t.title, onchange: (e) => { t.on = e.target.checked; renderImportPreview(); } }),
+        h("input", { type: "text", value: t.title, maxlength: "200", "aria-label": "Task title", oninput: (e) => { t.title = e.target.value; renderImportFoot(); } })),
+      h("div", { class: "imp-meta" },
+        h("div", { class: "wide" }, select(parentOpts, t.parent, (e) => { t.parent = e.target.value; }, "Belongs under")),
+        select([["", "No one"], ["a", people.a], ["b", people.b], ["both", "Both"]].map(([v, l]) => h("option", { value: v }, l)), t.assignee, (e) => { t.assignee = e.target.value; }, "Assigned to"),
+        h("input", { type: "date", value: t.due, "aria-label": "Due date", onchange: (e) => { t.due = e.target.value; } })),
+      t.notes && h("p", { class: "imp-notes" }, t.notes)));
+  });
+  out.push(h("div", { class: "imp-section" }, "Shopping"));
+  const forOpts = () => [h("option", { value: "" }, "Not linked to a task"),
+    ...(g.on && impData.tasks.length ? [h("option", { value: "group" }, "For " + (g.title.trim() || "the new parent task"))] : []),
+    ...impData.tasks.map((t, j) => h("option", { value: "new:" + j }, "For " + (t.title.trim() || "Untitled")))];
+  for (const x of impData.items) {
+    out.push(h("div", { class: "imp-row" + (x.on ? "" : " off") },
+      h("div", { class: "imp-head" },
+        h("input", { type: "checkbox", checked: x.on, "aria-label": "Include " + x.text, onchange: (e) => { x.on = e.target.checked; renderImportPreview(); } }),
+        h("input", { type: "text", value: x.text, maxlength: "200", "aria-label": "Item", oninput: (e) => { x.text = e.target.value; renderImportFoot(); } })),
+      h("div", { class: "imp-meta" },
+        select(listOpts(), x.list, (e) => { x.list = e.target.value; }, "Shopping list"),
+        select(forOpts(), x.task === "group" && !g.on ? "" : x.task, (e) => { x.task = e.target.value; }, "For task"))));
+  }
+  out.push(h("button", { type: "button", class: "btn small", onclick: () => { impData.items.push({ on: true, text: "", list: currentListId(), task: "" }); renderImportPreview(); } }, "+ Add an item to buy"));
+  box.replaceChildren(...out);
+  renderImportFoot();
+}
+async function importAdd() {
+  const data = impData;
+  if (!data) return;
+  const ids = {}, g = data.group;
+  // Anything set to go under a new task that wasn't created goes where that task would have gone.
+  const resolveParent = (p) => {
+    for (;;) {
+      if (p === "group") { if (ids.group) return ids.group; p = g?.parent || ""; continue; }
+      if (p && p.startsWith("new:")) { const j = +p.slice(4); if (ids[j]) return ids[j]; p = data.tasks[j]?.parent || ""; continue; }
+      return p && tasks.has(p) ? p : "";
+    }
+  };
+  closePanels();
+  let nt = 0, ni = 0;
+  try {
+    const create = async (fields, key, order) => {
+      const parentId = resolveParent(fields.parent), now = Date.now();
+      const id = await addTask({
+        title: fields.title.trim(), status: "todo", assignee: fields.assignee || "", priority: fields.priority || "normal", due: fields.due || "", repeat: "",
+        parentId, notes: fields.notes || "", order, createdAt: now, ...(fields.assignee ? { assignedBy: mySlot() || "", assignedAt: now } : {}),
+      });
+      ids[key] = id; nt++;
+      if (parentId) collapsed.delete(parentId);
+      collapsed.delete(id);
+      log(id, "created it from text" + (fields.assignee ? ` and assigned it to ${assigneeName(fields.assignee)}` : ""), fields.title.trim());
+    };
+    const base = Date.now();
+    if (g?.on && g.title.trim() && data.tasks.some((t) => t.on && t.title.trim())) await create(g, "group", base);
+    for (const [i, t] of data.tasks.entries()) if (t.on && t.title.trim()) await create(t, i, base + 1 + i);
+    saveCollapsed();
+    for (const x of data.items) {
+      if (!x.on || !x.text.trim()) continue;
+      ni += (await addItems(x.text, x.list, x.task ? resolveParent(x.task) : "")).length;
+    }
+    $("#imp-text").value = "";
+    impData = null;
+    if (view !== "tasks" && nt) switchView("tasks");
+    toast(`Added ${[nt && `${nt} task${nt > 1 ? "s" : ""}`, ni && `${ni} item${ni > 1 ? "s" : ""} to buy`].filter(Boolean).join(" and ")}`);
+  } catch (err) { writeFailed(err); }
+}
+$("#import-btn").addEventListener("click", openImport);
+$("#smart-btn").addEventListener("click", async () => {
+  const inp = $("#shop-input"), btn = $("#smart-btn"), text = inp.value.trim();
+  if (!text) { inp.focus(); toast("Type or dictate what you need first"); return; }
+  if (!(await ensureClaude("Smart add"))) return;
+  btn.disabled = true; btn.textContent = "Thinking…";
+  try {
+    const reply = await sampleFn.json(
+      "Turn this shopping request into shopping list items.\n" +
+      "Rules:\n" +
+      "- One entry per product to buy. Ignore filler words and anything that is not something to buy.\n" +
+      "- name: the product in 1-4 words, first letter capitalized, in the same language the person used, in the form a shopping list would use.\n" +
+      "- qty: the quantity with its unit if one was said (\"2\", \"500g\", \"1.5l\", \"12\" for a dozen), otherwise \"\".\n" +
+      "- section: exactly one of: " + SECTIONS.join(", ") + ".\n" +
+      "Reply with only a JSON array, for example [{\"name\":\"Milk\",\"qty\":\"2\",\"section\":\"Dairy & eggs\"}].\n\n" +
+      "Request: \"\"\"" + text + "\"\"\"",
+      { modelTier: "quick" });
+    const entries = (Array.isArray(reply) ? reply : [])
+      .filter((e) => e && typeof e.name === "string" && e.name.trim())
+      .map((e) => ({ name: e.name.trim().slice(0, 120), qty: String(e.qty ?? "").trim().slice(0, 20), section: String(e.section || "") }));
+    if (!entries.length) { toast("Claude didn't find any items in that. Try rephrasing."); return; }
+    inp.value = "";
+    const added = await addEntries(entries, currentListId());
+    renderChips();
+    if (added.length) toast(`Added ${added.length}: ${entries.slice(0, 5).map((e) => e.name + (e.qty ? " ×" + e.qty : "")).join(", ")}${entries.length > 5 ? "…" : ""}`);
+  } catch (e) {
+    sampleFailed(e, "Smart add");
+  } finally {
+    btn.disabled = false; btn.textContent = "Smart add";
+  }
+});
+
+// Shopping mode: just the list, big rows, screen kept awake.
+async function keepAwake(on) {
+  try {
+    if (on && navigator.wakeLock) wakeLock = await navigator.wakeLock.request("screen");
+    else if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+  } catch {}
+}
+function enterShopMode() { document.body.classList.add("shop-mode"); $("#mode-bar").hidden = false; keepAwake(true); window.scrollTo(0, 0); }
+function exitShopMode() { document.body.classList.remove("shop-mode"); $("#mode-bar").hidden = true; keepAwake(false); }
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && document.body.classList.contains("shop-mode")) keepAwake(true); });
+$("#mode-done").addEventListener("click", exitShopMode);
+
+// Task picker for linking: open tasks in tree order, plus the one already linked.
+function taskOptions(keepId) {
+  const opts = [h("option", { value: "" }, "Not linked")];
+  (function walk(pid, depth) {
+    for (const c of childrenOf(pid)) {
+      if (c.status !== "done" || c.id === keepId) opts.push(h("option", { value: c.id }, " ".repeat(depth) + (c.title || "Untitled")));
+      walk(c.id, depth + 1);
+    }
+  })("", 0);
+  return opts;
+}
+function openItemEditor(id) {
+  const i = items.get(id);
+  if (!i) return;
+  editingItem = id;
+  $("#it-name").value = i.name;
+  $("#it-qty").value = i.qty || "";
+  $("#it-section").replaceChildren(...SECTIONS.map((s) => h("option", { value: s }, s)));
+  $("#it-section").value = SECTIONS.includes(i.section) ? i.section : "Other";
+  $("#it-list").replaceChildren(...allLists().map((l) => h("option", { value: l.id }, l.name)));
+  $("#it-list").value = i.listId || "groceries";
+  $("#it-task").replaceChildren(...taskOptions(i.taskId));
+  $("#it-task").value = i.taskId && tasks.has(i.taskId) ? i.taskId : "";
+  $("#it-added").textContent = i.addedBy ? `Added by ${slotName(i.addedBy)} on ${fmtStamp(i.addedAt)}` : "";
+  openPanel($("#item-panel"));
+}
+$("#it-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const i = items.get(editingItem);
+  const name = $("#it-name").value.trim();
+  if (!i || !name) return;
+  const patch = { name, qty: $("#it-qty").value.trim(), section: $("#it-section").value, listId: $("#it-list").value, taskId: $("#it-task").value };
+  closePanels();
+  try {
+    await store.update("items", i.id, patch);
+    if (patch.section !== i.section) {
+      const cid = catalogId(name), c = catalog.get(cid);
+      store.put("catalog", cid, { name, section: patch.section, manual: true, count: c?.count || 1, lastAt: Date.now() }).catch(() => {});
+    }
+    if (patch.taskId && patch.taskId !== (i.taskId || "")) log(patch.taskId, `linked “${name}” from the ${listName(patch.listId)} list`);
+  } catch (err) { writeFailed(err); }
+});
+$("#it-delete").addEventListener("click", async () => {
+  const i = items.get(editingItem);
+  closePanels();
+  if (!i) return;
+  const { id, ...rest } = i;
+  try { await store.remove("items", id); toast(`Removed ${i.name}`, { label: "Undo", run: () => store.put("items", id, rest) }); }
+  catch (err) { writeFailed(err); }
+});
+
+function openListsPanel() { renderListsPanel(); openPanel($("#lists-panel")); }
+function renderListsPanel() {
+  $("#lists-rows").replaceChildren(...allLists().map((l) => h("div", { class: "list-row" },
+    h("input", { type: "text", value: l.name, maxlength: "40", "aria-label": "Name of list " + l.name, onchange: (e) => {
+      const name = e.target.value.trim();
+      if (name) store.put("lists", l.id, { name, order: l.order || 0 }).catch(writeFailed);
+    } }),
+    l.id !== "groceries" && h("button", { type: "button", class: "btn small danger", onclick: () => deleteList(l) }, "Delete"))));
+}
+async function deleteList(l) {
+  const its = openItems(l.id);
+  const ok = await showModal((m, finish) => {
+    m.replaceChildren(h("h2", { id: "modal-title" }, `Delete “${l.name}”?`),
+      h("p", {}, its.length ? `Its ${its.length} item${its.length > 1 ? "s" : ""} will be removed too.` : "The list is empty."),
+      h("div", { class: "actions" }, cancelBtn(finish), h("button", { class: "btn danger solid", type: "button", id: "modal-yes", onclick: () => finish(true) }, "Delete list")));
+    m.querySelector("#modal-yes").focus();
+  });
+  if (!ok) return;
+  try {
+    for (const i of its) await store.remove("items", i.id);
+    await store.remove("lists", l.id);
+    if (currentList === l.id) selectList("groceries");
+    renderListsPanel();
+  } catch (err) { writeFailed(err); }
+}
+$("#list-new").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const name = $("#list-new-name").value.trim();
+  if (!name) return;
+  $("#list-new-name").value = "";
+  try { const id = await store.add("lists", { name, order: Date.now() }); selectList(id); renderListsPanel(); }
+  catch (err) { writeFailed(err); }
+});
+
+// "To buy" inside a task.
+function renderTaskShop() {
+  const id = editingId;
+  if (!id) return;
+  const t = tasks.get(id);
+  const linked = [...items.values()].filter((i) => i.taskId === id).sort((a, b) => (a.bought ? 1 : 0) - (b.bought ? 1 : 0) || (a.addedAt || 0) - (b.addedAt || 0));
+  $("#task-shop-list").replaceChildren(...(linked.length ? linked.map((i) => h("div", { class: "task-shop-row" + (i.bought ? " bought" : "") },
+    h("span", {}, i.name + (i.qty ? " · " + i.qty : "")),
+    h("span", { class: "st-text" }, i.bought ? "Bought" + (i.boughtAt ? " " + fmtStamp(i.boughtAt) : "") : (i.checked ? "In the basket · " : "To buy · ") + listName(i.listId))))
+    : [h("p", { class: "hint" }, "Nothing to buy for this task yet.")]));
+  const canAdd = canWrite() && !t?.archived;
+  $("#task-shop-add").hidden = !canAdd;
+  if (canAdd) {
+    const sel = $("#ts-list"), keep = sel.value;
+    sel.replaceChildren(...allLists().map((l) => h("option", { value: l.id }, l.name)));
+    sel.value = allLists().some((l) => l.id === keep) ? keep : currentListId();
+  }
+}
+async function addTaskItem() {
+  const v = $("#ts-input").value;
+  if (!v.trim() || !editingId) return;
+  $("#ts-input").value = "";
+  const added = await addItems(v, $("#ts-list").value, editingId);
+  if (added.length) toast(`Added to ${listName($("#ts-list").value)}`);
+}
+$("#ts-add").addEventListener("click", addTaskItem);
+$("#ts-input").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addTaskItem(); } });
+
+// ---- people ----
+function renderLinkState(slot) {
+  const u = people[slot + "User"], el = $(`#p-${slot}-link`);
+  el.replaceChildren(h("span", {}, !u ? "Not linked to an account yet" : u === meId ? "Linked to your account" : "Linked to the other account"),
+    u && canWrite() && h("button", { type: "button", onclick: async () => {
+      try { await store.setDoc("config/people", { ...cleanPeople(), [slot + "User"]: null }); people[slot + "User"] = null; renderLinkState(slot); }
+      catch (err) { writeFailed(err); } } }, "Unlink"));
+}
+$("#people-btn").addEventListener("click", () => {
+  $("#p-a").value = people.a; $("#p-b").value = people.b;
+  renderLinkState("a"); renderLinkState("b");
+  for (const el of $("#pp-form").elements) el.disabled = !canWrite() && !el.hasAttribute("data-close");
+  openPanel($("#people")); setTimeout(() => $("#p-a").focus(), 30);
+});
+$("#pp-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const p = { ...cleanPeople(), a: $("#p-a").value.trim() || DEFAULT_PEOPLE.a, b: $("#p-b").value.trim() || DEFAULT_PEOPLE.b };
+  closePanels();
+  try { await store.setDoc("config/people", p); toast("Names saved"); } catch (err) { writeFailed(err); }
+});
+
+// ---- misc UI ----
+function showBanner(msg) { const b = $("#banner"); b.textContent = msg; b.hidden = false; }
+let toastTimer;
+function toast(msg, action) {
+  const t = $("#toast");
+  t.replaceChildren(h("span", {}, msg), action && h("button", { type: "button", onclick: () => { t.hidden = true; action.run(); } }, action.label));
+  t.hidden = false; clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (t.hidden = true), action ? 7000 : 2600);
+}
+function writeFailed(err) {
+  const code = err && err.code;
+  toast(code === "permission_denied" || code === "not_granted"
+    ? "Couldn't save: you can view these tasks but not change them."
+    : "Couldn't save the change. Check your connection and try again.");
+}
+document.addEventListener("click", (e) => { if (e.target.closest("[data-close]") || e.target.id === "scrim") closePanels(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#scrim").hidden) closePanels(); });
+$("#new-btn").addEventListener("click", () => { if (view === "upcoming") view = "tasks"; openEditor(null); });
+$("#hide-done").addEventListener("change", (e) => { filter.hideDone = e.target.checked; render(); });
+$("#search").addEventListener("input", (e) => { filter.q = e.target.value.trim().toLowerCase(); render(); });
+$("#sort").value = sortMode;
+$("#sort").addEventListener("change", (e) => { sortMode = e.target.value; try { localStorage.setItem("sort", sortMode); } catch {} render(); });
+
+render();
+store.init();
+initSmartAdd();
+</script>

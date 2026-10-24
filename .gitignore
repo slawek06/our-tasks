@@ -1,0 +1,17 @@
+# Secrets: never commit these
+.env
+.env.*
+!.env.example
+*.pem
+*-service-account*.json
+
+# macOS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+
+# Dependencies and build output (for later)
+node_modules/
+dist/
