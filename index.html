@@ -181,6 +181,14 @@ body.shop-mode .item .box svg { width: 26px; height: 26px; }
 .imp-head input[type=text] { font-weight: 600; }
 .imp-notes { margin: 0; font-size: 12.5px; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
 .imp-section { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-top: 6px; }
+.signin { position: fixed; inset: 0; z-index: 40; background: var(--bg); display: grid; place-items: center; overflow-y: auto;
+  padding-block: 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.signin-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 24px; width: min(400px, 100%); display: flex; flex-direction: column; gap: 10px; }
+.signin-card h2 { font: 700 30px/1.1 var(--f-display); letter-spacing: -.02em; margin: 0; }
+.signin-card p { margin: 0; color: var(--muted); }
+.signin-card .lbl { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-top: 6px; }
+.signin-card input { border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 11px 12px; font-size: 16px; }
+.signin-card .btn { padding: 11px 14px; font-size: 15px; }
 .empty { text-align: center; padding: 40px 16px; color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .empty strong { color: var(--ink); font: 600 18px var(--f-display); }
 
@@ -359,7 +367,9 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
       <div class="field"><label for="p-a">First person</label><input type="text" id="p-a" required maxlength="40"><div class="link-state" id="p-a-link"></div></div>
       <div class="field"><label for="p-b">Second person</label><input type="text" id="p-b" required maxlength="40"><div class="link-state" id="p-b-link"></div></div>
     </div>
-    <div class="panel-foot"><span class="spacer"></span>
+    <div class="panel-foot">
+      <button class="btn" type="button" id="signout-btn" hidden>Sign out</button>
+      <span class="spacer"></span>
       <button class="btn" type="button" data-close>Cancel</button>
       <button class="btn primary" type="submit">Save names</button>
     </div>
@@ -416,6 +426,17 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
 
 <div class="scrim top" id="scrim2" hidden></div>
 <div class="modal" id="cascade" role="alertdialog" aria-modal="true" hidden></div>
+
+<div class="signin" id="signin" hidden>
+  <form class="signin-card" id="signin-form" autocomplete="on">
+    <h2>Our Tasks</h2>
+    <p>Enter your email and you'll get a link to sign in. No password needed. Only invited people can sign in.</p>
+    <label class="lbl" for="signin-email">Email</label>
+    <input type="email" id="signin-email" required autocomplete="email" placeholder="name@example.com">
+    <button class="btn primary" type="submit" id="signin-btn">Send sign-in link</button>
+    <p class="hint" id="signin-msg" role="status"></p>
+  </form>
+</div>
 
 <div class="toast" id="toast" role="status" hidden></div>
 
@@ -475,11 +496,130 @@ let collapsed = new Set();
 try { collapsed = new Set(JSON.parse(localStorage.getItem("collapsed") || "[]")); } catch {}
 function saveCollapsed() { try { localStorage.setItem("collapsed", JSON.stringify([...collapsed])); } catch {} }
 
-// ---- storage: shared db in the artifact viewer, browser storage when opened as a plain file ----
+// ---- own hosting (GitHub Pages): Supabase ----
+// The publishable key is meant to be public. The database's access rules (supabase/schema.sql) protect the data:
+// nothing can be read or written without signing in, and only invited people can sign in.
+const SUPABASE_URL = "https://sjtdrnvezorxxdoitszz.supabase.co";
+const SUPABASE_KEY = "sb_publishable_M-eM_n6OUMqsPFZyTDk4aw_eh9MUU9A";
+const SUPABASE_JS = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js";
+
+// Database columns are snake_case; the app's fields are camelCase. BY and ORDER are reserved words in SQL.
+const COLUMN_FOR = { by: "author", order: "sort_order" };
+const FIELD_FOR = { author: "by", sort_order: "order" };
+const toColumn = (k) => COLUMN_FOR[k] || k.replace(/[A-Z]/g, (c) => "_" + c.toLowerCase());
+const toRow = (obj) => Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined).map(([k, v]) => [toColumn(k), v]));
+const fromRow = (row) => Object.fromEntries(Object.entries(row).map(([k, v]) => [FIELD_FOR[k] || k.replace(/_([a-z])/g, (_, c) => c.toUpperCase()), v]));
+// The app's two "documents" live in their own tables.
+const DOC_TABLES = {
+  "config/people": { table: "config", key: "key", keyValue: () => "people",
+    toRow: (d) => ({ key: "people", value: d }), fromRow: (r) => r.value },
+  seen: { table: "user_state", key: "user_id", keyValue: () => meId,
+    toRow: (d) => ({ user_id: meId, seen: d.map || {}, activity_at: d.activityAt || 0, shopping_at: d.shoppingAt || 0 }),
+    fromRow: (r) => ({ map: r.seen || {}, activityAt: r.activity_at || 0, shoppingAt: r.shopping_at || 0 }) },
+};
+const docSpec = (path) => DOC_TABLES[path] || (path.endsWith("/seen") ? DOC_TABLES.seen : null);
+
+// Keeps a copy of each table in memory, filled by one query and kept current by Supabase Realtime.
+const sb = {
+  client: null, caches: {}, queries: {}, listeners: {}, docListeners: {},
+  async load() {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = SUPABASE_JS; s.onload = resolve; s.onerror = reject;
+      document.head.append(s);
+    });
+    this.client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  },
+  check({ data, error }) { if (error) throw error; return data; },
+  async fetch(table) {
+    const { order, limit } = this.queries[table];
+    let q = this.client.from(table).select("*");
+    if (order) q = q.order(toColumn(order), { ascending: false }).limit(limit);
+    this.caches[table] = new Map(this.check(await q).map((r) => { const o = fromRow(r); return [o.id, o]; }));
+  },
+  fire(table) { const m = this.caches[table]; if (m) for (const fn of this.listeners[table] || []) fn(new Map(m)); },
+  async listen(table, cb, query = {}) {
+    this.queries[table] = query;
+    (this.listeners[table] ||= []).push(cb);
+    await this.fetch(table);
+    this.fire(table);
+  },
+  async listenDoc(path, cb) {
+    const spec = docSpec(path);
+    this.docListeners[spec.table] = cb;
+    const row = this.check(await this.client.from(spec.table).select("*").eq(spec.key, spec.keyValue()).maybeSingle());
+    cb(row ? spec.fromRow(row) : null);
+  },
+  onChange(p) {
+    const spec = Object.values(DOC_TABLES).find((s) => s.table === p.table);
+    if (spec) {
+      if (p.eventType !== "DELETE" && p.new[spec.key] === spec.keyValue()) this.docListeners[p.table]?.(spec.fromRow(p.new));
+      return;
+    }
+    const m = this.caches[p.table];
+    if (!m) return;
+    if (p.eventType === "DELETE") m.delete(p.old.id);
+    else { const o = fromRow(p.new); m.set(o.id, o); }
+    this.fire(p.table);
+  },
+  subscribe() {
+    this.client.channel("changes")
+      .on("postgres_changes", { event: "*", schema: "public" }, (p) => this.onChange(p))
+      .subscribe((status) => { if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") connectionLost({ code: status }); });
+    // Catch up on anything missed while the phone slept or the tab was in the background.
+    document.addEventListener("visibilitychange", async () => {
+      if (document.visibilityState !== "visible") return;
+      for (const table of Object.keys(this.queries)) { try { await this.fetch(table); this.fire(table); } catch {} }
+    });
+  },
+  async add(table, data) {
+    const row = this.check(await this.client.from(table).insert(toRow(data)).select().single());
+    this.onChange({ table, eventType: "INSERT", new: row });
+    return row.id;
+  },
+  async update(table, id, patch) {
+    const row = this.check(await this.client.from(table).update(toRow(patch)).eq("id", id).select().maybeSingle());
+    if (row) this.onChange({ table, eventType: "UPDATE", new: row });
+  },
+  async put(table, id, data) {
+    const row = this.check(await this.client.from(table).upsert(toRow({ ...data, id })).select().single());
+    this.onChange({ table, eventType: "UPDATE", new: row });
+  },
+  async remove(table, id) {
+    this.check(await this.client.from(table).delete().eq("id", id));
+    this.onChange({ table, eventType: "DELETE", old: { id } });
+  },
+  async setDoc(path, data) {
+    const spec = docSpec(path);
+    const row = this.check(await this.client.from(spec.table).upsert(spec.toRow(data)).select().single());
+    this.docListeners[spec.table]?.(spec.fromRow(row));
+  },
+  async query(table, field, value) {
+    return this.check(await this.client.from(table).select("*").eq(toColumn(field), value)).map(fromRow);
+  },
+};
+
+// ---- storage: claude.ai artifact database, Supabase on own hosting, browser storage when opened as a plain file ----
 const store = {
   db: null, mode: "loading", local: null, subs: {},
   async init() {
-    if (!window.claude?.use) return this.initLocal();
+    if (window.claude?.use) return this.initArtifact();
+    // ?supabase lets a local preview use the real database too (sign-in links only work on the hosted address).
+    if (location.protocol === "https:" || new URLSearchParams(location.search).has("supabase")) return this.initSupabase();
+    return this.initLocal();
+  },
+  async initSupabase() {
+    this.mode = "supabase";
+    try { await sb.load(); }
+    catch { this.mode = "off"; loaded = true; showBanner("Couldn't reach the server. Check your connection and reload the page."); render(); return; }
+    const { data } = await sb.client.auth.getSession();
+    if (!data.session) { showSignIn(); return; }
+    meId = data.session.user.id;
+    sb.client.auth.onAuthStateChange((event) => { if (event === "SIGNED_OUT") location.reload(); });
+    sb.subscribe();
+    try { startListening(); } catch (e) { connectionLost(e); }
+  },
+  async initArtifact() {
     const [db, user] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
     if (!db) {
       this.mode = "off"; loaded = true;
@@ -503,62 +643,84 @@ const store = {
     this.subs[key]?.();
   },
   listen(coll, cb) {
+    if (this.mode === "supabase") return sb.listen(coll, cb).catch(connectionLost);
     if (this.mode === "remote") return this.db.collection(coll).onSnapshot((s) => cb(new Map(s.docs.map((d) => [d.id, { id: d.id, ...d.data() }]))), connectionLost);
     const fire = () => cb(new Map(Object.entries(this.local[coll] || {}).map(([id, d]) => [id, { ...d, id }])));
     this.subs[coll] = fire; fire();
   },
   listenRecent(coll, field, n, cb) {
+    if (this.mode === "supabase") return sb.listen(coll, (m) => cb([...m.values()].sort((a, b) => (b[field] || 0) - (a[field] || 0)).slice(0, n)), { order: field, limit: n }).catch(connectionLost);
     if (this.mode === "remote") return this.db.collection(coll).orderBy(field, "desc").limit(n).onSnapshot((s) => cb(s.docs.map((d) => ({ id: d.id, ...d.data() }))), connectionLost);
     const fire = () => cb(Object.entries(this.local[coll] || {}).map(([id, d]) => ({ ...d, id })).sort((a, b) => (b[field] || 0) - (a[field] || 0)).slice(0, n));
     this.subs[coll] = fire; fire();
   },
   listenDoc(path, cb) {
+    if (this.mode === "supabase") return sb.listenDoc(path, cb).catch(connectionLost);
     if (this.mode === "remote") return this.db.doc(path).onSnapshot((s) => cb(s.exists ? s.data() : null), connectionLost);
     const fire = () => cb(this.local.docs[path] || null);
     this.subs["doc:" + path] = fire; fire();
   },
   async add(coll, data) {
+    if (this.mode === "supabase") return sb.add(coll, data);
     if (this.mode === "remote") return (await this.db.collection(coll).add(data)).id;
     const id = "x" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     (this.local[coll] ||= {})[id] = data; this.persist(coll); return id;
   },
   async update(coll, id, patch) {
+    if (this.mode === "supabase") return sb.update(coll, id, patch);
     if (this.mode === "remote") return this.db.doc(coll + "/" + id).update(patch);
     const c = (this.local[coll] ||= {}); c[id] = { ...c[id], ...patch }; this.persist(coll);
   },
   async put(coll, id, data) {
+    if (this.mode === "supabase") return sb.put(coll, id, data);
     if (this.mode === "remote") return this.db.doc(coll + "/" + id).set(data);
     (this.local[coll] ||= {})[id] = data; this.persist(coll);
   },
   async remove(coll, id) {
+    if (this.mode === "supabase") return sb.remove(coll, id);
     if (this.mode === "remote") return this.db.doc(coll + "/" + id).delete();
     delete this.local[coll]?.[id]; this.persist(coll);
   },
   async setDoc(path, data) {
+    if (this.mode === "supabase") return sb.setDoc(path, data);
     if (this.mode === "remote") return this.db.doc(path).set(data);
     this.local.docs[path] = data; this.persist("doc:" + path);
   },
   async query(coll, field, value) {
+    if (this.mode === "supabase") return sb.query(coll, field, value);
     if (this.mode === "remote") return (await this.db.collection(coll).where(field, "==", value).get()).docs.map((d) => ({ id: d.id, ...d.data() }));
     return Object.entries(this.local[coll] || {}).map(([id, d]) => ({ ...d, id })).filter((d) => d[field] === value);
   },
 };
-const canWrite = () => store.mode === "remote" || store.mode === "local";
+const canWrite = () => ["remote", "supabase", "local"].includes(store.mode);
 function connectionLost(e) { showBanner("Lost connection to your shared tasks (" + (e?.code || "error") + "). Reload the page to try again."); }
 
 // Private tasks live in your own area of the database (data/users/<you>/…), which nobody else can read, the owner included.
 // They keep the same ids when moved between shared and private, so parents and shopping links keep working.
 let sharedTasks = new Map(), privateTasks = new Map();
 function mergeTasks() { tasks = new Map([...sharedTasks, ...[...privateTasks].map(([k, v]) => [k, { ...v, private: true }])]); }
-const privColl = () => meId ? `data/users/${meId}/private/tasks` : null;
-const taskColl = (id) => tasks.get(id)?.private ? privColl() : "tasks";
+// On Supabase, private tasks stay in the tasks table with private = true; the database's access rules
+// make them readable only by their owner.
+const privColl = () => meId && store.mode !== "supabase" ? `data/users/${meId}/private/tasks` : null;
+const privateAvailable = () => store.mode === "supabase" || !!privColl();
+const taskColl = (id) => tasks.get(id)?.private && privColl() ? privColl() : "tasks";
 const updTask = (id, patch) => store.update(taskColl(id), id, patch);
 const removeTask = (id) => store.remove(taskColl(id), id);
 function addTask(data) {
   const { private: isPrivate, ...rest } = data;
+  if (store.mode === "supabase") return store.add("tasks", { ...rest, private: !!isPrivate });
   return isPrivate && privColl() ? store.add(privColl(), { ...rest, private: true }) : store.add("tasks", rest);
 }
 async function setPrivacy(id, makePrivate, rootData) {
+  if (store.mode === "supabase") {
+    for (const i of [id, ...descendantsAll(id)]) {
+      const cur = tasks.get(i);
+      if (!cur || (i !== id && !!cur.private === makePrivate)) continue;
+      const base = i === id ? (({ private: _p, ...r }) => r)(rootData) : {};
+      await store.update("tasks", i, { ...base, private: makePrivate, ...(makePrivate ? { assignee: "", owner: meId } : {}) });
+    }
+    return;
+  }
   for (const i of [id, ...descendantsAll(id)]) {
     const cur = i === id ? { ...tasks.get(i), ...rootData } : tasks.get(i);
     if (!cur || (i !== id && !!cur.private === makePrivate)) continue;
@@ -1111,7 +1273,7 @@ function openEditor(id, parentId = "") {
   $("#repeat-hint").hidden = !t.repeat;
   $("#f-notes").value = t.notes || "";
   $("#f-private").checked = !!t.private;
-  $("#private-wrap").hidden = !privColl();
+  $("#private-wrap").hidden = !privateAvailable();
   fillParents(t, id, !!t.private, t.parentId);
   for (const el of $("#editor .fields").querySelectorAll("input, select, textarea")) el.disabled = !canWrite() || !!t.archived;
   applyPrivateUI(!!t.private);
@@ -1171,7 +1333,7 @@ $("#ed-form").addEventListener("submit", async (e) => {
     repeat: $("#f-repeat").value,
     parentId: $("#f-parent").value,
     notes: $("#f-notes").value.trim(),
-    private: $("#f-private").checked && !!privColl(),
+    private: $("#f-private").checked && privateAvailable(),
   };
   if (!data.title) { $("#f-title").focus(); return; }
   const id = editingId, before = id ? tasks.get(id) : null;
@@ -1850,6 +2012,7 @@ function renderLinkState(slot) {
 }
 $("#people-btn").addEventListener("click", () => {
   $("#p-a").value = people.a; $("#p-b").value = people.b;
+  $("#signout-btn").hidden = store.mode !== "supabase";
   renderLinkState("a"); renderLinkState("b");
   for (const el of $("#pp-form").elements) el.disabled = !canWrite() && !el.hasAttribute("data-close");
   openPanel($("#people")); setTimeout(() => $("#p-a").focus(), 30);
@@ -1860,6 +2023,26 @@ $("#pp-form").addEventListener("submit", async (e) => {
   closePanels();
   try { await store.setDoc("config/people", p); toast("Names saved"); } catch (err) { writeFailed(err); }
 });
+
+// ---- sign-in (own hosting only) ----
+// Sign-ups are off in Supabase, so shouldCreateUser: false makes an uninvited email fail instead of creating an account.
+function showSignIn() {
+  $("#signin").hidden = false;
+  setTimeout(() => $("#signin-email").focus(), 30);
+}
+$("#signin-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = $("#signin-email").value.trim(), msg = $("#signin-msg"), btn = $("#signin-btn");
+  if (!email) return;
+  btn.disabled = true; msg.textContent = "Sending…";
+  const { error } = await sb.client.auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: location.origin + location.pathname } });
+  btn.disabled = false;
+  if (!error) msg.textContent = "Check your email and tap the link in it. It opens the app signed in.";
+  else if (error.status === 422 || /signup|not allowed|not found/i.test(error.message)) msg.textContent = "This email hasn't been invited. Ask the other person to invite you in Supabase.";
+  else if (error.status === 429) msg.textContent = "Too many sign-in emails just now. Wait a few minutes and try again.";
+  else msg.textContent = "Couldn't send the link: " + error.message;
+});
+$("#signout-btn").addEventListener("click", async () => { await sb.client?.auth.signOut(); location.reload(); });
 
 // ---- misc UI ----
 function showBanner(msg) { const b = $("#banner"); b.textContent = msg; b.hidden = false; }
