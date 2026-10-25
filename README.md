@@ -4,6 +4,21 @@ A shared task tracker and shopping list for two people.
 
 Live: https://slawek06.github.io/our-tasks/ (sign-in required; only invited people)
 
+## Environments
+
+| | Production | Development |
+|---|---|---|
+| App | https://slawek06.github.io/our-tasks/ (blue icon) | https://slawek06.github.io/our-tasks/dev/ (orange icon, "DEV") |
+| Git branch | `main` | `dev` |
+| Supabase project | `jwhuaaxrymdqwanwthvg` (our-tasks-prod, Frankfurt) | `sjtdrnvezorxxdoitszz` (London, test data) |
+| Sign-in Site URL | `/our-tasks/` | `/our-tasks/dev/` |
+| Secrets | `ANTHROPIC_API_KEY` | `ANTHROPIC_API_KEY`, `APP_URL` = dev address |
+
+Workflow: build on `dev` (published to /dev/ by the GitHub Action), try it on the orange app, then merge
+into `main`. Database changes: add a migration, run it in development first, then in production.
+Edge Functions are the same code in both projects; deploy to development first.
+A new project gets its full database from `python3 scripts/make-setup-sql.py <project-ref>`.
+
 ## Features
 
 - Tasks nested to any depth, with status (not started / in progress / done), assignee, due date, priority, notes and repeats

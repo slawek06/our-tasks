@@ -72,5 +72,6 @@ Status: ✅ done · 🔶 partly done · ⬜ open. Effort: S (one session) · M �
 | | Item | Effort | Notes |
 |---|---|---|---|
 | ✅ | Own hosting (GitHub Pages + Supabase), offline mode, app icon | | |
+| ✅ | Separate production and development environments | | Two Supabase projects, `main` / `dev` branches |
 | ✅ | Password and e-mail code sign-in | | |
 | ⬜ | Native iPhone/Mac app: widgets, Siri intents, Watch | L | $99/year Apple Developer Program |
