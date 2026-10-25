@@ -1152,8 +1152,8 @@ function render() {
   buildIndex(); visMemo = new Map();
   renderTabs(); renderWho(); renderSummary(); renderLinkBanner();
   $("#new-btn").hidden = !canWrite() || view === "archive" || view === "activity";
-  // Claude features exist only on claude.ai (not in preview mode from a plain file).
-  const claudeHere = store.mode === "remote";
+  // Claude features exist on claude.ai and on own hosting (via the Edge Function), not in plain-file preview mode.
+  const claudeHere = store.mode === "remote" || store.mode === "supabase";
   $("#import-btn").hidden = !claudeHere || !canWrite();
   $("#smart-btn").hidden = $("#smart-hint").hidden = !claudeHere;
   $("#hide-done-wrap").hidden = view !== "tasks";
@@ -1762,7 +1762,38 @@ $("#shop-input").addEventListener("input", renderChips);
 
 // Smart add: Claude turns a natural (often dictated) sentence into separate items. Runs on the viewer's own Claude usage.
 let sampleFn = null, permsApi = null;
+// On own hosting, Claude is reached through the Supabase Edge Function "claude" (supabase/functions/claude),
+// which holds the API key. It mirrors claude.ai's sample.json(): send a prompt, get parsed JSON back.
+function parseJsonReply(text) {
+  const fenced = (text.match(/```(?:json)?\s*([\s\S]*?)```/) || [])[1];
+  const starts = ["{", "["].map((c) => text.indexOf(c)).filter((i) => i >= 0);
+  const a = starts.length ? Math.min(...starts) : -1, b = Math.max(text.lastIndexOf("}"), text.lastIndexOf("]"));
+  for (const t of [text, fenced, a >= 0 && b > a ? text.slice(a, b + 1) : null]) {
+    if (!t) continue;
+    try { return JSON.parse(t); } catch {}
+  }
+  return undefined;
+}
+const supabaseClaude = {
+  async json(prompt) {
+    if (!navigator.onLine) throw { code: "offline" };
+    const { data, error } = await sb.client.functions.invoke("claude", { body: { prompt } });
+    if (error) {
+      const status = error.context?.status;
+      let body = null;
+      try { body = await error.context?.json(); } catch {}
+      const code = body?.error === "rate_limited" || status === 429 ? "rate_limited"
+        : body?.error === "not_configured" || status === 404 || status === 503 ? "not_configured"
+        : isNetworkError(error) ? "offline" : "upstream_error";
+      throw { code, message: error.message };
+    }
+    const value = parseJsonReply(data?.text || "");
+    if (value === undefined) throw { code: "invalid_json", text: data?.text };
+    return value;
+  },
+};
 async function initSmartAdd() {
+  if (store.mode === "supabase") { sampleFn = supabaseClaude; render(); return; }
   if (!window.claude?.use) return;
   [sampleFn, permsApi] = await Promise.all([window.claude.use("sample"), window.claude.use("permissions")]);
   render();
@@ -1793,6 +1824,8 @@ function showClaudeBlocked(what) {
 }
 function sampleFailed(e, what) {
   if (e?.code === "not_granted") showClaudeBlocked(what);
+  else if (e?.code === "offline") toast(`${what} needs an internet connection. Your text is still there.`);
+  else if (e?.code === "not_configured") toast(`${what} isn't set up yet on this address: the Claude function or its API key is missing in Supabase.`);
   else if (e?.code === "rate_limited") toast("Too many requests right now. Try again in a minute.");
   else if (e?.code !== "cancelled") toast(`${what} didn't work this time. Your text is still there, so you can try again.`);
 }
