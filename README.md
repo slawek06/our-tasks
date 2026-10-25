@@ -30,6 +30,7 @@ A new project gets its full database from `python3 scripts/make-setup-sql.py <pr
 - Shopping lists: quick add with quantities, suggestions, automatic shop sections, basket, shopping mode, several lists
 - Items to buy linked to tasks
 - Smart add and "create tasks from text" using Claude
+- Ideas: a shared inbox for app feedback, copied into the chat with Claude to plan changes
 - Works offline: changes wait on the device and sync when back online
 - Installable on iPhone (Add to Home Screen) and Mac (Add to Dock)
 
@@ -47,7 +48,7 @@ A new project gets its full database from `python3 scripts/make-setup-sql.py <pr
   RFC 8291/8292 code), the morning/evening briefings written by Claude, and the briefing chat whose
   proposed changes the app applies only after you confirm. A pg_cron job calls it every 15 minutes.
 - `supabase/migrations/`: database updates to run once in the SQL Editor (002 My day, 003 per-list
-  frequent items, 004 notifications and briefings).
+  frequent items, 004 notifications and briefings, 005 briefing language, 006 ideas for the app).
 
 ## Setup notes
 
