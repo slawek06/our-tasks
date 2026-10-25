@@ -387,6 +387,8 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
         <div class="task-shop-add">
           <button class="btn small" type="button" id="export-private-btn" hidden>Export my private tasks</button>
           <button class="btn small" type="button" id="import-file-btn" hidden>Import from a file</button>
+          <button class="btn small" type="button" id="backup-btn" hidden>Download a backup</button>
+          <button class="btn small danger" type="button" id="wipe-btn" hidden>Delete all data</button>
           <input type="file" id="import-file" accept=".json,application/json" hidden>
         </div>
       </div>
@@ -2190,6 +2192,8 @@ $("#people-btn").addEventListener("click", () => {
   $("#data-tools").hidden = !(onClaude || onOwn);
   $("#export-private-btn").hidden = !onClaude;
   $("#import-file-btn").hidden = !onOwn;
+  $("#backup-btn").hidden = !onOwn;
+  $("#wipe-btn").hidden = !onOwn;
   $("#data-hint").textContent = onClaude
     ? "Moving to the new address? Save your private tasks to a file here, then import it there. Shared tasks are moved for both of you."
     : "Import an Our Tasks export file, e.g. from claude.ai. Items with the same id are updated; nothing is deleted.";
@@ -2301,6 +2305,65 @@ async function importFile(file) {
     toast("Import finished");
   } catch (err) { toast(`Import stopped: ${err.message || "unknown error"}. Importing again is safe.`); }
 }
+// ---- backup and clean start (own hosting) ----
+const DATA_TABLES = ["tasks", "comments", "history", "items", "lists", "catalog"];
+async function downloadBackup() {
+  if (!navigator.onLine) { toast("A backup needs an internet connection."); return; }
+  try {
+    const out = { format: "our-tasks-export", version: 1, source: "own", savedAt: new Date().toISOString(), people: { a: people.a, b: people.b } };
+    for (const t of DATA_TABLES) out[t] = sb.check(await sb.client.from(t).select("*")).map(fromRow);
+    const url = URL.createObjectURL(new Blob([JSON.stringify(out, null, 1)], { type: "application/json" }));
+    const a = h("a", { href: url, download: `our-tasks-backup-${todayStr()}.json` });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    toast(`Backup saved: ${out.tasks.length} tasks, ${out.items.length} shopping items.`);
+  } catch (err) { toast("Couldn't make the backup: " + (err.message || "unknown error")); }
+}
+// Deletes all tasks, comments, history and shopping data. Names, accounts and links stay.
+// The database's rules mean only shared data and your own private tasks can be deleted.
+async function wipeAll() {
+  if (!navigator.onLine) { toast("Deleting all data needs an internet connection."); return; }
+  const counts = { tasks: tasks.size, items: items.size, history: activity.length };
+  const step1 = await showModal((m, finish) => {
+    m.replaceChildren(
+      h("span", { class: "step" }, "Step 1 of 2"),
+      h("h2", { id: "modal-title" }, "Delete all data?"),
+      h("p", {}, `This deletes every task (${counts.tasks}), comment, history entry, shopping item (${counts.items}), list and suggestion, for both of you. Your names and accounts stay, so you both stay signed in.`),
+      h("p", {}, "It can't be undone. Download a backup first if there's anything you might want back."),
+      h("div", { class: "actions" }, cancelBtn(finish),
+        h("button", { class: "btn", type: "button", onclick: async () => { await downloadBackup(); } }, "Download a backup"),
+        h("button", { class: "btn danger solid", type: "button", id: "modal-yes", onclick: () => finish(true) }, "Continue")));
+    m.querySelector("#modal-yes").focus();
+  });
+  if (!step1) return;
+  const step2 = await showModal((m, finish) => {
+    const input = h("input", { type: "text", id: "wipe-confirm", autocomplete: "off", "aria-label": "Type DELETE to confirm",
+      style: "border:1px solid var(--line);background:var(--bg);border-radius:9px;padding:9px 11px;font-size:16px",
+      oninput: (e) => { m.querySelector("#modal-yes").disabled = e.target.value.trim() !== "DELETE"; } });
+    m.replaceChildren(
+      h("span", { class: "step" }, "Step 2 of 2"),
+      h("h2", { id: "modal-title" }, "Type DELETE to confirm"),
+      input,
+      h("div", { class: "actions" }, cancelBtn(finish),
+        h("button", { class: "btn danger solid", type: "button", id: "modal-yes", disabled: true, onclick: () => finish(true) }, "Delete everything")));
+    input.focus();
+  });
+  if (!step2) return;
+  closePanels();
+  toast("Deleting…");
+  sb.outbox = []; sb.saveOutbox(); // changes waiting from offline use would re-create deleted items
+  try {
+    for (const t of DATA_TABLES) sb.check(await sb.client.from(t).delete().neq("id", ""));
+    seen = {}; activitySeenAt = shoppingSeenAt = 0; saveSeen();
+    for (const t of Object.keys(sb.queries)) { await sb.fetch(t); sb.fire(t); }
+    toast("All data deleted. You're starting fresh.");
+  } catch (err) {
+    toast("Deleting stopped: " + (err.message || "unknown error") + ". Try again.");
+    for (const t of Object.keys(sb.queries)) { try { await sb.fetch(t); sb.fire(t); } catch {} }
+  }
+}
+$("#backup-btn").addEventListener("click", downloadBackup);
+$("#wipe-btn").addEventListener("click", wipeAll);
 $("#export-private-btn").addEventListener("click", exportPrivate);
 $("#import-file-btn").addEventListener("click", () => $("#import-file").click());
 $("#import-file").addEventListener("change", (e) => { const f = e.target.files[0]; e.target.value = ""; if (f) importFile(f); });
