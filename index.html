@@ -17,17 +17,20 @@
   --accent: #2f5bd3; --accent-ink: #ffffff; --accent-soft: #e8eefc;
   --todo: #8a93a6; --doing: #c97d0c; --done: #2b9460; --danger: #c93838; --danger-soft: #fbeaea;
   --warn-soft: #fdf2e0; --hover: #f0f3f8; --shadow: 0 10px 40px rgba(20, 30, 60, .16);
+  --p-a: #2563c9; --p-a-soft: #e3ecfb; --p-b: #1d8a4b; --p-b-soft: #e0f3e7; /* person colours: first person blue, second green */
   --f-display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
   --f-body: "Figtree", -apple-system, "Segoe UI", system-ui, sans-serif;
   --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --p-a: #7aa7ff; --p-a-soft: #1d2a45; --p-b: #5fd394; --p-b-soft: #17332a;
   --bg: #10131a; --surface: #181c25; --ink: #e6e9ef; --muted: #9aa3b5; --line: #2a303c;
   --accent: #7d9cff; --accent-ink: #0e1220; --accent-soft: #1e2946;
   --todo: #7f889c; --doing: #f0a63a; --done: #4cc285; --danger: #ff6f6f; --danger-soft: #3a1d20;
   --warn-soft: #3a2c14; --hover: #1f2430; --shadow: 0 10px 40px rgba(0, 0, 0, .5); color-scheme: dark;
 } }
 :root[data-theme="dark"] {
+  --p-a: #7aa7ff; --p-a-soft: #1d2a45; --p-b: #5fd394; --p-b-soft: #17332a;
   --bg: #10131a; --surface: #181c25; --ink: #e6e9ef; --muted: #9aa3b5; --line: #2a303c;
   --accent: #7d9cff; --accent-ink: #0e1220; --accent-soft: #1e2946;
   --todo: #7f889c; --doing: #f0a63a; --done: #4cc285; --danger: #ff6f6f; --danger-soft: #3a1d20;
@@ -114,6 +117,16 @@ h1 { font: 700 34px/1.05 var(--f-display); letter-spacing: -.02em; margin: 0; te
 .chip.doing, .chip.unfinished { background: var(--warn-soft); border-color: transparent; color: var(--doing); }
 .chip.new { background: var(--accent); border-color: transparent; color: var(--accent-ink); font-weight: 600; }
 .chip.private { background: var(--ink); border-color: transparent; color: var(--bg); }
+.p-a { color: var(--p-a); } .p-b { color: var(--p-b); }
+.chip.p-a { background: var(--p-a-soft); color: var(--p-a); border-color: transparent; font-weight: 600; }
+.chip.p-b { background: var(--p-b-soft); color: var(--p-b); border-color: transparent; font-weight: 600; }
+.chip.p-both { background: linear-gradient(90deg, var(--p-a-soft), var(--p-b-soft)); border-color: transparent; font-weight: 600; }
+.seg button.p-a { color: var(--p-a); font-weight: 600; } .seg button.p-b { color: var(--p-b); font-weight: 600; }
+.seg button.p-a[aria-pressed="true"] { background: var(--p-a-soft); color: var(--p-a); }
+.seg button.p-b[aria-pressed="true"] { background: var(--p-b-soft); color: var(--p-b); }
+.who-init.p-a { background: var(--p-a-soft); color: var(--p-a); border-color: transparent; }
+.who-init.p-b { background: var(--p-b-soft); color: var(--p-b); border-color: transparent; }
+.comment .who b.p-a, .act-text b.p-a { color: var(--p-a); } .comment .who b.p-b, .act-text b.p-b { color: var(--p-b); }
 .private-check { font-size: 14px; color: var(--ink); }
 .private-check input { width: 17px; height: 17px; margin: 0; }
 .crumb { overflow-wrap: anywhere; }
@@ -1093,6 +1106,8 @@ function startListening() {
 // ---- people and identity ----
 const mySlot = () => meId && people.aUser === meId ? "a" : meId && people.bUser === meId ? "b" : null;
 const slotName = (s) => s === "a" ? people.a : s === "b" ? people.b : "";
+// Each person has a colour (first person blue, second green), used wherever their name appears.
+const pc = (s) => s === "a" || s === "b" ? "p-" + s : s === "both" ? "p-both" : "";
 const assigneeName = (a) => a === "both" ? "Both" : slotName(a);
 const cleanPeople = () => ({ a: people.a, b: people.b, aUser: people.aUser || null, bUser: people.bUser || null });
 const isMine = (t, me = mySlot()) => !!me && (t.assignee === me || t.assignee === "both");
@@ -1155,7 +1170,7 @@ function renderActivity(list) {
     const label = t ? (t.title || "Untitled") + (from ? " · in " + from : "") + (t.archived ? " · archived" : "") : `“${e.title || "Untitled"}” (deleted)`;
     out.push(h("button", { type: "button", class: "act" + (!e.mine && e.at > activityHighlightSince && activityHighlightSince ? " is-new" : ""), disabled: !t, onclick: () => t && openEditor(t.id) },
       h("span", { class: "act-time" }, new Date(e.at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })),
-      h("span", { class: "act-text" }, h("b", {}, slotName(e.by) || "Someone"), " " + e.text),
+      h("span", { class: "act-text" }, h("b", { class: pc(e.by) || null }, slotName(e.by) || "Someone"), " " + e.text),
       h("span", { class: "act-task" }, label)));
   }
   list.replaceChildren(...out);
@@ -1298,13 +1313,13 @@ function renderWho() {
   if ([...tasks.values()].some((t) => t.private && !t.archived)) opts.push(["private", "Private"]);
   if (filter.who === "new") opts.push(["new", "New for me"]);
   $("#who").replaceChildren(...opts.map(([k, label]) =>
-    h("button", { type: "button", "aria-pressed": String(filter.who === k), onclick: () => { filter.who = k; render(); } }, label)));
+    h("button", { type: "button", class: pc(k) || null, "aria-pressed": String(filter.who === k), onclick: () => { filter.who = k; render(); } }, label)));
 }
 function renderLinkBanner() {
   const el = $("#link-banner"), free = ["a", "b"].filter((s) => !people[s + "User"]);
   if (!loaded || !meId || mySlot() || !free.length || !canWrite()) { el.hidden = true; return; }
   el.replaceChildren(h("span", {}, "Which one are you? Then the app can show your tasks, who assigned them, and what's new for you."),
-    ...free.map((s) => h("button", { class: "btn small", type: "button", onclick: () => linkMe(s) }, "I'm " + slotName(s))));
+    ...free.map((s) => h("button", { class: "btn small " + pc(s), type: "button", onclick: () => linkMe(s) }, "I'm " + slotName(s))));
   el.hidden = false;
 }
 function renderSummary() {
@@ -1341,7 +1356,7 @@ function renderTask(t, depth) {
   if (status === "doing" && !archived) meta.append(h("span", { class: "chip doing" }, "In progress"));
   if (t.priority === "high") meta.append(h("span", { class: "prio-high" }, "High priority"));
   if (t.priority === "low") meta.append(h("span", { class: "prio-low" }, "Low priority"));
-  if (t.assignee) meta.append(h("span", { class: "chip" }, assigneeName(t.assignee)));
+  if (t.assignee) meta.append(h("span", { class: "chip " + pc(t.assignee) }, assigneeName(t.assignee)));
   if (t.due) {
     const cls = archived ? "" : status !== "done" && t.due < today ? " over" : status !== "done" && t.due === today ? " today" : "";
     meta.append(h("span", { class: "date" + cls }, (cls === " over" ? "Overdue · " : cls === " today" ? "Today · " : "Due ") + fmtDate(t.due)));
@@ -1730,13 +1745,13 @@ $("#quick-form").addEventListener("submit", async (e) => {
   const p = parseQuick($("#quick-input").value);
   if (!p.title) { $("#quick-input").focus(); return; }
   const parent = tasks.get(p.parentId), now = Date.now(), isPrivate = !!parent?.private;
-  const assignee = isPrivate ? "" : p.assignee;
+  const assignee = isPrivate ? "" : p.assignee || mySlot() || ""; // new tasks are yours unless you name someone
   try {
     const id = await addTask({
       title: p.title, status: "todo", assignee, priority: p.priority, due: p.due || defaultDue(), repeat: "", parentId: p.parentId, notes: "",
       order: now, createdAt: now, private: isPrivate, ...(assignee ? { assignedBy: mySlot() || "", assignedAt: now } : {}),
     });
-    if (!isPrivate) log(id, "created it" + (assignee ? ` and assigned it to ${assigneeName(assignee)}` : ""), p.title);
+    if (!isPrivate) log(id, "created it" + (assignee && assignee !== mySlot() ? ` and assigned it to ${assigneeName(assignee)}` : ""), p.title);
     if (assignee) notifyEvent("assigned", id);
     if (p.parentId) { collapsed.delete(p.parentId); saveCollapsed(); }
     $("#quick-input").value = "";
@@ -1751,7 +1766,7 @@ $("#quick-more").addEventListener("click", () => {
   $("#f-title").value = p.title;
   $("#f-due").value = p.due || defaultDue();
   $("#f-priority").value = p.priority;
-  if (!tasks.get(p.parentId)?.private) $("#f-assignee").value = p.assignee;
+  if (!tasks.get(p.parentId)?.private) $("#f-assignee").value = p.assignee || mySlot() || "";
 });
 // Press N anywhere (not while typing) to quick-add.
 document.addEventListener("keydown", (e) => {
@@ -1945,7 +1960,7 @@ function closePanels() {
   editingId = null; editingItem = null; resetFoot(); lastFocus?.focus?.();
 }
 function openEditor(id, parentId = "", opts = {}) {
-  const t = id ? tasks.get(id) : { status: "todo", priority: "normal", assignee: "", repeat: "", parentId, due: opts.area ? "" : defaultDue(), private: !!tasks.get(parentId)?.private };
+  const t = id ? tasks.get(id) : { status: "todo", priority: "normal", assignee: opts.area ? "" : mySlot() || "", repeat: "", parentId, due: opts.area ? "" : defaultDue(), private: !!tasks.get(parentId)?.private };
   if (!t) return;
   editingId = id;
   const area = editingArea = id ? isArea(t) : !!opts.area;
@@ -2059,7 +2074,7 @@ $("#ed-form").addEventListener("submit", async (e) => {
     } else {
       const newId = await addTask({ ...data, order: Date.now(), createdAt: Date.now() });
       if (data.assignee) notifyEvent("assigned", newId);
-      if (!data.private) log(newId, "created it" + (data.assignee ? ` and assigned it to ${assigneeName(data.assignee)}` : ""), data.title);
+      if (!data.private) log(newId, "created it" + (data.assignee && data.assignee !== mySlot() ? ` and assigned it to ${assigneeName(data.assignee)}` : ""), data.title);
       toast("Task added");
     }
     if (data.status !== "done") await reopenAncestors(data.parentId);
@@ -2147,7 +2162,7 @@ function renderComments() {
   const id = editingId; if (!id) return;
   const t = tasks.get(id), items = commentsBy.get(id) || [];
   $("#comment-list").replaceChildren(...(items.length ? items.map((c) => h("div", { class: "comment" },
-    h("div", { class: "who" }, h("b", {}, slotName(c.by) || "Someone"), h("span", {}, fmtStamp(c.at)),
+    h("div", { class: "who" }, h("b", { class: pc(c.by) || null }, slotName(c.by) || "Someone"), h("span", {}, fmtStamp(c.at)),
       c.byUser && c.byUser === meId && canWrite() && !t?.archived && h("button", { type: "button", onclick: () => store.remove("comments", c.id).catch(writeFailed) }, "Delete")),
     h("p", {}, c.text))) : [h("p", { class: "hint" }, "No comments yet.")]));
   $("#comment-new").hidden = !canWrite() || !!t?.archived;
@@ -2276,7 +2291,7 @@ function clItemMenu(i, c) {
         !i.heading && act("Make it a task (goes to the Inbox)", async () => {
           try {
             const now = Date.now();
-            const id = await addTask({ title: i.text, status: "todo", assignee: "", priority: "normal", due: defaultDue(), repeat: "", parentId: "", notes: `From the checklist “${c.title}”`, order: now, createdAt: now, private: !!c.private });
+            const id = await addTask({ title: i.text, status: "todo", assignee: c.private ? "" : mySlot() || "", priority: "normal", due: defaultDue(), repeat: "", parentId: "", notes: `From the checklist “${c.title}”`, order: now, createdAt: now, private: !!c.private });
             if (!c.private) log(id, "created it from a checklist", i.text);
             toast(`Added the task “${i.text}”`, { label: "Show", run: () => showTask(id) });
           } catch (err) { writeFailed(err); }
@@ -2300,7 +2315,7 @@ function renderClItem(i, c) {
       onclick: () => tickable && toggleClItem(i) },
       c.template ? h("span", { class: "box tpl" }, "•") : h("span", { class: "box" }, svg(i.done ? ICON.done : ICON.todo, 22)),
       h("span", { class: "item-text" }, h("span", { class: "item-name" }, i.text)),
-      who && h("span", { class: "who-init", title: "Ticked by " + who }, who[0].toUpperCase())),
+      who && h("span", { class: "who-init " + pc(i.doneBy), title: "Ticked by " + who }, who[0].toUpperCase())),
     editable ? h("button", { type: "button", class: "item-more", "aria-label": "More for " + i.text, onclick: () => clItemMenu(i, c) }, "⋯") : h("span")));
 }
 // Empty input: what this template's lists usually have; while typing: matching items from all lists.
@@ -2537,7 +2552,7 @@ function ideaRow(i) {
   const mine = i.byUser && i.byUser === meId;
   return h("div", { class: "comment" + (i.moved ? " moved" : "") },
     h("div", { class: "who" }, h("span", { class: "idea-kind" + (i.kind === "problem" ? " problem" : "") }, i.kind === "problem" ? "Problem" : "Idea"),
-      h("b", {}, slotName(i.by) || "Someone"), h("span", {}, fmtStamp(i.at)),
+      h("b", { class: pc(i.by) || null }, slotName(i.by) || "Someone"), h("span", {}, fmtStamp(i.at)),
       h("button", { type: "button", onclick: () => store.update("ideas", i.id, { moved: !i.moved, movedAt: i.moved ? null : Date.now() }).catch(writeFailed) },
         i.moved ? "Back to open" : "In backlog"),
       mine && h("button", { type: "button", onclick: () => store.remove("ideas", i.id).catch(writeFailed) }, "Delete")),
@@ -2582,7 +2597,7 @@ async function loadHistory(id) {
     const items = (await store.query("history", "taskId", id)).sort((a, b) => (b.at || 0) - (a.at || 0));
     if (editingId !== id) return;
     ol.replaceChildren(...(items.length
-      ? items.map((e) => h("li", {}, h("b", {}, slotName(e.by) || "Someone"), " " + e.text + " · ", h("span", {}, fmtStamp(e.at))))
+      ? items.map((e) => h("li", {}, h("b", { class: pc(e.by) || null }, slotName(e.by) || "Someone"), " " + e.text + " · ", h("span", {}, fmtStamp(e.at))))
       : [h("li", {}, "No changes recorded yet.")]));
   } catch { ol.replaceChildren(h("li", {}, "Couldn't load the history.")); }
 }
@@ -2758,7 +2773,8 @@ function renderChips() {
 }
 function renderItem(i) {
   const t = i.taskId && tasks.get(i.taskId), fresh = isNewItem(i, shoppingHighlightSince);
-  const meta = [fresh && "New", t && "For " + (t.title || "a task"), i.addedBy && "Added by " + slotName(i.addedBy)].filter(Boolean).join(" · ");
+  const meta = [fresh && "New", t && "For " + (t.title || "a task"), i.addedBy && h("span", { class: pc(i.addedBy) || null }, "Added by " + slotName(i.addedBy))]
+    .filter(Boolean).flatMap((m, k) => k ? [" · ", m] : [m]);
   return h("div", { class: "item" + (i.checked ? " checked" : "") + (fresh ? " is-new" : "") },
     h("button", { type: "button", class: "item-main", "aria-pressed": String(!!i.checked), "aria-label": (i.checked ? "Put back: " : "In the basket: ") + i.name,
       onclick: () => canWrite() && toggleItem(i) },

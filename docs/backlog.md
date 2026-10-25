@@ -49,7 +49,8 @@ Notes from daily use go here, then we pick what to improve.
 |---|---|---|---|
 | ✅ | **Areas → Projects → Tasks** | | Live 26 Oct 2026 (migration 007, notify function updated) |
 | 🔶 | **Checklists** (Sławek): see the design below | M | Building on dev, released together with other items |
-| ⬜ | **A colour per person**: Sławek and Wiola each get their own colour at the top (person filter) and everywhere their name appears (assignee, comments, activity, shopping "added by") | S | Sławek. Open question: which colours; pick them under People? |
+| 🔶 | **A colour per person**: Sławek blue, Wiola green, at the top and wherever a name appears | | Built on dev, in the next release |
+| 🔶 | **New tasks belong to whoever creates them** (unless you pick or name someone else) | | Built on dev, in the next release |
 
 ### Design: Checklists (agreed 26 Oct 2026)
 
