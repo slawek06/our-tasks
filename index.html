@@ -368,6 +368,14 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
       <p class="hint">The two of you. Each name is linked to the claude.ai account of the person who picked it, so the app knows whose tasks are whose.</p>
       <div class="field"><label for="p-a">First person</label><input type="text" id="p-a" required maxlength="40"><div class="link-state" id="p-a-link"></div></div>
       <div class="field"><label for="p-b">Second person</label><input type="text" id="p-b" required maxlength="40"><div class="link-state" id="p-b-link"></div></div>
+      <div class="field" id="password-tools" hidden>
+        <label class="lbl" for="new-password">Your password</label>
+        <p class="hint">Set a password to sign in on other devices, the Dock app or the iPhone home-screen app without waiting for an email. At least 8 characters.</p>
+        <div class="task-shop-add">
+          <input type="password" id="new-password" autocomplete="new-password" minlength="8" placeholder="New password" aria-label="New password">
+          <button class="btn small" type="button" id="set-password-btn">Set password</button>
+        </div>
+      </div>
       <div class="field" id="data-tools" hidden>
         <span class="lbl">Your data</span>
         <p class="hint" id="data-hint"></p>
@@ -441,10 +449,13 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
 <div class="signin" id="signin" hidden>
   <form class="signin-card" id="signin-form" autocomplete="on">
     <h2>Our Tasks</h2>
-    <p>Enter your email and you'll get a link to sign in. No password needed. Only invited people can sign in.</p>
+    <p>Only invited people can sign in.</p>
     <label class="lbl" for="signin-email">Email</label>
-    <input type="email" id="signin-email" required autocomplete="email" placeholder="name@example.com">
-    <button class="btn primary" type="submit" id="signin-btn">Send sign-in email</button>
+    <input type="email" id="signin-email" required autocomplete="username" placeholder="name@example.com">
+    <label class="lbl" for="signin-password">Password</label>
+    <input type="password" id="signin-password" autocomplete="current-password" placeholder="Leave empty to get an email instead">
+    <button class="btn primary" type="submit" id="signin-btn">Sign in</button>
+    <p class="hint">No password yet? Leave it empty and you'll get a sign-in email. Once you're in, you can set a password under People.</p>
     <p class="hint" id="signin-msg" role="status"></p>
     <div id="code-step" hidden>
       <label class="lbl" for="signin-code">Code from the email</label>
@@ -2134,6 +2145,8 @@ function renderLinkState(slot) {
 $("#people-btn").addEventListener("click", () => {
   $("#p-a").value = people.a; $("#p-b").value = people.b;
   $("#signout-btn").hidden = store.mode !== "supabase";
+  $("#password-tools").hidden = store.mode !== "supabase";
+  $("#new-password").value = "";
   // Moving from claude.ai: export your private tasks there, import the file on your own hosting.
   const onClaude = store.mode === "remote", onOwn = store.mode === "supabase";
   $("#data-tools").hidden = !(onClaude || onOwn);
@@ -2161,8 +2174,18 @@ function showSignIn() {
 }
 $("#signin-form").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const email = $("#signin-email").value.trim(), msg = $("#signin-msg"), btn = $("#signin-btn");
+  const email = $("#signin-email").value.trim(), password = $("#signin-password").value, msg = $("#signin-msg"), btn = $("#signin-btn");
   if (!email) return;
+  if (password) {
+    btn.disabled = true; msg.textContent = "Signing in…";
+    const { error } = await sb.client.auth.signInWithPassword({ email, password });
+    btn.disabled = false;
+    if (!error) { location.reload(); return; }
+    msg.textContent = /invalid/i.test(error.message)
+      ? "Email or password is wrong. If you haven't set a password yet, leave the password empty to get a sign-in email."
+      : "Couldn't sign in: " + error.message;
+    return;
+  }
   btn.disabled = true; msg.textContent = "Sending…";
   const { error } = await sb.client.auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: location.origin + location.pathname } });
   btn.disabled = false;
@@ -2187,6 +2210,14 @@ async function signInWithCode() {
 }
 $("#code-btn").addEventListener("click", signInWithCode);
 $("#signin-code").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); signInWithCode(); } });
+$("#set-password-btn").addEventListener("click", async () => {
+  const pw = $("#new-password").value;
+  if (pw.length < 8) { toast("Use at least 8 characters."); $("#new-password").focus(); return; }
+  const { error } = await sb.client.auth.updateUser({ password: pw });
+  if (error) { toast("Couldn't set the password: " + error.message); return; }
+  $("#new-password").value = "";
+  toast("Password set. Use it with your email to sign in on other devices.");
+});
 $("#signout-btn").addEventListener("click", async () => { await sb.client?.auth.signOut(); location.reload(); });
 
 // ---- moving data between claude.ai and own hosting ----
