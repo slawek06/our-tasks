@@ -172,6 +172,19 @@ h1 { font: 700 34px/1.05 var(--f-display); letter-spacing: -.02em; margin: 0; te
 .item-more { border: 0; background: none; width: 40px; height: 40px; border-radius: 8px; color: var(--muted); font-size: 18px; }
 .item-more:hover { background: var(--line); }
 .basket-head .btn { margin-left: auto; text-transform: none; letter-spacing: 0; }
+.lists-mode { align-self: flex-start; }
+body.shop-mode #lists-mode { display: none; }
+.cl-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.cl-head h2 { font: 600 19px/1.2 var(--f-display); margin: 0; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.cl-head .meta { font-size: 13px; color: var(--muted); display: inline-flex; gap: 8px; align-items: center; }
+.item .box.tpl { color: var(--muted); width: 22px; justify-content: center; font-size: 18px; line-height: 1; }
+.who-init { flex: none; font: 600 11px/18px var(--f-mono); width: 18px; height: 18px; text-align: center; border-radius: 50%; background: var(--hover); border: 1px solid var(--line); color: var(--muted); text-decoration: none; }
+.cl-row-act { margin-right: 6px; }
+.cl-foot { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 16px 10px 6px; }
+.cl-foot .spacer { flex: 1; }
+details.cl-closed summary { cursor: pointer; padding: 14px 10px 4px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.modal .pick { display: flex; flex-direction: column; gap: 6px; }
+.modal input[type=text] { border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 9px 11px; width: 100%; font-size: 16px; }
 .mode-bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--bg); padding-block: 6px; }
 .mode-bar b { font: 700 24px/1.1 var(--f-display); }
 .mode-bar span { color: var(--muted); margin-left: 8px; }
@@ -352,6 +365,21 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
   <div class="banner link" id="link-banner" hidden></div>
 
   <nav class="tabs" id="view-tabs" aria-label="View"></nav>
+
+  <div class="seg lists-mode" id="lists-mode" role="group" aria-label="Kind of list" hidden></div>
+
+  <section class="shop-bar" id="cl-bar" hidden>
+    <div class="cl-head">
+      <button class="btn small" type="button" id="cl-back">‹ Checklists</button>
+      <h2 id="cl-title"></h2>
+      <span class="meta" id="cl-meta"></span>
+    </div>
+    <form class="shop-form" id="cl-form" autocomplete="off">
+      <input type="text" id="cl-input" placeholder="Add items, or “Heading:”" aria-label="Add items" enterkeyhint="done">
+      <button class="btn primary" type="submit">Add</button>
+    </form>
+    <div class="chips" id="cl-chips" hidden></div>
+  </section>
 
   <section class="shop-bar" id="shop-bar" hidden>
     <div class="shop-lists" id="shop-lists"></div>
@@ -1050,6 +1078,7 @@ function startListening() {
   store.listen("lists", (m) => { lists = m; render(); if (!$("#lists-panel").hidden && !$("#lists-panel").contains(document.activeElement)) renderListsPanel(); });
   store.listen("catalog", (m) => { catalog = m; if (view === "shopping") renderChips(); });
   listenIdeas();
+  listenChecklists();
   if (meId) store.listenDoc("data/users/" + meId + "/seen", (d) => { seen = d?.map || {}; activitySeenAt = d?.activityAt || 0; shoppingSeenAt = d?.shoppingAt || 0; todayPins = d?.today || {}; render(); });
 }
 
@@ -1251,7 +1280,7 @@ function renderTabs() {
   const n = archiveRoots().length;
   const fresh = view === "activity" ? 0 : newActivityCount(), freshItems = view === "shopping" ? 0 : newItemsCount();
   const nToday = Object.values(todayLists()).reduce((n, g) => n + g.length, 0);
-  $("#view-tabs").replaceChildren(...[["today", nToday ? `Today (${nToday})` : "Today"], ["tasks", "Tasks"], ["upcoming", "Upcoming"], ["shopping", freshItems ? `Shopping (${freshItems} new)` : "Shopping"],
+  $("#view-tabs").replaceChildren(...[["today", nToday ? `Today (${nToday})` : "Today"], ["tasks", "Tasks"], ["upcoming", "Upcoming"], ["shopping", freshItems ? `Lists (${freshItems} new)` : "Lists"],
     ["activity", fresh ? `Activity (${fresh} new)` : "Activity"], ["archive", n ? `Archive (${n})` : "Archive"]].map(([k, label]) =>
     h("button", { type: "button", "aria-pressed": String(view === k), onclick: () => switchView(k) }, label)));
 }
@@ -1391,12 +1420,18 @@ function render() {
   $("#who").hidden = view === "activity" || view === "today" || searching;
   $("#fab").hidden = !canWrite() || !["tasks", "today", "upcoming"].includes(view);
   $("#toolbar").hidden = view === "shopping";
-  $("#shop-bar").hidden = view !== "shopping";
+  $("#shop-bar").hidden = view !== "shopping" || listsMode !== "shopping";
+  $("#lists-mode").hidden = view !== "shopping";
+  $("#cl-bar").hidden = view !== "shopping" || listsMode !== "checklists" || !openChecklist();
   const list = $("#list");
   list.classList.toggle("can-drag", canDrag());
   if (!loaded) return;
   if (view === "activity") return renderActivity(list);
-  if (view === "shopping") { renderShopBar(); return renderShopping(list); }
+  if (view === "shopping") {
+    renderListsMode();
+    if (listsMode === "checklists") return renderChecklists(list);
+    renderShopBar(); return renderShopping(list);
+  }
   const noMatch = () => h("div", { class: "empty" }, h("span", {}, "Nothing matches these filters."),
     h("button", { type: "button", class: "btn", onclick: clearFilters }, "Clear filters"));
   if (searching) return renderSearch(list);
@@ -2116,6 +2151,251 @@ $("#comment-add").addEventListener("click", async () => {
   try { await store.add("comments", { taskId: editingId, text, by: mySlot() || "", byUser: meId || "", at: Date.now() }); notifyEvent("comment", editingId, text); }
   catch (err) { writeFailed(err); }
 });
+
+// ---- checklists: reusable templates ("Leaving Warsaw → Kraków") and the lists started from them ----
+// Items are text + done only; ticked items stay until the whole list is closed, which archives it.
+let checklists = new Map(), clItems = new Map(), checklistsMissing = false, openChecklistId = null;
+let listsMode = "shopping";
+try { listsMode = localStorage.getItem("listsMode") === "checklists" ? "checklists" : "shopping"; } catch {}
+function listenChecklists() {
+  const after = () => { checklistsMissing = false; render(); };
+  const onLists = (m) => { checklists = m; after(); }, onItems = (m) => { clItems = m; after(); };
+  // Until supabase/migrations/008_checklists.sql runs, the tables are missing; the Checklists view says so.
+  if (store.mode === "supabase") {
+    sb.listen("checklists", onLists).catch(() => { checklistsMissing = true; render(); });
+    sb.listen("checklist_items", onItems).catch(() => { checklistsMissing = true; render(); });
+  } else { store.listen("checklists", onLists); store.listen("checklist_items", onItems); }
+}
+const openChecklist = () => (openChecklistId && checklists.get(openChecklistId)) || null;
+const clItemsOf = (id) => [...clItems.values()].filter((i) => i.checklistId === id).sort((a, b) => (a.order || 0) - (b.order || 0));
+const clProgress = (id) => { const xs = clItemsOf(id).filter((i) => !i.heading); return [xs.filter((i) => i.done).length, xs.length]; };
+const clDate = () => new Date().toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+function setListsMode(m) { listsMode = m; try { localStorage.setItem("listsMode", m); } catch {} render(); }
+function showChecklist(id) { openChecklistId = id; $("#cl-input").value = ""; render(); window.scrollTo(0, 0); }
+function renderListsMode() {
+  const active = [...checklists.values()].filter((c) => !c.template && !c.closed).length;
+  fill($("#lists-mode"), [["shopping", "Shopping"], ["checklists", active ? `Checklists · ${active}` : "Checklists"]].map(([k, label]) =>
+    h("button", { type: "button", "aria-pressed": String(listsMode === k), onclick: () => setListsMode(k) }, label)));
+}
+function clBar([done, total]) {
+  return h("span", { class: "progress" }, h("span", { class: "pbar" }, h("i", { style: `width:${total ? Math.round(100 * done / total) : 0}%` })), `${done}/${total}`);
+}
+
+// Small dialogs on the shared modal.
+function askText(title, placeholder, { value = "", privacy = false, yes = "Create" } = {}) {
+  return showModal((m, finish) => {
+    const inp = h("input", { type: "text", value, maxlength: "120", placeholder, "aria-label": title });
+    const priv = privacy && privateAvailable() ? h("input", { type: "checkbox" }) : null;
+    const go = () => { const v = inp.value.trim(); if (v) finish({ text: v, private: !!priv?.checked }); else inp.focus(); };
+    inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); go(); } });
+    m.replaceChildren(h("h2", { id: "modal-title" }, title), inp,
+      priv && h("label", { class: "check" }, priv, " Private: only you can see it"),
+      h("div", { class: "actions" }, cancelBtn(finish), h("button", { class: "btn primary", type: "button", onclick: go }, yes)));
+    setTimeout(() => inp.focus(), 30);
+  });
+}
+function askConfirm(title, text, yes) {
+  return showModal((m, finish) => {
+    m.replaceChildren(h("h2", { id: "modal-title" }, title), h("p", {}, text),
+      h("div", { class: "actions" }, cancelBtn(finish), h("button", { class: "btn primary", type: "button", id: "modal-yes", onclick: () => finish(true) }, yes)));
+    m.querySelector("#modal-yes").focus();
+  });
+}
+
+// ---- creating and starting ----
+async function newChecklist(template) {
+  const r = await askText(template ? "New template" : "New list", template ? "e.g. Leaving Warsaw → Kraków" : "e.g. Before the guests arrive", { privacy: true });
+  if (!r) return;
+  try {
+    const id = await store.add("checklists", { title: r.text, template, templateId: "", closed: false, private: r.private, order: Date.now(), createdAt: Date.now() });
+    showChecklist(id);
+    toast(template ? "Add the items you always need. Start the template before each trip." : "List created. Add your items.");
+  } catch (err) { writeFailed(err); }
+}
+async function startTemplate(tpl) {
+  try {
+    const id = await store.add("checklists", { title: `${tpl.title} · ${clDate()}`, template: false, templateId: tpl.id, closed: false, private: !!tpl.private, order: Date.now(), createdAt: Date.now() });
+    for (const i of clItemsOf(tpl.id)) await store.add("checklist_items", { checklistId: id, text: i.text, heading: !!i.heading, done: false, doneBy: "", order: i.order || 0 });
+    showChecklist(id);
+  } catch (err) { writeFailed(err); }
+}
+
+// ---- items ----
+async function addClItems(text, c) {
+  const parts = String(text).split(/[,;\n]/).map((x) => x.trim()).filter(Boolean);
+  const last = Math.max(0, ...clItemsOf(c.id).map((i) => i.order || 0));
+  try {
+    for (const [n, raw] of parts.entries()) {
+      const heading = raw.endsWith(":"), t = heading ? raw.slice(0, -1).trim() : raw;
+      if (t) await store.add("checklist_items", { checklistId: c.id, text: t.slice(0, 200), heading, done: false, doneBy: "", order: last + 1000 * (n + 1) });
+    }
+  } catch (err) { writeFailed(err); }
+}
+function toggleClItem(i) {
+  store.update("checklist_items", i.id, i.done ? { done: false, doneBy: "", doneAt: null } : { done: true, doneBy: mySlot() || "", doneAt: Date.now() }).catch(writeFailed);
+}
+function clItemMenu(i, c) {
+  showModal((m, finish) => {
+    const act = (label, fn, cls = "btn") => h("button", { class: cls, type: "button", onclick: async () => { finish(true); await fn(); } }, label);
+    m.replaceChildren(h("h2", { id: "modal-title" }, i.text),
+      h("div", { class: "pick" },
+        !i.heading && !c.template && act(`Add to ${listName(currentListId())} (shopping)`, async () => {
+          const added = await addItems(i.text, currentListId());
+          if (added.length) toast(`Added to ${listName(currentListId())}`);
+        }),
+        !i.heading && act("Make it a task (goes to the Inbox)", async () => {
+          try {
+            const now = Date.now();
+            const id = await addTask({ title: i.text, status: "todo", assignee: "", priority: "normal", due: defaultDue(), repeat: "", parentId: "", notes: `From the checklist “${c.title}”`, order: now, createdAt: now, private: !!c.private });
+            if (!c.private) log(id, "created it from a checklist", i.text);
+            toast(`Added the task “${i.text}”`, { label: "Show", run: () => showTask(id) });
+          } catch (err) { writeFailed(err); }
+        }),
+        act(i.heading ? "Delete heading" : "Delete", () => store.remove("checklist_items", i.id).catch(writeFailed), "btn danger"),
+        cancelBtn(finish)));
+  });
+}
+function renderClItem(i, c) {
+  if (i.heading) return h("div", { class: "group-head" }, i.text,
+    canWrite() && !c.closed && h("button", { type: "button", class: "linkish", onclick: () => clItemMenu(i, c) }, "Edit"));
+  const tickable = !c.template && !c.closed && canWrite(), who = i.done && slotName(i.doneBy);
+  return h("div", { class: "item" + (i.done ? " checked" : "") },
+    h("button", { type: "button", class: "item-main", "aria-pressed": c.template ? null : String(!!i.done), "aria-label": c.template ? i.text : (i.done ? "Untick: " : "Tick: ") + i.text,
+      onclick: () => tickable && toggleClItem(i) },
+      c.template ? h("span", { class: "box tpl" }, "•") : h("span", { class: "box" }, svg(i.done ? ICON.done : ICON.todo, 22)),
+      h("span", { class: "item-text" }, h("span", { class: "item-name" }, i.text)),
+      who && h("span", { class: "who-init", title: "Ticked by " + who }, who[0].toUpperCase())),
+    canWrite() && !c.closed ? h("button", { type: "button", class: "item-more", "aria-label": "More for " + i.text, onclick: () => clItemMenu(i, c) }, "⋯") : h("span"));
+}
+// Empty input: what this template's lists usually have; while typing: matching items from all lists.
+function renderClChips() {
+  const el = $("#cl-chips"), c = openChecklist();
+  if (!c || c.closed || !canWrite()) { el.hidden = true; return; }
+  const seg = norm(($("#cl-input").value.split(/[,;]/).pop() || "").trim());
+  const family = new Set([c.id, c.templateId, ...[...checklists.values()].filter((x) => x.templateId && x.templateId === (c.template ? c.id : c.templateId)).map((x) => x.id)].filter(Boolean));
+  const onList = new Set(clItemsOf(c.id).map((i) => norm(i.text)));
+  const score = new Map(), label = new Map();
+  for (const i of clItems.values()) {
+    const k = norm(i.text);
+    if (i.heading || !k || onList.has(k)) continue;
+    score.set(k, (score.get(k) || 0) + (family.has(i.checklistId) ? 3 : 1));
+    if (!label.has(k)) label.set(k, i.text);
+  }
+  let pool = [...score.keys()];
+  pool = seg ? pool.filter((k) => k.includes(seg)).sort((a, b) => (a.startsWith(seg) ? 0 : 1) - (b.startsWith(seg) ? 0 : 1) || score.get(b) - score.get(a)).slice(0, 8)
+    : pool.sort((a, b) => score.get(b) - score.get(a)).slice(0, 12);
+  el.hidden = !pool.length;
+  el.replaceChildren(h("span", { class: "lbl" }, seg ? "Suggestions" : "Frequent"), ...pool.map((k) => h("button", { type: "button", class: "chip-btn", onclick: async () => {
+    const inp = $("#cl-input"), parts = inp.value.split(/[,;]/);
+    parts.pop();
+    inp.value = parts.length ? parts.join(",") + ", " : "";
+    await addClItems(label.get(k), c);
+    renderClChips();
+  } }, label.get(k))));
+}
+$("#cl-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const c = openChecklist(), v = $("#cl-input").value;
+  if (!c || !v.trim()) return;
+  $("#cl-input").value = "";
+  await addClItems(v, c);
+  renderClChips();
+});
+$("#cl-input").addEventListener("input", renderClChips);
+$("#cl-back").addEventListener("click", () => { openChecklistId = null; render(); });
+
+// ---- closing: archives the list, and offers to add what was added on the way to its template ----
+async function closeChecklist(c) {
+  const xs = clItemsOf(c.id), open = xs.filter((i) => !i.heading && !i.done).length;
+  if (open && !(await askConfirm("Close this list?", `${open} item${open > 1 ? "s aren't" : " isn't"} ticked. Close and archive it anyway?`, "Close anyway"))) return;
+  const tpl = checklists.get(c.templateId);
+  let learn = [];
+  if (tpl) {
+    const have = new Set(clItemsOf(tpl.id).map((i) => norm(i.text)));
+    const fresh = xs.filter((i) => !i.heading && !have.has(norm(i.text)));
+    if (fresh.length) learn = await showModal((m, finish) => {
+      const boxes = fresh.map((i) => ({ i, box: h("input", { type: "checkbox", checked: true }) }));
+      m.replaceChildren(h("h2", { id: "modal-title" }, `Add to “${tpl.title}”?`),
+        h("p", {}, "You added these on the way. Add them to the template, so they're there next time?"),
+        h("div", { class: "pick" }, boxes.map(({ i, box }) => h("label", { class: "check" }, box, " " + i.text))),
+        h("div", { class: "actions" }, h("button", { class: "btn", type: "button", onclick: () => finish([]) }, "No, just close"),
+          h("button", { class: "btn primary", type: "button", onclick: () => finish(boxes.filter((b) => b.box.checked).map((b) => b.i)) }, "Add and close")));
+    }) || [];
+  }
+  try {
+    if (tpl && learn.length) {
+      const last = Math.max(0, ...clItemsOf(tpl.id).map((i) => i.order || 0));
+      for (const [n, i] of learn.entries()) await store.add("checklist_items", { checklistId: tpl.id, text: i.text, heading: false, done: false, doneBy: "", order: last + 1000 * (n + 1) });
+    }
+    await store.update("checklists", c.id, { closed: true, closedAt: Date.now() });
+    openChecklistId = null;
+    render();
+    toast(learn.length ? `Closed. ${learn.length} item${learn.length > 1 ? "s" : ""} added to the template.` : "Closed and archived", { label: "Undo", run: () => store.update("checklists", c.id, { closed: false, closedAt: null }).catch(writeFailed) });
+  } catch (err) { writeFailed(err); }
+}
+async function deleteChecklist(c) {
+  const kind = c.template ? "template" : "list";
+  if (!(await askConfirm(`Delete this ${kind}?`, `“${c.title}” and its items will be deleted. This can't be undone.`, "Delete"))) return;
+  try {
+    for (const i of clItemsOf(c.id)) await store.remove("checklist_items", i.id);
+    await store.remove("checklists", c.id);
+    openChecklistId = null; render();
+  } catch (err) { writeFailed(err); }
+}
+async function renameChecklist(c) {
+  const r = await askText("Rename", "", { value: c.title, yes: "Save" });
+  if (r) store.update("checklists", c.id, { title: r.text }).catch(writeFailed);
+}
+
+// ---- screens ----
+function renderChecklists(list) {
+  if (checklistsMissing) { list.replaceChildren(h("div", { class: "empty" }, h("strong", {}, "Checklists need the database update"), h("span", {}, "Run supabase/migrations/008_checklists.sql in Supabase."))); return; }
+  const c = openChecklist();
+  if (c) return renderChecklist(list, c);
+  openChecklistId = null;
+  const all = [...checklists.values()], byOrder = (a, b) => (a.order || 0) - (b.order || 0);
+  const active = all.filter((x) => !x.template && !x.closed).sort(byOrder), templates = all.filter((x) => x.template).sort((a, b) => a.title.localeCompare(b.title));
+  const closed = all.filter((x) => !x.template && x.closed).sort((a, b) => (b.closedAt || 0) - (a.closedAt || 0));
+  const row = (x, extra, act) => h("div", { class: "item" },
+    h("button", { type: "button", class: "item-main", onclick: () => showChecklist(x.id) },
+      h("span", { class: "item-text" }, h("span", { class: "item-name" }, x.title), x.private && h("span", { class: "chip private" }, "Private"), h("span", { class: "item-meta" }, extra))),
+    act || h("span"));
+  const out = [];
+  if (!all.length) out.push(h("div", { class: "empty" }, h("strong", {}, "No checklists yet"),
+    h("span", {}, "Make a template for what you do again and again, like “Leaving Warsaw → Kraków” or “Ski trip packing”. Before each trip, tap Start: you get a fresh list to tick off together.")));
+  if (active.length) out.push(h("div", { class: "group-head" }, "Active", h("span", { class: "n" }, String(active.length))),
+    ...active.map((x) => row(x, clBar(clProgress(x.id)))));
+  if (templates.length) out.push(h("div", { class: "group-head" }, "Templates", h("span", { class: "n" }, String(templates.length))),
+    ...templates.map((x) => { const n = clProgress(x.id)[1];
+      return row(x, `${n} item${n === 1 ? "" : "s"}`, canWrite() ? h("button", { type: "button", class: "btn small primary cl-row-act", onclick: () => startTemplate(x) }, "Start") : null); }));
+  if (canWrite()) out.push(h("div", { class: "cl-foot" },
+    h("button", { type: "button", class: "btn", onclick: () => newChecklist(true) }, "+ New template"),
+    h("button", { type: "button", class: "btn", onclick: () => newChecklist(false) }, "+ One-off list")));
+  if (closed.length) out.push(h("details", { class: "cl-closed" }, h("summary", {}, `Closed (${closed.length})`),
+    ...closed.map((x) => row(x, "Closed " + (x.closedAt ? fmtStamp(x.closedAt) : "")))));
+  fill(list, out);
+}
+function renderChecklist(list, c) {
+  $("#cl-title").textContent = c.title;
+  const [done, total] = clProgress(c.id), tpl = checklists.get(c.templateId);
+  fill($("#cl-meta"), c.private && h("span", { class: "chip private" }, "Private"),
+    c.template ? h("span", {}, "Template") : c.closed ? h("span", {}, "Closed " + (c.closedAt ? fmtStamp(c.closedAt) : "")) : clBar([done, total]));
+  $("#cl-form").hidden = c.closed || !canWrite();
+  renderClChips();
+  const xs = clItemsOf(c.id), w = canWrite();
+  const out = xs.length ? xs.map((i) => renderClItem(i, c)) : [h("div", { class: "empty" }, h("span", {}, c.template
+    ? "Add the things you always need, several at once with commas. A line ending with “:” becomes a heading, e.g. “Before we go:” or “Bring:”."
+    : "Add items above, several at once with commas."))];
+  out.push(h("div", { class: "cl-foot" },
+    w && h("button", { type: "button", class: "btn danger", onclick: () => deleteChecklist(c) }, "Delete"),
+    w && !c.closed && h("button", { type: "button", class: "btn", onclick: () => renameChecklist(c) }, "Rename"),
+    h("span", { class: "spacer" }),
+    w && c.template && h("button", { type: "button", class: "btn primary", onclick: () => startTemplate(c) }, "Start a list from it"),
+    w && !c.template && !c.closed && h("button", { type: "button", class: "btn done", onclick: () => closeChecklist(c) }, "Close list"),
+    w && c.closed && h("button", { type: "button", class: "btn", onclick: () => store.update("checklists", c.id, { closed: false, closedAt: null }).catch(writeFailed) }, "Reopen")));
+  if (tpl && !c.template) out.push(h("p", { class: "hint", style: "padding: 0 10px" }, `Started from the template “${tpl.title}”.`));
+  fill(list, out);
+}
 
 // ---- sort into areas: one screen to give every Inbox task an area ----
 // Each choice is "" (stay), "area" (the task becomes an area), an area id, or "new:<name>" (a new area, from Claude's suggestions).

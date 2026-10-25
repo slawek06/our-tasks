@@ -48,8 +48,22 @@ Notes from daily use go here, then we pick what to improve.
 | | Item | Effort | Notes |
 |---|---|---|---|
 | ✅ | **Areas → Projects → Tasks** | | Live 26 Oct 2026 (migration 007, notify function updated) |
-| ⬜ | **Checklists** (e.g. "Before we leave for the other home", "What to bring"): several lists like shopping lists, simple items with only done/not done, ticked items stay visible, closing the whole list archives it; frequent items per list; reusable versions of a list | M | Sławek. Reuse the shopping lists and items tables with a list type. Open question: closing = archive, or also "start again" (untick all) for lists used every trip? |
+| 🔶 | **Checklists** (Sławek): see the design below | M | Building on dev, released together with other items |
 | ⬜ | **A colour per person**: Sławek and Wiola each get their own colour at the top (person filter) and everywhere their name appears (assignee, comments, activity, shopping "added by") | S | Sławek. Open question: which colours; pick them under People? |
+
+### Design: Checklists (agreed 26 Oct 2026)
+
+- Lives in a **Lists** tab with two parts: Shopping and Checklists (no seventh tab).
+- **Templates** are the reusable versions ("Leaving Warsaw → Kraków", "Ski trip packing"); never ticked.
+- **Start** a template → a fresh list ("Leaving Warsaw · Fri 31 Oct"); blank one-off lists too.
+- Items are text + done only. Ticked items stay visible (struck through) with the initial of who ticked it (trial: keep it?).
+- Headings inside a list: a line ending with ":" (e.g. "Before we go:", "Bring:").
+- Frequent suggestions: this template's past lists first, then all lists.
+- **Close list** archives it (asks if items are open) and offers to add items added during the trip to the template.
+- Closed lists stay viewable. Shared or private like tasks. Works offline.
+- Item actions: send to Shopping, make it a task.
+- Later: belong to an area and show in Today; "Start Leaving Warsaw?" when switching home; Claude drafts a template;
+  standing lists (never closed, for "To talk about"); templates that start on a schedule.
 
 ### Design: Areas → Projects → Tasks (agreed 26 Oct 2026)
 
@@ -94,7 +108,7 @@ Notes from daily use go here, then we pick what to improve.
 | ✅ | Recurring tasks, default due date tomorrow | | |
 | ✅ | Create tasks from text (one new parent task) | | |
 | ✅ | Progress bar per project | | Part of Areas → Projects → Tasks |
-| ⬜ | Templates (reusable checklists) | S | |
+| 🔶 | Templates (reusable checklists) | | Covered by Checklists |
 | ⬜ | Calendar view (month grid) | M | |
 | ⬜ | Attachments and photos (quotes, invoices) | M | Supabase Storage |
 | ⬜ | Cost tracking per project | M | |
