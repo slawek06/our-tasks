@@ -84,12 +84,12 @@ h1 { font: 700 34px/1.05 var(--f-display); letter-spacing: -.02em; margin: 0; te
 .banner.link span { flex: 1 1 260px; }
 
 .list { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 6px; }
-.row { display: grid; grid-template-columns: 0 24px 28px minmax(0, 1fr) 32px; align-items: center; gap: 2px;
+.row { display: grid; grid-template-columns: 0 24px 28px minmax(0, 1fr) 32px 32px; align-items: center; gap: 2px;
   padding-left: calc(min(var(--d), 6) * 22px); border-radius: 9px; min-height: 44px; }
-.can-drag .row { grid-template-columns: 22px 24px 28px minmax(0, 1fr) 32px; }
+.can-drag .row { grid-template-columns: 22px 24px 28px minmax(0, 1fr) 32px 32px; }
 .row:hover { background: var(--hover); }
-.row:hover .add, .add:focus-visible { opacity: 1; }
-.caret, .add, .st, .handle { border: 0; background: none; padding: 0; display: grid; place-items: center; border-radius: 6px; }
+.row:hover .add, .add:focus-visible, .row:hover .day, .day:focus-visible { opacity: 1; }
+.caret, .add, .st, .handle, .day { border: 0; background: none; padding: 0; display: grid; place-items: center; border-radius: 6px; }
 .handle { visibility: hidden; overflow: hidden; width: 22px; height: 32px; color: var(--muted); cursor: grab; touch-action: none; opacity: .45; }
 .can-drag .handle { visibility: visible; }
 .row:hover .handle, .handle:focus-visible { opacity: 1; }
@@ -123,7 +123,7 @@ h1 { font: 700 34px/1.05 var(--f-display); letter-spacing: -.02em; margin: 0; te
 .prio-low { opacity: .8; }
 .progress { font: 500 12px var(--f-mono); font-variant-numeric: tabular-nums; }
 .add { width: 32px; height: 32px; font-size: 20px; color: var(--muted); opacity: 0; }
-@media (hover: none) { .add { opacity: .7; } .handle { opacity: .8; } }
+@media (hover: none) { .add, .day { opacity: .7; } .handle { opacity: .8; } }
 .group-head { display: flex; gap: 8px; align-items: baseline; padding: 14px 10px 4px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .group-head:first-child { padding-top: 6px; }
 .group-head.over { color: var(--danger); }
@@ -195,6 +195,26 @@ body.shop-mode .item .box svg { width: 26px; height: 26px; }
 .signin-card .lbl { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-top: 6px; }
 .signin-card input { border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 11px 12px; font-size: 16px; }
 .signin-card .btn { padding: 11px 14px; font-size: 15px; }
+.day { width: 32px; height: 32px; color: var(--muted); opacity: 0; }
+.chip.myday { background: var(--accent-soft); border-color: transparent; color: var(--accent); font-weight: 600; }
+.fab { position: fixed; z-index: 15; right: calc(20px + env(safe-area-inset-right, 0px)); bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--accent); color: var(--accent-ink);
+  font-size: 30px; line-height: 1; box-shadow: var(--shadow); display: grid; place-items: center; }
+.fab:hover { filter: brightness(1.07); }
+body.shop-mode .fab { display: none; }
+.menu { display: flex; flex-direction: column; gap: 6px; }
+.menu-opt { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; border: 1px solid var(--line); background: var(--surface);
+  border-radius: 10px; padding: 11px 12px; text-align: left; font-weight: 600; }
+.menu-opt:hover { background: var(--hover); }
+.menu-opt .sub, .result .sub { font-weight: 400; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.menu-date { display: flex; justify-content: space-between; align-items: center; gap: 12px; border: 1px solid var(--line); border-radius: 10px; padding: 7px 12px; font-weight: 600; }
+.menu-date input { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 6px 8px; }
+.modal.quick { top: max(12%, calc(env(safe-area-inset-top, 0px) + 16px)); transform: translateX(-50%); }
+.quick-input { border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 12px; font-size: 16px; width: 100%; }
+.chip.preview { background: var(--accent-soft); border-color: transparent; }
+.result { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; width: 100%; text-align: left; border: 0; background: none; padding: 10px; border-radius: 9px; }
+.result:hover { background: var(--hover); }
+.result > span:first-child { font-weight: 500; overflow-wrap: anywhere; min-width: 0; }
 .empty { text-align: center; padding: 40px 16px; color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .empty strong { color: var(--ink); font: 600 18px var(--f-display); }
 
@@ -473,6 +493,20 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
   </form>
 </div>
 
+<button class="fab" id="fab" type="button" title="Quick add (N)" aria-label="Quick add a task" hidden>+</button>
+<form class="modal quick" id="quick-form" role="dialog" aria-labelledby="quick-title" autocomplete="off" hidden>
+  <h2 id="quick-title">Quick add</h2>
+  <input class="quick-input" id="quick-input" type="text" maxlength="200" enterkeyhint="done"
+    placeholder="e.g. Call the plumber tomorrow for Wiola #garage !high" aria-describedby="quick-help">
+  <div class="chips" id="quick-preview"></div>
+  <p class="hint" id="quick-help">Understands dates (today, tomorrow, Friday, next week, in 3 days, 31.10), a person (for Wiola, for me, for both), #part of a task name to put it under, and !high or !low. Polish works too: jutro, piątek, dla Wioli.</p>
+  <div class="actions">
+    <button class="btn" type="button" id="quick-more">More details</button>
+    <button class="btn" type="button" id="quick-cancel">Close</button>
+    <button class="btn primary" type="submit">Add</button>
+  </div>
+</form>
+
 <div class="toast" id="toast" role="status" hidden></div>
 
 <script>
@@ -496,7 +530,9 @@ let meId = null;
 let loaded = false;
 let byParent = new Map(), byParentAll = new Map(), commentsBy = new Map();
 let editingId = null;
-let view = "tasks";
+let view = (() => { try { return localStorage.getItem("view") || "today"; } catch { return "today"; } })();
+let searchMode = false, searchSnippets = new Map();
+let todayPins = {}, pinsSupported = true;
 const filter = { who: "all", hideDone: false, q: "" };
 let sortMode = "manual";
 try { sortMode = localStorage.getItem("sort") || "manual"; } catch {}
@@ -525,6 +561,7 @@ const ICON = {
   doing: '<circle cx="9" cy="9" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9 4.5a4.5 4.5 0 0 1 0 9z" fill="currentColor"/>',
   done: '<circle cx="9" cy="9" r="8" fill="currentColor"/><path d="M5.4 9.3l2.4 2.4 4.8-5" fill="none" stroke="var(--surface)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
   chevron: '<path d="M7 4.5L11.5 9 7 13.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
+  clock: '<circle cx="9" cy="9" r="7" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9 5.3V9l2.6 1.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
   grip: '<g fill="currentColor"><circle cx="6.5" cy="4.5" r="1.4"/><circle cx="11.5" cy="4.5" r="1.4"/><circle cx="6.5" cy="9" r="1.4"/><circle cx="11.5" cy="9" r="1.4"/><circle cx="6.5" cy="13.5" r="1.4"/><circle cx="11.5" cy="13.5" r="1.4"/></g>',
 };
 
@@ -551,8 +588,8 @@ const DOC_TABLES = {
   "config/people": { table: "config", key: "key", keyValue: () => "people",
     toRow: (d) => ({ key: "people", value: d }), fromRow: (r) => r.value },
   seen: { table: "user_state", key: "user_id", keyValue: () => meId,
-    toRow: (d) => ({ user_id: meId, seen: d.map || {}, activity_at: d.activityAt || 0, shopping_at: d.shoppingAt || 0 }),
-    fromRow: (r) => ({ map: r.seen || {}, activityAt: r.activity_at || 0, shoppingAt: r.shopping_at || 0 }) },
+    toRow: (d) => ({ user_id: meId, seen: d.map || {}, activity_at: d.activityAt || 0, shopping_at: d.shoppingAt || 0, ...(pinsSupported ? { today: d.today || {} } : {}) }),
+    fromRow: (r) => ({ map: r.seen || {}, activityAt: r.activity_at || 0, shoppingAt: r.shopping_at || 0, today: r.today || {} }) },
 };
 const docSpec = (path) => DOC_TABLES[path] || (path.endsWith("/seen") ? DOC_TABLES.seen : null);
 
@@ -757,6 +794,8 @@ const store = {
     sb.subscribe();
     updateOfflineNotice();
     try { startListening(); } catch (e) { connectionLost(e); }
+    // My day pins need a column added by supabase/migrations/002_my_day.sql; until then the feature explains itself.
+    sb.client.from("user_state").select("today").limit(1).then(({ error }) => { pinsSupported = !error || isNetworkError(error); });
   },
   async initArtifact() {
     const [db, user] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
@@ -878,7 +917,7 @@ function startListening() {
   store.listen("items", (m) => { items = m; render(); if (editingId) renderTaskShop(); });
   store.listen("lists", (m) => { lists = m; render(); if (!$("#lists-panel").hidden && !$("#lists-panel").contains(document.activeElement)) renderListsPanel(); });
   store.listen("catalog", (m) => { catalog = m; if (view === "shopping") renderChips(); });
-  if (meId) store.listenDoc("data/users/" + meId + "/seen", (d) => { seen = d?.map || {}; activitySeenAt = d?.activityAt || 0; shoppingSeenAt = d?.shoppingAt || 0; render(); });
+  if (meId) store.listenDoc("data/users/" + meId + "/seen", (d) => { seen = d?.map || {}; activitySeenAt = d?.activityAt || 0; shoppingSeenAt = d?.shoppingAt || 0; todayPins = d?.today || {}; render(); });
 }
 
 // ---- people and identity ----
@@ -898,7 +937,7 @@ async function markSeen(ids) {
   saveSeen();
 }
 function saveSeen() {
-  if (meId) store.setDoc("data/users/" + meId + "/seen", { map: seen, activityAt: activitySeenAt, shoppingAt: shoppingSeenAt }).catch(() => {});
+  if (meId) store.setDoc("data/users/" + meId + "/seen", { map: seen, activityAt: activitySeenAt, shoppingAt: shoppingSeenAt, today: todayPins }).catch(() => {});
 }
 // Activity and Shopping highlight what the other person did since you last looked at them.
 function switchView(k) {
@@ -910,7 +949,9 @@ function switchView(k) {
   if (k === "shopping" || view === "shopping") shoppingSeenAt = now;
   if (tracked.includes(k) || tracked.includes(view)) saveSeen();
   if (view === "shopping") exitShopMode();
-  view = k; render();
+  view = k;
+  try { localStorage.setItem("view", k); } catch {}
+  render();
 }
 
 // ---- activity feed: recent changes and comments from both of you ----
@@ -991,7 +1032,7 @@ function buildIndex() {
 const childrenOf = (id) => byParent.get(id || "") || [];
 const childrenAll = (id) => byParentAll.get(id || "") || [];
 const parentKey = (t) => { const p = tasks.get(t.parentId); return p && !p.archived ? t.parentId : ""; };
-const kidsInView = (id) => view === "archive" ? childrenAll(id).filter((c) => c.archived) : view === "upcoming" ? [] : childrenOf(id);
+const kidsInView = (id) => view === "archive" ? childrenAll(id).filter((c) => c.archived) : view === "upcoming" || view === "today" || searchMode ? [] : childrenOf(id);
 const archiveRoots = () => [...tasks.values()].filter((t) => t.archived && !tasks.get(t.parentId)?.archived);
 function descendants(id, out = []) { for (const c of childrenOf(id)) { out.push(c.id); descendants(c.id, out); } return out; }
 function descendantsAll(id, out = []) { for (const c of childrenAll(id)) { out.push(c.id); descendantsAll(c.id, out); } return out; }
@@ -1071,7 +1112,8 @@ const canDrag = () => view === "tasks" && sortMode === "manual" && !filterActive
 function renderTabs() {
   const n = archiveRoots().length;
   const fresh = view === "activity" ? 0 : newActivityCount(), freshItems = view === "shopping" ? 0 : newItemsCount();
-  $("#view-tabs").replaceChildren(...[["tasks", "Tasks"], ["upcoming", "Upcoming"], ["shopping", freshItems ? `Shopping (${freshItems} new)` : "Shopping"],
+  const nToday = Object.values(todayLists()).reduce((n, g) => n + g.length, 0);
+  $("#view-tabs").replaceChildren(...[["today", nToday ? `Today (${nToday})` : "Today"], ["tasks", "Tasks"], ["upcoming", "Upcoming"], ["shopping", freshItems ? `Shopping (${freshItems} new)` : "Shopping"],
     ["activity", fresh ? `Activity (${fresh} new)` : "Activity"], ["archive", n ? `Archive (${n})` : "Archive"]].map(([k, label]) =>
     h("button", { type: "button", "aria-pressed": String(view === k), onclick: () => switchView(k) }, label)));
 }
@@ -1105,7 +1147,7 @@ function renderSummary() {
   if (over) el.append(h("span", { class: "over" }, h("b", {}, String(over)), " overdue"));
 }
 function renderTask(t, depth) {
-  const archived = view === "archive", flat = view === "upcoming";
+  const archived = view === "archive" || (searchMode && !!t.archived), flat = view === "upcoming" || view === "today" || searchMode;
   const kids = kidsInView(t.id), counted = archived ? kids : childrenOf(t.id);
   const shown = sortTasks(kids.filter(visible));
   const isCollapsed = !filterActive() && collapsed.has(t.id);
@@ -1115,6 +1157,8 @@ function renderTask(t, depth) {
   const meta = h("span", { class: "meta" });
   if (t.private) meta.append(h("span", { class: "chip private", title: "Only you can see this task" }, "Private"));
   if (isNew(t)) meta.append(h("span", { class: "chip new" }, "New from " + slotName(t.assignedBy)));
+  if (isPinned(t) && !archived) meta.append(h("span", { class: "chip myday" }, "My day"));
+  if (searchMode && searchSnippets.has(t.id)) meta.append(h("span", { class: "crumb" }, searchSnippets.get(t.id)));
   if ((archived && depth === 0) || flat) { const from = pathOf(t); if (from) meta.append(h("span", { class: "crumb" }, (flat ? "In " : "From ") + from)); }
   if (archived && depth === 0 && t.archivedAt) meta.append(h("span", { class: "date" }, "Archived " + new Date(t.archivedAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })));
   if (archived && status !== "done") meta.append(h("span", { class: "chip unfinished" }, "Not finished"));
@@ -1146,6 +1190,9 @@ function renderTask(t, depth) {
       : h("button", { type: "button", class: "st", "data-s": status, title: STATUS[status] + " (click to change)", "aria-label": "Status: " + STATUS[status] + ". Change to " + STATUS[NEXT_STATUS[status]],
           onclick: () => canWrite() && changeStatus(t, NEXT_STATUS[status]) }, svg(ICON[status])),
     h("button", { type: "button", class: "main", onclick: () => openEditor(t.id) }, h("span", { class: "title" }, t.title || "Untitled"), meta),
+    canWrite() && !archived && status !== "done"
+      ? h("button", { type: "button", class: "day", title: "My day or postpone", "aria-label": "Add to My day or postpone: " + t.title, onclick: () => openDayMenu(t) }, svg(ICON.clock, 17))
+      : h("span"),
     canWrite() && !archived && !flat && status !== "done"
       ? h("button", { type: "button", class: "add", title: "Add subtask", "aria-label": "Add subtask under " + t.title, onclick: () => openEditor(null, t.id) }, "+")
       : h("span"));
@@ -1163,9 +1210,11 @@ function render() {
   const claudeHere = store.mode === "remote" || store.mode === "supabase";
   $("#import-btn").hidden = !claudeHere || !canWrite();
   $("#smart-btn").hidden = $("#smart-hint").hidden = !claudeHere;
-  $("#hide-done-wrap").hidden = view !== "tasks";
-  $("#sort").hidden = view !== "tasks";
-  $("#who").hidden = view === "activity";
+  const searching = !!filter.q && ["tasks", "today", "upcoming"].includes(view);
+  $("#hide-done-wrap").hidden = view !== "tasks" || searching;
+  $("#sort").hidden = view !== "tasks" || searching;
+  $("#who").hidden = view === "activity" || view === "today" || searching;
+  $("#fab").hidden = !canWrite() || !["tasks", "today", "upcoming"].includes(view);
   $("#toolbar").hidden = view === "shopping";
   $("#shop-bar").hidden = view !== "shopping";
   const list = $("#list");
@@ -1175,6 +1224,8 @@ function render() {
   if (view === "shopping") { renderShopBar(); return renderShopping(list); }
   const noMatch = () => h("div", { class: "empty" }, h("span", {}, "Nothing matches these filters."),
     h("button", { type: "button", class: "btn", onclick: clearFilters }, "Clear filters"));
+  if (searching) return renderSearch(list);
+  if (view === "today") return renderToday(list);
 
   if (view === "archive") {
     const all = archiveRoots().sort((a, b) => (b.archivedAt || 0) - (a.archivedAt || 0)), shown = all.filter(visible);
@@ -1213,6 +1264,255 @@ function render() {
   }
 }
 function clearFilters() { filter.who = "all"; filter.hideDone = false; filter.q = ""; $("#hide-done").checked = false; $("#search").value = ""; render(); }
+
+// ---- Today: what's yours today, plus tasks you pinned to My day ----
+// Pins are personal ({taskId: "YYYY-MM-DD"} in your own state) and only count on the day they were made.
+const isPinned = (t) => todayPins[t.id] === todayStr();
+function todayLists() {
+  const me = mySlot(), today = todayStr();
+  const open = [...tasks.values()].filter((t) => !t.archived && t.status !== "done");
+  const forMe = (t) => !me || t.private || isMine(t, me);
+  const byDue = (x, y) => (x.due || "").localeCompare(y.due || "") || (PRIO_RANK[x.priority] ?? 1) - (PRIO_RANK[y.priority] ?? 1);
+  const overdue = open.filter((t) => forMe(t) && t.due && t.due < today).sort(byDue);
+  const dueToday = open.filter((t) => forMe(t) && t.due === today).sort(byDue);
+  const taken = new Set([...overdue, ...dueToday].map((t) => t.id));
+  const pinned = open.filter((t) => isPinned(t) && !taken.has(t.id)).sort(byDue);
+  pinned.forEach((t) => taken.add(t.id));
+  const unassigned = me ? open.filter((t) => !t.private && !t.assignee && t.due && t.due <= today && !taken.has(t.id)).sort(byDue) : [];
+  return { overdue, dueToday, pinned, unassigned };
+}
+function renderToday(list) {
+  const { overdue, dueToday, pinned, unassigned } = todayLists();
+  const out = [];
+  if (!mySlot()) out.push(h("p", { class: "hint", style: "padding: 8px 10px" }, "Showing everyone's tasks. Choose who you are in the blue banner to see just yours."));
+  for (const [label, g, over] of [["Overdue", overdue, true], ["Due today", dueToday], ["My day", pinned], ["Due, but nobody's assigned", unassigned]]) {
+    if (g.length) out.push(h("div", { class: "group-head" + (over ? " over" : "") }, label, h("span", { class: "n" }, String(g.length))), ...g.map((t) => renderTask(t, 0)));
+  }
+  if (!overdue.length && !dueToday.length && !pinned.length && !unassigned.length) out.push(h("div", { class: "empty" },
+    h("strong", {}, "Nothing for today"),
+    h("span", {}, "Tasks due today or overdue for you show up here. Add any task to My day with its clock button, or add a new one with +.")));
+  list.replaceChildren(...out);
+}
+async function togglePin(t) {
+  if (!pinsSupported) { toast("My day needs a small database update: run supabase/migrations/002_my_day.sql in Supabase's SQL Editor."); return; }
+  const today = todayStr(), pins = {};
+  for (const [id, d] of Object.entries(todayPins)) if (d === today && tasks.has(id)) pins[id] = d; // yesterday's pins drop off
+  if (pins[t.id]) delete pins[t.id]; else pins[t.id] = today;
+  todayPins = pins;
+  saveSeen();
+  render();
+  toast(pins[t.id] ? "Added to My day" : "Removed from My day");
+}
+
+// ---- postpone ("snooze") from the task row ----
+// On Saturday or Sunday "this weekend" is today; otherwise the coming Saturday.
+const thisWeekend = () => [0, 6].includes(new Date().getDay()) ? todayStr() : addDays(todayStr(), daysUntil(6));
+const daysUntil = (weekday) => { const n = (weekday - new Date().getDay() + 7) % 7; return n || 7; }; // next one, never today
+async function setDue(t, due) {
+  try {
+    await updTask(t.id, { due });
+    if (due && due > todayStr() && isPinned(t)) await togglePin(t); // postponed: no longer for today
+    log(t.id, due ? `postponed it to ${fmtDate(due)}` : "removed the due date");
+    toast(due ? `Moved to ${fmtDate(due)}` : "Due date removed");
+  } catch (err) { writeFailed(err); }
+}
+function openDayMenu(t) {
+  const today = todayStr();
+  const tomorrow = addDays(today, 1), weekend = thisWeekend(), nextWeek = addDays(today, daysUntil(1));
+  showModal((m, finish) => {
+    const opt = (label, sub, run) => h("button", { type: "button", class: "menu-opt", onclick: () => { finish(false); run(); } }, h("span", {}, label), sub && h("span", { class: "sub" }, sub));
+    const picker = h("input", { type: "date", "aria-label": "Pick a date", min: today, onchange: (e) => { if (e.target.value) { finish(false); setDue(t, e.target.value); } } });
+    m.replaceChildren(
+      h("h2", { id: "modal-title" }, t.title || "Untitled"),
+      h("div", { class: "menu" },
+        opt(isPinned(t) ? "Remove from My day" : "Add to My day", "Shows under Today, just for you", () => togglePin(t)),
+        opt("Today", fmtDate(today), () => setDue(t, today)),
+        opt("Tomorrow", fmtDate(tomorrow), () => setDue(t, tomorrow)),
+        opt("This weekend", fmtDate(weekend), () => setDue(t, weekend)),
+        opt("Next week", fmtDate(nextWeek), () => setDue(t, nextWeek)),
+        h("label", { class: "menu-date" }, "Pick a date", picker),
+        t.due && opt("Remove due date", "", () => setDue(t, ""))),
+      h("div", { class: "actions" }, cancelBtn(finish)));
+    m.querySelector(".menu-opt")?.focus();
+  });
+}
+
+// ---- search across everything: tasks (also archived), comments, shopping, things bought before ----
+function renderSearch(list) {
+  const q = filter.q, has = (s) => (s || "").toLowerCase().includes(q);
+  searchSnippets = new Map();
+  const hits = [];
+  for (const t of tasks.values()) {
+    const c = (commentsBy.get(t.id) || []).find((x) => has(x.text));
+    if (!has(t.title) && !has(t.notes) && !c) continue;
+    if (!has(t.title)) searchSnippets.set(t.id, c ? `Comment: “${c.text.slice(0, 80)}${c.text.length > 80 ? "…" : ""}”` : "Match in the notes");
+    hits.push(t);
+  }
+  const rank = (t) => (t.archived ? 2 : t.status === "done" ? 1 : 0);
+  hits.sort((a, b) => rank(a) - rank(b) || (a.order || 0) - (b.order || 0));
+  const active = hits.filter((t) => !t.archived), archivedHits = hits.filter((t) => t.archived);
+  const itemHits = [...items.values()].filter((i) => has(i.name)).sort((a, b) => (a.bought ? 1 : 0) - (b.bought ? 1 : 0));
+  const onLists = new Set(itemHits.filter((i) => !i.bought).map((i) => norm(i.name)));
+  const pastHits = [...catalog.values()].filter((c) => has(c.name) && !onLists.has(norm(c.name))).sort((a, b) => (b.lastAt || 0) - (a.lastAt || 0)).slice(0, 10);
+
+  const out = [], head = (label, n) => h("div", { class: "group-head" }, label, h("span", { class: "n" }, String(n)));
+  searchMode = true;
+  try {
+    if (active.length) out.push(head("Tasks", active.length), ...active.map((t) => renderTask(t, 0)));
+    if (archivedHits.length) out.push(head("In the archive", archivedHits.length), ...archivedHits.map((t) => renderTask(t, 0)));
+  } finally { searchMode = false; }
+  if (itemHits.length) out.push(head("Shopping", itemHits.length), ...itemHits.map((i) => {
+    const t = i.taskId && tasks.get(i.taskId);
+    const state = i.bought ? "Bought" + (i.boughtAt ? " " + fmtDate(toDateStr(new Date(i.boughtAt))) : "") : i.checked ? "In the basket" : "To buy";
+    return h("button", { type: "button", class: "result", onclick: () => (i.bought ? t && openEditor(t.id) : openItemEditor(i.id)) },
+      h("span", {}, i.name + (i.qty ? " · " + i.qty : "")),
+      h("span", { class: "sub" }, [state, listName(i.listId), t && "for " + (t.title || "a task")].filter(Boolean).join(" · ")));
+  }));
+  if (pastHits.length && canWrite()) out.push(head("Bought before", pastHits.length), ...pastHits.map((c) =>
+    h("button", { type: "button", class: "result", title: "Add to " + listName(currentListId()), onclick: async () => { const a = await addItems(c.name, currentListId()); if (a.length) toast(`Added ${c.name} to ${listName(currentListId())}`); } },
+      h("span", {}, c.name),
+      h("span", { class: "sub" }, `${c.count || 1}× · tap to add to ${listName(currentListId())}`))));
+  if (!out.length) out.push(h("div", { class: "empty" }, h("span", {}, `Nothing found for “${$("#search").value.trim()}”.`),
+    h("button", { type: "button", class: "btn", onclick: clearFilters }, "Clear search")));
+  list.replaceChildren(...out);
+}
+
+// ---- quick add: one line with date, person, parent task and priority ----
+// Matching runs on a lower-case copy without Polish accents; it has the same length, so positions map back to the original text.
+const WEEKDAY_WORDS = [
+  ["sunday", "niedziela", "niedziele"], ["monday", "poniedzialek"], ["tuesday", "wtorek"], ["wednesday", "sroda", "srode"],
+  ["thursday", "czwartek"], ["friday", "piatek"], ["saturday", "sobota", "sobote"],
+];
+function parseQuick(text) {
+  const n = text.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ł/g, "l");
+  const cut = [], out = { due: "", assignee: "", priority: "normal", parentId: "", title: "" };
+  const today = todayStr();
+  const take = (re, fn) => { // first match of re (group 1 = leading space) -> fn(match) returns a value or undefined
+    const m = re.exec(n);
+    if (!m) return undefined;
+    const value = fn(m);
+    if (value !== undefined) cut.push([m.index + m[1].length, m.index + m[0].length]);
+    return value;
+  };
+  const end = "(?=[\\s,.!?]|$)";
+  // priority
+  out.priority = take(new RegExp("(^|\\s)!(high|h|!)" + end), () => "high") || take(new RegExp("(^|\\s)!(low|l)" + end), () => "low") || "normal";
+  // parent task: #word matches the start of (or a word in) an open task's title
+  const parent = take(/(^|\s)#(\S+)/, (m) => {
+    const key = m[2].replace(/_/g, " ");
+    const open = [...tasks.values()].filter((t) => !t.archived && t.status !== "done" && norm(t.title).includes(key));
+    open.sort((a, b) => (norm(a.title).startsWith(key) ? 0 : 1) - (norm(b.title).startsWith(key) ? 0 : 1) || a.title.length - b.title.length);
+    return open[0]?.id;
+  });
+  out.parentId = parent || "";
+  // person
+  const who = (w) => {
+    if (["me", "mnie", "mine"].includes(w)) return mySlot() || undefined;
+    if (["both", "oboje", "nas", "us"].includes(w)) return "both";
+    for (const s of ["a", "b"]) {
+      const name = norm(people[s] || "").split(" ")[0];
+      if (name && name.length >= 3 && (w.startsWith(name.slice(0, Math.max(3, name.length - 2))))) return s; // "Wioli", "Wiolę" -> Wiola
+    }
+    return undefined;
+  };
+  out.assignee = take(new RegExp("(^|\\s)(?:for|dla)\\s+(\\S+?)" + end), (m) => who(m[2])) || take(new RegExp("(^|\\s)@(\\S+?)" + end), (m) => who(m[2])) || "";
+  // date: first match wins
+  const pre = "(?:on |by |due |w |we |na |do |in )?";
+  const dateRules = [
+    [new RegExp("(^|\\s)" + pre + "(day after tomorrow|pojutrze)" + end), () => addDays(today, 2)],
+    [new RegExp("(^|\\s)" + pre + "(today|tonight|dzis|dzisiaj)" + end), () => today],
+    [new RegExp("(^|\\s)" + pre + "(tomorrow|jutro)" + end), () => addDays(today, 1)],
+    [new RegExp("(^|\\s)(?:in|za) (\\d{1,3}) (days?|dni|dzien)" + end), (m) => addDays(today, +m[2])],
+    [new RegExp("(^|\\s)(?:in|za) (\\d{1,2}) (weeks?|tygodni|tygodnie|tydzien)" + end), (m) => addDays(today, 7 * m[2])],
+    [new RegExp("(^|\\s)(next week|w przyszlym tygodniu|przyszly tydzien)" + end), () => addDays(today, daysUntil(1))],
+    [new RegExp("(^|\\s)(this weekend|w weekend|na weekend)" + end), () => thisWeekend()],
+    [new RegExp("(^|\\s)(?:on |by |w |we |next )?(" + WEEKDAY_WORDS.flat().join("|") + ")" + end), (m) => addDays(today, daysUntil(WEEKDAY_WORDS.findIndex((ws) => ws.includes(m[2]))))],
+    [new RegExp("(^|\\s)" + pre + "(\\d{4})-(\\d{2})-(\\d{2})" + end), (m) => validDate(+m[2], +m[3], +m[4])],
+    [new RegExp("(^|\\s)" + pre + "(\\d{1,2})[./](\\d{1,2})(?:[./](\\d{2,4}))?" + end), (m) => {
+      let y = m[4] ? +m[4] : new Date().getFullYear();
+      if (y < 100) y += 2000;
+      const d = validDate(y, +m[3], +m[2]);
+      return d && !m[4] && d < today ? validDate(y + 1, +m[3], +m[2]) : d;
+    }],
+  ];
+  for (const [re, fn] of dateRules) { const d = take(re, fn); if (d) { out.due = d; break; } }
+  // title = what's left
+  let title = "";
+  let pos = 0;
+  for (const [a, b] of cut.sort((x, y) => x[0] - y[0])) { title += text.slice(pos, a); pos = Math.max(pos, b); }
+  title += text.slice(pos);
+  title = title.replace(/\s+/g, " ").replace(/\s+(by|on|for|due|do|na|dla|w)$/i, "").replace(/^[\s,.\-–]+|[\s,\-–]+$/g, "").trim();
+  out.title = title.charAt(0).toUpperCase() + title.slice(1);
+  return out;
+}
+function validDate(y, m, d) {
+  const dt = new Date(y, m - 1, d);
+  return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d ? toDateStr(dt) : undefined;
+}
+function renderQuickPreview() {
+  const p = parseQuick($("#quick-input").value), parent = tasks.get(p.parentId);
+  const chips = [
+    p.title && "“" + p.title + "”",
+    p.due && "Due " + new Date(parseDate(p.due)).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" }),
+    p.assignee && "For " + assigneeName(p.assignee),
+    parent && "Under " + (pathOf(parent) ? pathOf(parent) + " › " : "") + parent.title,
+    p.priority !== "normal" && PRIORITY[p.priority] + " priority",
+  ].filter(Boolean);
+  fill($("#quick-preview"), chips.map((c) => h("span", { class: "chip preview" }, c)));
+}
+let quickBack = null;
+function openQuick() {
+  if (!canWrite()) return;
+  quickBack = document.activeElement;
+  $("#quick-input").value = "";
+  renderQuickPreview();
+  $("#scrim2").hidden = false; $("#quick-form").hidden = false;
+  setTimeout(() => $("#quick-input").focus(), 30);
+}
+function closeQuick() {
+  if ($("#quick-form").hidden) return;
+  $("#quick-form").hidden = true; $("#scrim2").hidden = true;
+  quickBack?.focus?.();
+}
+$("#fab").addEventListener("click", openQuick);
+$("#quick-cancel").addEventListener("click", closeQuick);
+$("#scrim2").addEventListener("click", () => { if (!$("#quick-form").hidden) closeQuick(); });
+$("#quick-input").addEventListener("input", renderQuickPreview);
+$("#quick-form").addEventListener("keydown", (e) => { if (e.key === "Escape") { e.stopPropagation(); closeQuick(); } });
+$("#quick-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const p = parseQuick($("#quick-input").value);
+  if (!p.title) { $("#quick-input").focus(); return; }
+  const parent = tasks.get(p.parentId), now = Date.now(), isPrivate = !!parent?.private;
+  const assignee = isPrivate ? "" : p.assignee;
+  try {
+    const id = await addTask({
+      title: p.title, status: "todo", assignee, priority: p.priority, due: p.due, repeat: "", parentId: p.parentId, notes: "",
+      order: now, createdAt: now, private: isPrivate, ...(assignee ? { assignedBy: mySlot() || "", assignedAt: now } : {}),
+    });
+    if (!isPrivate) log(id, "created it" + (assignee ? ` and assigned it to ${assigneeName(assignee)}` : ""), p.title);
+    if (p.parentId) { collapsed.delete(p.parentId); saveCollapsed(); }
+    $("#quick-input").value = "";
+    renderQuickPreview();
+    toast(`Added “${p.title}”. Add another, or close.`, { label: "Edit", run: () => { closeQuick(); openEditor(id); } });
+  } catch (err) { writeFailed(err); }
+});
+$("#quick-more").addEventListener("click", () => {
+  const p = parseQuick($("#quick-input").value);
+  closeQuick();
+  openEditor(null, p.parentId);
+  $("#f-title").value = p.title;
+  $("#f-due").value = p.due;
+  $("#f-priority").value = p.priority;
+  if (!tasks.get(p.parentId)?.private) $("#f-assignee").value = p.assignee;
+});
+// Press N anywhere (not while typing) to quick-add.
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "n" || e.metaKey || e.ctrlKey || e.altKey || $("#fab").hidden) return;
+  if (e.target.closest("input, textarea, select, [contenteditable]") || !$("#scrim").hidden || !$("#scrim2").hidden) return;
+  e.preventDefault();
+  openQuick();
+});
 
 // ---- reordering: drag the handle, or focus it and use the arrow keys ----
 let drag = null, renderQueued = false;

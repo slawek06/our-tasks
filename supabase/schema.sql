@@ -95,7 +95,8 @@ create table public.user_state (
   user_id      uuid primary key default auth.uid() references auth.users on delete cascade,
   seen         jsonb not null default '{}'::jsonb,
   activity_at  bigint not null default 0,
-  shopping_at  bigint not null default 0
+  shopping_at  bigint not null default 0,
+  today        jsonb not null default '{}'::jsonb  -- My day pins: {"<task id>": "YYYY-MM-DD"}
 );
 
 create index on public.tasks (parent_id);
