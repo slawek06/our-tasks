@@ -21,15 +21,26 @@ Status: ✅ done · 🔶 partly done · ⬜ open. Effort: S (one session) · M �
 | ⬜ | Weekly summary e-mail via Gmail | M | Check Supabase mail ports first |
 | ⬜ | Weekly review by Claude ("what's stuck, what to do this weekend") | S | Can reuse the briefing |
 
-## Going live and bringing Wiola in
+## Going live and bringing Wiola in ✅
 
 | | Item | Effort | Notes |
 |---|---|---|---|
-| ⬜ | Gmail as Supabase's mail sender (removes sign-in e-mail limit) | S | Gmail app password, Authentication > SMTP |
-| ⬜ | Sign-in code in the Magic Link e-mail template | S | Works once custom SMTP is on |
-| ⬜ | Invite Wiola, her password, home-screen app, notifications | S | |
-| ⬜ | Clean start: backup, then Delete all data | S | Buttons exist under People > Your data |
+| ✅ | Gmail as Supabase's mail sender (removes sign-in e-mail limit) | | In production and development |
+| ✅ | Sign-in code in the Magic Link e-mail template | | |
+| ✅ | Invite Wiola, her password, home-screen app, notifications | | Live since 25 Oct 2026 |
+| ✅ | Clean start | | Production started with an empty database |
+| ✅ | Error messages show the server's reason | | |
 | ⬜ | Translate the app to Polish | M | Everything is English today |
+
+## First week of real use (from 26 Oct 2026)
+
+Notes from daily use go here, then we pick what to improve.
+
+| | Item | Effort | Notes |
+|---|---|---|---|
+| ⬜ | Collect what's annoying or missing (Sławek and Wiola) | | |
+| ⬜ | Check briefing times and tone for both | S | Times are per person under People |
+| ⬜ | Show "I'm Wiola / I'm Sławek" link button in People when not linked | S | Today only the main screen offers it |
 
 ## Working as a couple
 
