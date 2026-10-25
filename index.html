@@ -638,8 +638,8 @@ function saveCollapsed() { try { localStorage.setItem("collapsed", JSON.stringif
 // Two environments on the same site: /our-tasks/ is production, /our-tasks/dev/ is development (test data).
 const IS_DEV = /\/dev\//.test(location.pathname);
 const ENVIRONMENTS = {
-  // Production: switches to the new, clean project once it exists.
-  prod: { url: "https://sjtdrnvezorxxdoitszz.supabase.co", key: "sb_publishable_M-eM_n6OUMqsPFZyTDk4aw_eh9MUU9A" },
+  // Production: our-tasks-prod (Frankfurt), real data only.
+  prod: { url: "https://jwhuaaxrymdqwanwthvg.supabase.co", key: "sb_publishable_-GEHxxiWZMLnJ3nwOibMvg_NcgkGZ7n" },
   // Development: the original project, with its test data.
   dev: { url: "https://sjtdrnvezorxxdoitszz.supabase.co", key: "sb_publishable_M-eM_n6OUMqsPFZyTDk4aw_eh9MUU9A" },
 };
