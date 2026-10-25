@@ -2,13 +2,19 @@
 // Sends a prompt from the app (Smart add, Create tasks from text) to Claude and returns the answer text.
 //
 // Deploy: Supabase dashboard > Edge Functions > Deploy a new function > Via Editor > name "claude",
-// paste this file, keep "Verify JWT" on, Deploy.
+// replace the example code with this file, Deploy.
 // Secret: Edge Functions > Secrets > ANTHROPIC_API_KEY = your key from console.anthropic.com.
 //
-// Only signed-in users of this project reach this code: with "Verify JWT" on, Supabase rejects
-// requests without a valid sign-in token before the function runs. The API key never leaves the server.
+// Only signed-in users of this project get an answer: the function checks the caller's sign-in token
+// with Supabase Auth itself, so it doesn't depend on dashboard settings. The API key never leaves the server.
 
 import Anthropic from "npm:@anthropic-ai/sdk";
+import { createClient } from "npm:@supabase/supabase-js@2";
+
+// Public values (the same ones are in the app's index.html); they grant nothing without a sign-in.
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "https://sjtdrnvezorxxdoitszz.supabase.co";
+const SUPABASE_KEY = "sb_publishable_M-eM_n6OUMqsPFZyTDk4aw_eh9MUU9A";
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -21,6 +27,11 @@ const reply = (body: unknown, status = 200) =>
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return reply({ error: "method_not_allowed" }, 405);
+
+  // Signed-in users only: the app sends the user's access token; Supabase Auth confirms it.
+  const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+  const { data: auth } = token ? await supabase.auth.getUser(token) : { data: { user: null } };
+  if (!auth?.user) return reply({ error: "not_signed_in" }, 401);
 
   let prompt: unknown;
   try { ({ prompt } = await req.json()); } catch { return reply({ error: "bad_request" }, 400); }
