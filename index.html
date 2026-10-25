@@ -2795,7 +2795,7 @@ async function fnErrorText(error) {
 }
 async function loadNotifyPrefs() {
   const { data, error } = await sb.client.from("notify_prefs").select("*").eq("user_id", meId).maybeSingle();
-  if (error) { $("#notify-status").textContent = NEEDS_UPDATE; return; }
+  if (error) { $("#notify-status").textContent = /notify_prefs|42P01|schema cache/i.test(error.message + error.code) ? NEEDS_UPDATE : "Couldn't load the notification settings: " + error.message; return; }
   const p = data || { morning: "07:30", evening: "20:00", on_assigned: true, on_comment: true, on_closed: true };
   $("#n-lang").value = p.lang === "pl" ? "pl" : "en";
   $("#n-morning").value = p.morning || "";
@@ -3116,7 +3116,8 @@ function writeFailed(err) {
   const code = err && err.code;
   toast(code === "permission_denied" || code === "not_granted"
     ? "Couldn't save: you can view these tasks but not change them."
-    : "Couldn't save the change. Check your connection and try again.");
+    : isNetworkError(err) || !err?.message ? "Couldn't save the change. Check your connection and try again."
+    : "Couldn't save the change: " + err.message);
 }
 document.addEventListener("click", (e) => { if (e.target.closest("[data-close]") || e.target.id === "scrim") closePanels(); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#scrim").hidden) closePanels(); });

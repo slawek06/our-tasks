@@ -1,7 +1,7 @@
 // Our Tasks service worker: keeps the app's files on the device so it opens without internet.
 // Data is not handled here: the app keeps its own copy of the data and syncs it with Supabase.
 // Bump VERSION when the list of files below changes.
-const VERSION = "v4";
+const VERSION = "v5";
 // Production (/our-tasks/) and development (/our-tasks/dev/) share one website, so each keeps its own cache.
 const SCOPE = new URL(self.registration.scope).pathname;
 const CACHE = "our-tasks-" + VERSION + "-" + SCOPE;
