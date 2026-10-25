@@ -180,6 +180,13 @@ body.shop-mode #lists-mode { display: none; }
 .item .box.tpl { color: var(--muted); width: 22px; justify-content: center; font-size: 18px; line-height: 1; }
 .who-init { flex: none; font: 600 11px/18px var(--f-mono); width: 18px; height: 18px; text-align: center; border-radius: 50%; background: var(--hover); border: 1px solid var(--line); color: var(--muted); text-decoration: none; }
 .cl-row-act { margin-right: 6px; }
+.cl-items .item { grid-template-columns: 22px minmax(0, 1fr) 40px; }
+.cl-items .group-head { align-items: center; padding-left: 0; }
+.cl-items .group-head .item-more { margin-left: -6px; width: 32px; height: 28px; font-size: 15px; }
+.cl-items .item:hover .handle, .cl-items .group-head:hover .handle { opacity: 1; }
+.dragging > .item, .dragging > .group-head { background: var(--accent-soft); box-shadow: 0 3px 14px rgba(20, 30, 60, .18); border-radius: 9px; }
+.cl-target { display: flex; gap: 8px; align-items: center; font-size: 13.5px; color: var(--accent); font-weight: 600; }
+.cl-target button { border: 0; background: none; padding: 0 4px; font-size: 13px; color: var(--muted); text-decoration: underline; }
 .cl-foot { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 16px 10px 6px; }
 .cl-foot .spacer { flex: 1; }
 details.cl-closed summary { cursor: pointer; padding: 14px 10px 4px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
@@ -378,6 +385,7 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
       <input type="text" id="cl-input" placeholder="Add items, or “Heading:”" aria-label="Add items" enterkeyhint="done">
       <button class="btn primary" type="submit">Add</button>
     </form>
+    <div class="cl-target" id="cl-target" hidden></div>
     <div class="chips" id="cl-chips" hidden></div>
   </section>
 
@@ -1755,12 +1763,12 @@ document.addEventListener("keydown", (e) => {
 
 // ---- reordering: drag the handle, or focus it and use the arrow keys ----
 let drag = null, renderQueued = false;
-function startDrag(e) {
-  if (e.button > 0 || !canDrag()) return;
+function startDrag(e, save = saveOrder, allowed = canDrag()) {
+  if (e.button > 0 || !allowed) return;
   e.preventDefault();
   // Listen on the window: moving the row in the DOM would drop a pointer capture taken on the handle.
   const node = e.currentTarget.closest(".node");
-  drag = { node, container: node.parentElement };
+  drag = { node, container: node.parentElement, save };
   node.classList.add("dragging"); document.body.classList.add("is-dragging");
   window.addEventListener("pointermove", onDragMove);
   window.addEventListener("pointerup", endDrag);
@@ -1779,7 +1787,7 @@ function onDragMove(e) {
 }
 async function endDrag() {
   if (!drag) return;
-  const { node, container } = drag;
+  const { node, container, save } = drag;
   window.removeEventListener("pointermove", onDragMove);
   window.removeEventListener("pointerup", endDrag);
   window.removeEventListener("pointercancel", endDrag);
@@ -1787,7 +1795,7 @@ async function endDrag() {
   node.classList.remove("dragging"); document.body.classList.remove("is-dragging");
   const ids = [...container.children].map((n) => n.dataset.id).filter(Boolean);
   drag = null;
-  await saveOrder(ids);
+  await save(ids);
   if (renderQueued) { renderQueued = false; render(); }
 }
 async function saveOrder(ids) {
@@ -2155,6 +2163,7 @@ $("#comment-add").addEventListener("click", async () => {
 // ---- checklists: reusable templates ("Leaving Warsaw → Kraków") and the lists started from them ----
 // Items are text + done only; ticked items stay until the whole list is closed, which archives it.
 let checklists = new Map(), clItems = new Map(), checklistsMissing = false, openChecklistId = null;
+let clTarget = null; // heading that new items go under ("Add here"); otherwise they go to the end
 let listsMode = "shopping";
 try { listsMode = localStorage.getItem("listsMode") === "checklists" ? "checklists" : "shopping"; } catch {}
 function listenChecklists() {
@@ -2171,7 +2180,7 @@ const clItemsOf = (id) => [...clItems.values()].filter((i) => i.checklistId === 
 const clProgress = (id) => { const xs = clItemsOf(id).filter((i) => !i.heading); return [xs.filter((i) => i.done).length, xs.length]; };
 const clDate = () => new Date().toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
 function setListsMode(m) { listsMode = m; try { localStorage.setItem("listsMode", m); } catch {} render(); }
-function showChecklist(id) { openChecklistId = id; $("#cl-input").value = ""; render(); window.scrollTo(0, 0); }
+function showChecklist(id) { openChecklistId = id; clTarget = null; $("#cl-input").value = ""; render(); window.scrollTo(0, 0); }
 function renderListsMode() {
   const active = [...checklists.values()].filter((c) => !c.template && !c.closed).length;
   fill($("#lists-mode"), [["shopping", "Shopping"], ["checklists", active ? `Checklists · ${active}` : "Checklists"]].map(([k, label]) =>
@@ -2223,13 +2232,34 @@ async function startTemplate(tpl) {
 // ---- items ----
 async function addClItems(text, c) {
   const parts = String(text).split(/[,;\n]/).map((x) => x.trim()).filter(Boolean);
-  const last = Math.max(0, ...clItemsOf(c.id).map((i) => i.order || 0));
+  const xs = clItemsOf(c.id);
+  // New items go to the end, or after the last item under the chosen heading (before the next heading).
+  let prev = Math.max(0, ...xs.map((i) => i.order || 0)), step = 1000;
+  const at = xs.findIndex((i) => i.id === clTarget);
+  if (at >= 0) {
+    let end = at + 1;
+    while (end < xs.length && !xs[end].heading) end++;
+    prev = xs[end - 1].order || 0;
+    if (end < xs.length) step = ((xs[end].order || 0) - prev) / (parts.length + 1);
+  }
   try {
     for (const [n, raw] of parts.entries()) {
       const heading = raw.endsWith(":"), t = heading ? raw.slice(0, -1).trim() : raw;
-      if (t) await store.add("checklist_items", { checklistId: c.id, text: t.slice(0, 200), heading, done: false, doneBy: "", order: last + 1000 * (n + 1) });
+      if (t) await store.add("checklist_items", { checklistId: c.id, text: t.slice(0, 200), heading, done: false, doneBy: "", order: prev + step * (n + 1) });
     }
   } catch (err) { writeFailed(err); }
+}
+async function saveClOrder(ids) {
+  try {
+    for (const [n, id] of ids.entries()) { const o = (n + 1) * 1000; if (clItems.get(id) && clItems.get(id).order !== o) await store.update("checklist_items", id, { order: o }); }
+  } catch (err) { writeFailed(err); }
+}
+async function moveClItem(i, c, delta) {
+  const ids = clItemsOf(c.id).map((x) => x.id), k = ids.indexOf(i.id), j = k + delta;
+  if (j < 0 || j >= ids.length) return;
+  [ids[k], ids[j]] = [ids[j], ids[k]];
+  await saveClOrder(ids);
+  setTimeout(() => document.querySelector(`.node[data-id="${i.id}"] .handle`)?.focus(), 60);
 }
 function toggleClItem(i) {
   store.update("checklist_items", i.id, i.done ? { done: false, doneBy: "", doneAt: null } : { done: true, doneBy: mySlot() || "", doneAt: Date.now() }).catch(writeFailed);
@@ -2256,16 +2286,22 @@ function clItemMenu(i, c) {
   });
 }
 function renderClItem(i, c) {
-  if (i.heading) return h("div", { class: "group-head" }, i.text,
-    canWrite() && !c.closed && h("button", { type: "button", class: "linkish", onclick: () => clItemMenu(i, c) }, "Edit"));
+  const editable = canWrite() && !c.closed;
+  const handle = editable ? h("button", { type: "button", class: "handle", title: "Drag to move (or use the arrow keys)", "aria-label": "Move " + i.text,
+    onpointerdown: (e) => startDrag(e, saveClOrder, true),
+    onkeydown: (e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); moveClItem(i, c, e.key === "ArrowUp" ? -1 : 1); } } }, svg(ICON.grip, 16)) : h("span");
+  if (i.heading) return h("div", { class: "node", "data-id": i.id }, h("div", { class: "group-head" }, handle, i.text,
+    editable && h("button", { type: "button", class: "item-more", "aria-label": "More for " + i.text, onclick: () => clItemMenu(i, c) }, "⋯"),
+    editable && h("button", { type: "button", class: "linkish", onclick: () => { clTarget = clTarget === i.id ? null : i.id; render(); if (clTarget) $("#cl-input").focus(); } },
+      clTarget === i.id ? "Adding here" : "+ Add here")));
   const tickable = !c.template && !c.closed && canWrite(), who = i.done && slotName(i.doneBy);
-  return h("div", { class: "item" + (i.done ? " checked" : "") },
+  return h("div", { class: "node", "data-id": i.id }, h("div", { class: "item" + (i.done ? " checked" : "") }, handle,
     h("button", { type: "button", class: "item-main", "aria-pressed": c.template ? null : String(!!i.done), "aria-label": c.template ? i.text : (i.done ? "Untick: " : "Tick: ") + i.text,
       onclick: () => tickable && toggleClItem(i) },
       c.template ? h("span", { class: "box tpl" }, "•") : h("span", { class: "box" }, svg(i.done ? ICON.done : ICON.todo, 22)),
       h("span", { class: "item-text" }, h("span", { class: "item-name" }, i.text)),
       who && h("span", { class: "who-init", title: "Ticked by " + who }, who[0].toUpperCase())),
-    canWrite() && !c.closed ? h("button", { type: "button", class: "item-more", "aria-label": "More for " + i.text, onclick: () => clItemMenu(i, c) }, "⋯") : h("span"));
+    editable ? h("button", { type: "button", class: "item-more", "aria-label": "More for " + i.text, onclick: () => clItemMenu(i, c) }, "⋯") : h("span")));
 }
 // Empty input: what this template's lists usually have; while typing: matching items from all lists.
 function renderClChips() {
@@ -2302,7 +2338,7 @@ $("#cl-form").addEventListener("submit", async (e) => {
   renderClChips();
 });
 $("#cl-input").addEventListener("input", renderClChips);
-$("#cl-back").addEventListener("click", () => { openChecklistId = null; render(); });
+$("#cl-back").addEventListener("click", () => { openChecklistId = null; clTarget = null; render(); });
 
 // ---- closing: archives the list, and offers to add what was added on the way to its template ----
 async function closeChecklist(c) {
@@ -2382,8 +2418,12 @@ function renderChecklist(list, c) {
     c.template ? h("span", {}, "Template") : c.closed ? h("span", {}, "Closed " + (c.closedAt ? fmtStamp(c.closedAt) : "")) : clBar([done, total]));
   $("#cl-form").hidden = c.closed || !canWrite();
   renderClChips();
-  const xs = clItemsOf(c.id), w = canWrite();
-  const out = xs.length ? xs.map((i) => renderClItem(i, c)) : [h("div", { class: "empty" }, h("span", {}, c.template
+  const xs = clItemsOf(c.id), w = canWrite(), target = xs.find((i) => i.id === clTarget && i.heading);
+  if (!target) clTarget = null;
+  const tl = $("#cl-target");
+  tl.hidden = !target || c.closed;
+  if (target) fill(tl, h("span", {}, `New items go under “${target.text}”`), h("button", { type: "button", onclick: () => { clTarget = null; render(); } }, "Add at the end instead"));
+  const out = xs.length ? [h("div", { class: "cl-items" + (w && !c.closed ? " can-drag" : "") }, xs.map((i) => renderClItem(i, c)))] : [h("div", { class: "empty" }, h("span", {}, c.template
     ? "Add the things you always need, several at once with commas. A line ending with “:” becomes a heading, e.g. “Before we go:” or “Bring:”."
     : "Add items above, several at once with commas."))];
   out.push(h("div", { class: "cl-foot" },
