@@ -94,7 +94,7 @@ Notes from daily use go here, then we pick what to improve.
 | ⬜ | **Gentle nudge**: "Remind Wiola" push worded by Claude, at most once a day per task | S | |
 | ⬜ | ⭐ **"Where are we this week?"**: which home each of you is at; that home's tasks first in Today, briefing mentions it, "Next time in Warsaw" lists | M | Top pick; pairs with Checklists and areas |
 | ⬜ | **Decisions and approvals**: options (with photos) to vote on or approve ("OK to order this sofa?"); result kept in the task | M | Replaces the old "Approvals" item |
-| ⬜ | **"To talk about" list**: topics that aren't tasks yet; one tap turns one into a project | S | Feeds the weekly check-in |
+| 🔶 | **"To talk about" list**: a standing checklist (never closed); shows who raised each topic; tick when discussed, then Clear ticked; briefings may mention topics | | Built on dev, next release (migration 009) |
 | ⬜ | **Our week**: who's doing what this week and what each finished, incl. planning and shopping; awareness, not scorekeeping | S | Replaces "Who's doing what this week" |
 | ⬜ | **Rotating chores**: repeating tasks alternate the assignee ("Bins: Sławek this week, Wiola next") | S | |
 | ⬜ | ⭐ **"Thanks ❤️"**: one-tap thanks on "closed by the other" notifications | S | Top pick; covers "reactions" |
@@ -122,7 +122,7 @@ Notes from daily use go here, then we pick what to improve.
 |---|---|---|---|
 | ✅ | Lists, sections, suggestions, smart add, shopping mode, items for tasks | | |
 | ✅ | Frequent items per list | | |
-| ⬜ | Private shopping items | S | Today all items are shared |
+| 🔶 | Private shopping lists (whole list private; private items not needed) | | Built on dev, next release (migration 009) |
 | ⬜ | Recurring shopping ("coffee every 2 weeks") | S | |
 | ⬜ | Shop-specific order (learned from ticking order) | S | |
 | ⬜ | Prices and budget per list / trip | M | |

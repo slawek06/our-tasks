@@ -50,7 +50,7 @@ A new project gets its full database from `python3 scripts/make-setup-sql.py <pr
   RFC 8291/8292 code), the morning/evening briefings written by Claude, and the briefing chat whose
   proposed changes the app applies only after you confirm. A pg_cron job calls it every 15 minutes.
 - `supabase/migrations/`: database updates to run once in the SQL Editor (002 My day, 003 per-list
-  frequent items, 004 notifications and briefings, 005 briefing language, 006 ideas for the app, 007 areas, 008 checklists).
+  frequent items, 004 notifications and briefings, 005 briefing language, 006 ideas for the app, 007 areas, 008 checklists, 009 private lists and standing lists).
 
 ## Setup notes
 

@@ -212,7 +212,8 @@ body.shop-mode header.top, body.shop-mode .tabs, body.shop-mode #shop-lists, bod
 body.shop-mode .item-main { min-height: 62px; font-size: 18px; }
 body.shop-mode .item .box svg { width: 26px; height: 26px; }
 .list-row { display: flex; gap: 8px; align-items: center; }
-.list-row input { flex: 1; min-width: 0; border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 9px 11px; }
+.list-row .check { font-size: 13px; white-space: nowrap; }
+.list-row input[type=text] { flex: 1; min-width: 0; border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 9px 11px; }
 .task-shop-row { display: flex; gap: 8px; font-size: 14px; align-items: baseline; padding: 3px 0; }
 .task-shop-row > span:first-child { overflow-wrap: anywhere; min-width: 0; }
 .task-shop-row.bought > span:first-child { color: var(--muted); text-decoration: line-through; }
@@ -561,12 +562,13 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
 <aside class="panel" id="lists-panel" hidden aria-labelledby="ls-title">
   <div class="panel-head"><h2 id="ls-title">Shopping lists</h2><button class="x" type="button" data-close aria-label="Close">×</button></div>
   <div class="fields">
-    <p class="hint">Rename a list by editing its name. Groceries is the default list and can't be deleted.</p>
+    <p class="hint">Rename a list by editing its name. Groceries is the default list and can't be deleted. A private list and its items are visible only to you.</p>
     <div class="field" id="lists-rows"></div>
     <form class="shop-form" id="list-new" autocomplete="off">
       <input type="text" id="list-new-name" maxlength="40" placeholder="New list, e.g. Drugstore" aria-label="New list name">
       <button class="btn" type="submit">Add list</button>
     </form>
+    <label class="check" id="list-new-private-wrap"><input type="checkbox" id="list-new-private"> New list is private</label>
   </div>
 </aside>
 
@@ -698,7 +700,7 @@ let byParent = new Map(), byParentAll = new Map(), commentsBy = new Map();
 let editingId = null;
 let view = (() => { try { return localStorage.getItem("view") || "today"; } catch { return "today"; } })();
 let searchMode = false, searchSnippets = new Map(), flashId = null;
-let todayPins = {}, pinsSupported = true, perListSupported = true, areasSupported = true, editingArea = false;
+let todayPins = {}, pinsSupported = true, perListSupported = true, areasSupported = true, privateListsSupported = true, editingArea = false;
 // New tasks are due tomorrow unless you pick another date (or clear it).
 const defaultDue = () => addDays(todayStr(), 1);
 const filter = { who: "all", hideDone: false, q: "" };
@@ -973,6 +975,8 @@ const store = {
     // My day pins need a column added by supabase/migrations/002_my_day.sql; until then the feature explains itself.
     if (/[?&](briefing|task)=/.test(location.search)) { const url = location.href; history.replaceState(null, "", location.pathname); setTimeout(() => handleOpen(url), 300); }
     sb.client.from("user_state").select("today").limit(1).then(({ error }) => { pinsSupported = !error || isNetworkError(error); });
+    // Private shopping lists and standing checklists need supabase/migrations/009_private_lists_standing.sql.
+    sb.client.from("lists").select("private").limit(1).then(({ error }) => { privateListsSupported = !error || isNetworkError(error); render(); });
     // Areas need the kind column from supabase/migrations/007_areas.sql; until then the Tasks view says so.
     sb.client.from("tasks").select("kind").limit(1).then(({ error }) => { areasSupported = !error || isNetworkError(error); render(); });
     // Per-list frequent items need supabase/migrations/003_catalog_per_list.sql; until then Frequent is shared.
@@ -2197,7 +2201,7 @@ const clDate = () => new Date().toLocaleDateString(undefined, { weekday: "short"
 function setListsMode(m) { listsMode = m; try { localStorage.setItem("listsMode", m); } catch {} render(); }
 function showChecklist(id) { openChecklistId = id; clTarget = null; $("#cl-input").value = ""; render(); window.scrollTo(0, 0); }
 function renderListsMode() {
-  const active = [...checklists.values()].filter((c) => !c.template && !c.closed).length;
+  const active = [...checklists.values()].filter((c) => !c.template && !c.closed && !c.standing).length;
   fill($("#lists-mode"), [["shopping", "Shopping"], ["checklists", active ? `Checklists · ${active}` : "Checklists"]].map(([k, label]) =>
     h("button", { type: "button", "aria-pressed": String(listsMode === k), onclick: () => setListsMode(k) }, label)));
 }
@@ -2227,14 +2231,25 @@ function askConfirm(title, text, yes) {
 }
 
 // ---- creating and starting ----
-async function newChecklist(template) {
-  const r = await askText(template ? "New template" : "New list", template ? "e.g. Leaving Warsaw → Kraków" : "e.g. Before the guests arrive", { privacy: true });
+// kind: "template" (reusable version), "oneoff" (closed when done) or "standing" (never closed, e.g. "To talk about").
+async function newChecklist(kind, title) {
+  const template = kind === "template", standing = kind === "standing";
+  const r = title ? { text: title, private: false } : await askText(template ? "New template" : standing ? "New standing list" : "New list",
+    template ? "e.g. Leaving Warsaw → Kraków" : standing ? "e.g. To talk about, Gift ideas" : "e.g. Before the guests arrive", { privacy: true });
   if (!r) return;
   try {
-    const id = await store.add("checklists", { title: r.text, template, templateId: "", closed: false, private: r.private, order: Date.now(), createdAt: Date.now() });
+    const id = await store.add("checklists", { title: r.text, template, templateId: "", closed: false, private: r.private, order: Date.now(), createdAt: Date.now(),
+      ...(standing ? { standing: true } : {}) });
     showChecklist(id);
-    toast(template ? "Add the items you always need. Start the template before each trip." : "List created. Add your items.");
+    toast(template ? "Add the items you always need. Start the template before each trip."
+      : standing ? "Add topics anytime. Tick them once you've talked, then clear the ticked ones." : "List created. Add your items.");
   } catch (err) { writeFailed(err); }
+}
+async function clearTicked(c) {
+  const ticked = clItemsOf(c.id).filter((i) => !i.heading && i.done);
+  if (!ticked.length || !(await askConfirm("Clear the ticked items?", `${ticked.length} ticked item${ticked.length > 1 ? "s" : ""} will be removed from “${c.title}”.`, "Clear"))) return;
+  try { for (const i of ticked) await store.remove("checklist_items", i.id); toast(`Cleared ${ticked.length}`); }
+  catch (err) { writeFailed(err); }
 }
 async function startTemplate(tpl) {
   try {
@@ -2260,7 +2275,8 @@ async function addClItems(text, c) {
   try {
     for (const [n, raw] of parts.entries()) {
       const heading = raw.endsWith(":"), t = heading ? raw.slice(0, -1).trim() : raw;
-      if (t) await store.add("checklist_items", { checklistId: c.id, text: t.slice(0, 200), heading, done: false, doneBy: "", order: prev + step * (n + 1) });
+      if (t) await store.add("checklist_items", { checklistId: c.id, text: t.slice(0, 200), heading, done: false, doneBy: "", order: prev + step * (n + 1),
+        ...(privateListsSupported ? { addedBy: mySlot() || "" } : {}) });
     }
   } catch (err) { writeFailed(err); }
 }
@@ -2309,13 +2325,14 @@ function renderClItem(i, c) {
     editable && h("button", { type: "button", class: "item-more", "aria-label": "More for " + i.text, onclick: () => clItemMenu(i, c) }, "⋯"),
     editable && h("button", { type: "button", class: "linkish", onclick: () => { clTarget = clTarget === i.id ? null : i.id; render(); if (clTarget) $("#cl-input").focus(); } },
       clTarget === i.id ? "Adding here" : "+ Add here")));
-  const tickable = !c.template && !c.closed && canWrite(), who = i.done && slotName(i.doneBy);
+  const tickable = !c.template && !c.closed && canWrite();
+  const whoSlot = c.standing ? i.addedBy : i.done ? i.doneBy : "", who = slotName(whoSlot);
   return h("div", { class: "node", "data-id": i.id }, h("div", { class: "item" + (i.done ? " checked" : "") }, handle,
     h("button", { type: "button", class: "item-main", "aria-pressed": c.template ? null : String(!!i.done), "aria-label": c.template ? i.text : (i.done ? "Untick: " : "Tick: ") + i.text,
       onclick: () => tickable && toggleClItem(i) },
       c.template ? h("span", { class: "box tpl" }, "•") : h("span", { class: "box" }, svg(i.done ? ICON.done : ICON.todo, 22)),
       h("span", { class: "item-text" }, h("span", { class: "item-name" }, i.text)),
-      who && h("span", { class: "who-init " + pc(i.doneBy), title: "Ticked by " + who }, who[0].toUpperCase())),
+      who && h("span", { class: "who-init " + pc(whoSlot), title: (c.standing ? "Added by " : "Ticked by ") + who }, who[0].toUpperCase())),
     editable ? h("button", { type: "button", class: "item-more", "aria-label": "More for " + i.text, onclick: () => clItemMenu(i, c) }, "⋯") : h("span")));
 }
 // Empty input: what this template's lists usually have; while typing: matching items from all lists.
@@ -2405,7 +2422,8 @@ function renderChecklists(list) {
   if (c) return renderChecklist(list, c);
   openChecklistId = null;
   const all = [...checklists.values()], byOrder = (a, b) => (a.order || 0) - (b.order || 0);
-  const active = all.filter((x) => !x.template && !x.closed).sort(byOrder), templates = all.filter((x) => x.template).sort((a, b) => a.title.localeCompare(b.title));
+  const standing = all.filter((x) => x.standing).sort(byOrder);
+  const active = all.filter((x) => !x.template && !x.closed && !x.standing).sort(byOrder), templates = all.filter((x) => x.template).sort((a, b) => a.title.localeCompare(b.title));
   const closed = all.filter((x) => !x.template && x.closed).sort((a, b) => (b.closedAt || 0) - (a.closedAt || 0));
   const row = (x, extra, act) => h("div", { class: "item" },
     h("button", { type: "button", class: "item-main", onclick: () => showChecklist(x.id) },
@@ -2413,15 +2431,21 @@ function renderChecklists(list) {
     act || h("span"));
   const out = [];
   if (!all.length) out.push(h("div", { class: "empty" }, h("strong", {}, "No checklists yet"),
+    h("span", {}, "A “To talk about” list collects topics for a calm moment together; tick them once discussed."),
     h("span", {}, "Make a template for what you do again and again, like “Leaving Warsaw → Kraków” or “Ski trip packing”. Before each trip, tap Start: you get a fresh list to tick off together.")));
+  if (standing.length) out.push(h("div", { class: "group-head" }, "Standing lists", h("span", { class: "n" }, String(standing.length))),
+    ...standing.map((x) => { const n = clItemsOf(x.id).filter((i) => !i.heading && !i.done).length; return row(x, n ? `${n} open` : "Nothing open"); }));
   if (active.length) out.push(h("div", { class: "group-head" }, "Active", h("span", { class: "n" }, String(active.length))),
     ...active.map((x) => row(x, clBar(clProgress(x.id)))));
   if (templates.length) out.push(h("div", { class: "group-head" }, "Templates", h("span", { class: "n" }, String(templates.length))),
     ...templates.map((x) => { const n = clProgress(x.id)[1];
       return row(x, `${n} item${n === 1 ? "" : "s"}`, canWrite() ? h("button", { type: "button", class: "btn small primary cl-row-act", onclick: () => startTemplate(x) }, "Start") : null); }));
   if (canWrite()) out.push(h("div", { class: "cl-foot" },
-    h("button", { type: "button", class: "btn", onclick: () => newChecklist(true) }, "+ New template"),
-    h("button", { type: "button", class: "btn", onclick: () => newChecklist(false) }, "+ One-off list")));
+    h("button", { type: "button", class: "btn", onclick: () => newChecklist("template") }, "+ New template"),
+    h("button", { type: "button", class: "btn", onclick: () => newChecklist("oneoff") }, "+ One-off list"),
+    privateListsSupported && h("button", { type: "button", class: "btn", onclick: () => newChecklist("standing") }, "+ Standing list"),
+    privateListsSupported && !standing.some((x) => norm(x.title) === "to talk about") &&
+      h("button", { type: "button", class: "btn primary", onclick: () => newChecklist("standing", "To talk about") }, "+ “To talk about” list")));
   if (closed.length) out.push(h("details", { class: "cl-closed" }, h("summary", {}, `Closed (${closed.length})`),
     ...closed.map((x) => row(x, "Closed " + (x.closedAt ? fmtStamp(x.closedAt) : "")))));
   fill(list, out);
@@ -2430,7 +2454,7 @@ function renderChecklist(list, c) {
   $("#cl-title").textContent = c.title;
   const [done, total] = clProgress(c.id), tpl = checklists.get(c.templateId);
   fill($("#cl-meta"), c.private && h("span", { class: "chip private" }, "Private"),
-    c.template ? h("span", {}, "Template") : c.closed ? h("span", {}, "Closed " + (c.closedAt ? fmtStamp(c.closedAt) : "")) : clBar([done, total]));
+    c.template ? h("span", {}, "Template") : c.standing ? h("span", {}, "Standing list") : c.closed ? h("span", {}, "Closed " + (c.closedAt ? fmtStamp(c.closedAt) : "")) : clBar([done, total]));
   $("#cl-form").hidden = c.closed || !canWrite();
   renderClChips();
   const xs = clItemsOf(c.id), w = canWrite(), target = xs.find((i) => i.id === clTarget && i.heading);
@@ -2440,13 +2464,15 @@ function renderChecklist(list, c) {
   if (target) fill(tl, h("span", {}, `New items go under “${target.text}”`), h("button", { type: "button", onclick: () => { clTarget = null; render(); } }, "Add at the end instead"));
   const out = xs.length ? [h("div", { class: "cl-items" + (w && !c.closed ? " can-drag" : "") }, xs.map((i) => renderClItem(i, c)))] : [h("div", { class: "empty" }, h("span", {}, c.template
     ? "Add the things you always need, several at once with commas. A line ending with “:” becomes a heading, e.g. “Before we go:” or “Bring:”."
+    : c.standing ? "Add topics anytime, several at once with commas. Tick them once you've talked about them."
     : "Add items above, several at once with commas."))];
   out.push(h("div", { class: "cl-foot" },
     w && h("button", { type: "button", class: "btn danger", onclick: () => deleteChecklist(c) }, "Delete"),
     w && !c.closed && h("button", { type: "button", class: "btn", onclick: () => renameChecklist(c) }, "Rename"),
     h("span", { class: "spacer" }),
     w && c.template && h("button", { type: "button", class: "btn primary", onclick: () => startTemplate(c) }, "Start a list from it"),
-    w && !c.template && !c.closed && h("button", { type: "button", class: "btn done", onclick: () => closeChecklist(c) }, "Close list"),
+    w && c.standing && h("button", { type: "button", class: "btn", onclick: () => clearTicked(c) }, "Clear ticked"),
+    w && !c.template && !c.closed && !c.standing && h("button", { type: "button", class: "btn done", onclick: () => closeChecklist(c) }, "Close list"),
     w && c.closed && h("button", { type: "button", class: "btn", onclick: () => store.update("checklists", c.id, { closed: false, closedAt: null }).catch(writeFailed) }, "Reopen")));
   if (tpl && !c.template) out.push(h("p", { class: "hint", style: "padding: 0 10px" }, `Started from the template “${tpl.title}”.`));
   fill(list, out);
@@ -2694,6 +2720,8 @@ async function addEntries(entries, listId, taskId = "") {
       }
       added.push(e.name);
       const cid = catalogId(e.name), c = catalog.get(cid);
+      // Private lists stay out of the shared suggestions, so their items can't show up for the other person.
+      if (lists.get(listId)?.private) { if (taskId) log(taskId, `added “${e.name}” to a private list`); continue; }
       // Older entries keep their earlier history under Groceries.
       const before = c?.listCounts && Object.keys(c.listCounts).length ? c.listCounts : c?.count ? { groceries: c.count } : {};
       const listCounts = { ...before, [listId]: (before[listId] || 0) + 1 };
@@ -2732,7 +2760,7 @@ function renderShopBar() {
   fill($("#shop-lists"),
     h("div", { class: "seg", role: "group", "aria-label": "Shopping lists" }, allLists().map((l) => {
       const n = openItems(l.id).filter((i) => !i.checked).length;
-      return h("button", { type: "button", "aria-pressed": String(l.id === cur), onclick: () => selectList(l.id) }, l.name + (n ? ` · ${n}` : ""));
+      return h("button", { type: "button", "aria-pressed": String(l.id === cur), title: l.private ? "Private: only you can see this list" : null, onclick: () => selectList(l.id) }, (l.private ? "🔒 " : "") + l.name + (n ? ` · ${n}` : ""));
     })),
     canWrite() && h("button", { type: "button", class: "btn small", onclick: openListsPanel }, "Edit lists"),
     h("span", { class: "spacer" }),
@@ -3160,12 +3188,21 @@ $("#it-delete").addEventListener("click", async () => {
 
 function openListsPanel() { renderListsPanel(); openPanel($("#lists-panel")); }
 function renderListsPanel() {
+  $("#list-new-private-wrap").hidden = !privateListsSupported || store.mode !== "supabase" && store.mode !== "local";
   $("#lists-rows").replaceChildren(...allLists().map((l) => h("div", { class: "list-row" },
     h("input", { type: "text", value: l.name, maxlength: "40", "aria-label": "Name of list " + l.name, onchange: (e) => {
       const name = e.target.value.trim();
-      if (name) store.put("lists", l.id, { name, order: l.order || 0 }).catch(writeFailed);
+      if (name) store.put("lists", l.id, { name, order: l.order || 0, ...(privateListsSupported ? { private: !!l.private } : {}) }).catch(writeFailed);
     } }),
+    l.id !== "groceries" && privateListsSupported && h("label", { class: "check", title: "Only you can see a private list and its items" },
+      h("input", { type: "checkbox", checked: !!l.private, onchange: (e) => setListPrivate(l, e.target.checked) }), " Private"),
     l.id !== "groceries" && h("button", { type: "button", class: "btn small danger", onclick: () => deleteList(l) }, "Delete"))));
+}
+async function setListPrivate(l, on) {
+  try {
+    await store.update("lists", l.id, on ? { private: true, ...(store.mode === "supabase" ? { owner: meId } : {}) } : { private: false });
+    toast(on ? `“${l.name}” is now private: only you can see it` : `“${l.name}” is now shared`);
+  } catch (err) { writeFailed(err); renderListsPanel(); }
 }
 async function deleteList(l) {
   const its = openItems(l.id);
@@ -3188,7 +3225,9 @@ $("#list-new").addEventListener("submit", async (e) => {
   const name = $("#list-new-name").value.trim();
   if (!name) return;
   $("#list-new-name").value = "";
-  try { const id = await store.add("lists", { name, order: Date.now() }); selectList(id); renderListsPanel(); }
+  const priv = privateListsSupported && $("#list-new-private").checked;
+  $("#list-new-private").checked = false;
+  try { const id = await store.add("lists", { name, order: Date.now(), ...(priv ? { private: true } : {}) }); selectList(id); renderListsPanel(); }
   catch (err) { writeFailed(err); }
 });
 
