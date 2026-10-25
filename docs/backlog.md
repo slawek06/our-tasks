@@ -66,12 +66,24 @@ Notes from daily use go here, then we pick what to improve.
 
 ## Working as a couple
 
+⭐ = top picks (most effect for the effort). Ideas collected 26 Oct 2026, for the future.
+
 | | Item | Effort | Notes |
 |---|---|---|---|
 | ✅ | Assign to each other, "new for you", activity feed, comments | | |
-| ⬜ | "Who's doing what this week" overview | S | |
-| ⬜ | Reactions and quick replies on comments | S | |
-| ⬜ | Approvals ("OK to order this?") | M | |
+| ⬜ | ⭐ **"I'm going to the shop"**: one tap tells the other person, items they add appear live | S | Top pick |
+| ⬜ | ⭐ **"Can you take this?"**: ask instead of assign; Take it / Can't, because… | S | Top pick; pairs with seen markers |
+| ⬜ | **Seen markers**: "Wiola saw it 10:42" on assigned tasks and comments | S | |
+| ⬜ | **Mentions in comments**: @Wiola sends her a push | S | |
+| ⬜ | **Gentle nudge**: "Remind Wiola" push worded by Claude, at most once a day per task | S | |
+| ⬜ | ⭐ **"Where are we this week?"**: which home each of you is at; that home's tasks first in Today, briefing mentions it, "Next time in Warsaw" lists | M | Top pick; pairs with Checklists and areas |
+| ⬜ | **Decisions and approvals**: options (with photos) to vote on or approve ("OK to order this sofa?"); result kept in the task | M | Replaces the old "Approvals" item |
+| ⬜ | **"To talk about" list**: topics that aren't tasks yet; one tap turns one into a project | S | Feeds the weekly check-in |
+| ⬜ | **Our week**: who's doing what this week and what each finished, incl. planning and shopping; awareness, not scorekeeping | S | Replaces "Who's doing what this week" |
+| ⬜ | **Rotating chores**: repeating tasks alternate the assignee ("Bins: Sławek this week, Wiola next") | S | |
+| ⬜ | ⭐ **"Thanks ❤️"**: one-tap thanks on "closed by the other" notifications | S | Top pick; covers "reactions" |
+| ⬜ | ⭐ **Weekly check-in with Claude**: 10-minute Sunday conversation (done, stuck, to talk about, who takes what), changes applied on confirm | M | Top pick; builds on the briefing chat |
+| ⬜ | Quick replies on comments | S | |
 
 ## Tasks and projects
 
