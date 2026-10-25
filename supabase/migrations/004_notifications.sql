@@ -20,6 +20,7 @@ create policy "push_subscriptions: own rows" on public.push_subscriptions
 -- Each person's notification settings. Times are local "HH:MM" in their time zone.
 create table if not exists public.notify_prefs (
   user_id      uuid primary key default auth.uid() references auth.users on delete cascade,
+  lang         text not null default 'en',             -- briefing language: en | pl (also added by 005)
   tz           text not null default 'Europe/Warsaw',
   morning      text not null default '07:30',   -- '' = no morning briefing
   evening      text not null default '20:00',   -- '' = no evening check

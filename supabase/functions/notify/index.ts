@@ -114,7 +114,7 @@ async function people() {
 }
 const slotOf = (p: Awaited<ReturnType<typeof people>>, uid: string) => (p.aUser === uid ? "a" : p.bUser === uid ? "b" : "");
 const nameOf = (p: Awaited<ReturnType<typeof people>>, slot: string) => (slot === "a" ? p.a : slot === "b" ? p.b : slot === "both" ? "both of you" : "") || "";
-const PREF_DEFAULTS = { tz: "Europe/Warsaw", morning: "07:30", evening: "20:00", quiet_from: "22:00", quiet_to: "07:00", on_assigned: true, on_comment: true, on_closed: true, morning_sent: "", evening_sent: "" };
+const PREF_DEFAULTS = { lang: "en", tz: "Europe/Warsaw", morning: "07:30", evening: "20:00", quiet_from: "22:00", quiet_to: "07:00", on_assigned: true, on_comment: true, on_closed: true, morning_sent: "", evening_sent: "" };
 async function prefsOf(uid: string) {
   const { data } = await db.from("notify_prefs").select("*").eq("user_id", uid).maybeSingle();
   return { ...PREF_DEFAULTS, ...(data ?? {}), user_id: uid };
@@ -156,7 +156,7 @@ async function snapshot(uid: string) {
   for (const i of itemsRes.data ?? []) {
     const ln = listName.get(i.list_id) ?? "Groceries";
     if (!shopping.has(ln)) shopping.set(ln, []);
-    shopping.get(ln)!.push(i.name + (i.qty ? ` x${i.qty}` : "") + (i.checked ? " (in basket)" : ""));
+    shopping.get(ln)!.push(i.name + (i.qty ? ` (quantity: ${i.qty})` : "") + (i.checked ? " (already in the basket)" : ""));
   }
   const lists = [{ id: "groceries", name: "Groceries" }, ...(listsRes.data ?? []).filter((l) => l.id !== "groceries")];
   const activity = (histRes.data ?? []).filter((h) => byId.has(h.task_id) || !h.task_id).map((h) => `${nameOf(ppl, h.author) || "Someone"} ${h.text} ("${h.title}")`);
@@ -188,6 +188,15 @@ async function askClaude(system: string, messages: Turn[], schema: Record<string
   return JSON.parse(response.content.filter((b) => b.type === "text").map((b) => b.text).join(""));
 }
 
+// Briefings and replies are also read aloud by the app, so they must sound natural when spoken.
+const SPOKEN_STYLE =
+  "Your text is shown in the app and also read aloud by a speech voice, so write natural spoken sentences: " +
+  "no symbols or shorthand (never \"x4\", \"×\", \"/\", \"&\", bullets, emoji or abbreviations like \"pcs\"); " +
+  "say quantities the way a person would (\"four kilos of potatoes\" when a unit is given, otherwise \"four potatoes\"; skip a quantity of one); " +
+  "don't read out whole lists: summarise and name at most two or three items (\"six things on Groceries, including potatoes and herring\"); " +
+  "write dates as words (\"on Friday\", \"tomorrow\"), not as numbers.";
+const LANGUAGE = { en: "English", pl: "Polish" } as Record<string, string>;
+
 // ---- briefings ----
 const BRIEFING_SCHEMA = {
   type: "object",
@@ -203,7 +212,7 @@ async function writeBriefing(uid: string, kind: "morning" | "evening") {
   const ask = `${s.text}\n\n` + (kind === "morning"
     ? `Write ${s.myName}'s morning briefing: friendly and short, 2-4 sentences, like a helpful partner. Lead with what matters most today for ${s.myName} (overdue first, then due today and MY DAY picks), and give one practical tip, for example combining an errand with an open shopping list or a related task. Mention ${s.me === "a" ? s.ppl.b : s.ppl.a}'s day only if it helps coordinate.`
     : `Write ${s.myName}'s evening check: friendly and short, 2-3 sentences. Say what's still open for today and suggest what to move or do first tomorrow.`) +
-    ` Use task titles exactly as written (they may be Polish); never invent tasks. Write in English. Don't start with a greeting line of its own.` +
+    ` Use task titles as written (they may be Polish), but you may inflect them to fit the sentence; never invent tasks. Write in ${LANGUAGE[s.prefs.lang] || "English"}. Don't start with a greeting line of its own. ${SPOKEN_STYLE}` +
     ` Also write "push": a one-line summary for the lock screen, at most 110 characters.`;
   const out = await askClaude(system, [{ role: "user", content: ask }], BRIEFING_SCHEMA);
   const briefing = String(out.briefing || "").trim(), push = String(out.push || "").trim().slice(0, 140);
@@ -250,7 +259,7 @@ async function chat(uid: string, message: string) {
   }
   if (history[0]?.role === "assistant") history.unshift({ role: "user", content: "Give me my briefing." });
   const system = `You are the friendly assistant inside "Our Tasks", a shared task and shopping app for ${s.ppl.a} and ${s.ppl.b}. ` +
-    `You are chatting with ${s.myName}. Reply conversationally and briefly (usually 1-4 sentences). Use task titles exactly as written; never invent tasks.\n` +
+    `You are chatting with ${s.myName}. Reply conversationally and briefly (usually 1-4 sentences), in the language of ${s.myName}'s last message (${LANGUAGE[s.prefs.lang] || "English"} if unclear). Use task titles as written; never invent tasks. ${SPOKEN_STYLE}\n` +
     `You can PROPOSE changes in "actions"; the app shows them to ${s.myName}, who confirms. Never say a change is done; say you've suggested it.\n` +
     `Action types (fill unused fields with ""): complete {taskId}; set_due {taskId, due "YYYY-MM-DD" or "" to remove}; assign {taskId, assignee "a"|"b"|"both"|""}; ` +
     `add_task {title, due, assignee, parentId}; add_item {text like "2 milk", listId}; pin_today {taskId} (adds to MY DAY). ` +
@@ -301,7 +310,9 @@ Deno.serve(async (req) => {
           if ((nh * 60 + nm) - (h * 60 + m) > 180) continue;
           const b = await writeBriefing(uid, kind);
           if (!b) continue;
-          await pushTo(uid, { title: kind === "morning" ? `Good morning, ${b.name}` : "Evening check", body: b.push || b.row.text.slice(0, 120), url: APP_URL + "?briefing=1", tag: "briefing" });
+          const pl = p.lang === "pl";
+          const title = kind === "morning" ? (pl ? `Dzień dobry, ${b.name}` : `Good morning, ${b.name}`) : (pl ? "Wieczorne podsumowanie" : "Evening check");
+          await pushTo(uid, { title, body: b.push || b.row.text.slice(0, 120), url: APP_URL + "?briefing=1", tag: "briefing" });
           done.push(`${kind}:${uid}`);
         }
       }

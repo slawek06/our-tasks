@@ -432,6 +432,8 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
           <button class="btn small primary" type="button" id="notify-on">Turn on notifications on this device</button>
           <button class="btn small" type="button" id="notify-test" hidden>Send a test</button>
         </div>
+        <div class="field"><label for="n-lang">Briefing language</label>
+          <select id="n-lang"><option value="en">English</option><option value="pl">Polski</option></select></div>
         <div class="two">
           <div class="field"><label for="n-morning">Morning briefing</label><input type="time" id="n-morning"></div>
           <div class="field"><label for="n-evening">Evening check</label><input type="time" id="n-evening"></div>
@@ -2787,14 +2789,16 @@ async function loadNotifyPrefs() {
   const { data, error } = await sb.client.from("notify_prefs").select("*").eq("user_id", meId).maybeSingle();
   if (error) { $("#notify-status").textContent = NEEDS_UPDATE; return; }
   const p = data || { morning: "07:30", evening: "20:00", on_assigned: true, on_comment: true, on_closed: true };
+  $("#n-lang").value = p.lang === "pl" ? "pl" : "en";
   $("#n-morning").value = p.morning || "";
   $("#n-evening").value = p.evening || "";
+  try { if (!localStorage.getItem("voiceLang")) { voiceLang = p.lang === "pl" ? "pl-PL" : "en-GB"; $("#voice-lang").value = voiceLang; } } catch {}
   $("#n-assigned").checked = p.on_assigned; $("#n-comment").checked = p.on_comment; $("#n-closed").checked = p.on_closed;
 }
 async function saveNotifyPrefs(quiet) {
   const row = {
     user_id: meId, tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Warsaw",
-    morning: $("#n-morning").value, evening: $("#n-evening").value,
+    lang: $("#n-lang").value, morning: $("#n-morning").value, evening: $("#n-evening").value,
     on_assigned: $("#n-assigned").checked, on_comment: $("#n-comment").checked, on_closed: $("#n-closed").checked,
   };
   const { error } = await sb.client.from("notify_prefs").upsert(row);
@@ -2843,7 +2847,7 @@ $("#notify-test").addEventListener("click", async () => {
   const { data, error } = await sb.client.functions.invoke("notify", { body: { action: "test" } });
   toast(error ? await fnErrorText(error) : data?.sent ? "Test sent: it should appear in a few seconds." : "No device received it. Turn notifications on again on this device.");
 });
-for (const id of ["#n-morning", "#n-evening", "#n-assigned", "#n-comment", "#n-closed"]) $(id).addEventListener("change", () => saveNotifyPrefs());
+for (const id of ["#n-lang", "#n-morning", "#n-evening", "#n-assigned", "#n-comment", "#n-closed"]) $(id).addEventListener("change", () => saveNotifyPrefs());
 
 // ---- briefing and the conversation about it ----
 let briefRows = [];
@@ -2870,7 +2874,7 @@ function renderBriefing(thinking) {
     out.push(h("div", { class: "bubble " + (r.role === "assistant" ? "assistant" : "user") },
       h("span", { class: "when" }, (label ? label + " · " : "") + when(r)), r.text,
       r.role === "assistant" && synth && h("button", { type: "button", class: "listen-btn", "data-text": r.text,
-        onclick: () => (talk.speaking && talk.speaking.text === r.text ? stopSpeaking() : speak(r.text)) }, "▶ Listen")));
+        onclick: () => (talk.speaking && talk.speaking.original === r.text ? stopSpeaking() : speak(r.text)) }, "▶ Listen")));
     if (r.role === "assistant" && (r.actions?.length || r.applied)) out.push(proposalCard(r));
   }
   if (thinking) out.push(h("div", { class: "bubble assistant" }, h("span", { class: "when" }, "Claude"), "Thinking…"));
@@ -2957,11 +2961,21 @@ function pickVoice(lang) {
   return candidates.sort((a, b) => score(b) - score(a))[0];
 }
 // Reads text aloud; resolves when it's finished (or stopped). Polish replies get a Polish voice.
+// Turns shorthand that slipped into a reply ("Ziemniaki x4", "• item", "2/3") into something a voice can read.
+function speakable(text) {
+  return text
+    .replace(/\s*[x×]\s?(\d+(?:[.,]\d+)?)\b/gi, " $1")   // "x4" -> "4"
+    .replace(/\(quantity:\s*([^)]+)\)/gi, "$1")          // "(quantity: 4)" -> "4"
+    .replace(/[•*#_~`>|]+/g, " ")
+    .replace(/\s*&\s*/g, " and ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
 function speak(text) {
   return new Promise((resolve) => {
     if (!synth || !text) return resolve();
     synth.cancel();
-    const u = new SpeechSynthesisUtterance(text);
+    const u = new SpeechSynthesisUtterance(speakable(text));
     u.lang = looksPolish(text) || /^(Zrobione|Do usłyszenia|Słucham|Dobrze, niczego)/.test(text) ? "pl-PL" : "en-GB";
     const v = pickVoice(u.lang);
     if (v) u.voice = v;
@@ -2969,6 +2983,7 @@ function speak(text) {
     const finish = () => { if (done) return; done = true; if (talk.speaking === u) talk.speaking = null; renderListenButtons(); resolve(); };
     u.onend = u.onerror = finish;
     setTimeout(finish, 2000 + text.length * 120); // some devices never report the end
+    u.original = text;
     talk.speaking = u;
     synth.speak(u);
     renderListenButtons();
@@ -2976,7 +2991,7 @@ function speak(text) {
 }
 function stopSpeaking() { synth?.cancel(); talk.speaking = null; renderListenButtons(); }
 function renderListenButtons() {
-  for (const b of document.querySelectorAll(".listen-btn")) b.textContent = talk.speaking && talk.speaking.text === b.dataset.text ? "■ Stop" : "▶ Listen";
+  for (const b of document.querySelectorAll(".listen-btn")) b.textContent = talk.speaking && talk.speaking.original === b.dataset.text ? "■ Stop" : "▶ Listen";
 }
 const confirmPrompt = (text) => looksPolish(text) ? "Powiedz tak, żeby zatwierdzić, albo nie." : "Say yes to apply, or no.";
 const pendingProposalRow = () => [...briefRows].reverse().find((r) => r.role === "assistant" && r.actions?.length && !r.applied);
