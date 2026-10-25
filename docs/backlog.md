@@ -47,7 +47,7 @@ Notes from daily use go here, then we pick what to improve.
 
 | | Item | Effort | Notes |
 |---|---|---|---|
-| ⬜ | **Areas → Projects → Tasks** (build first: Checklists and colours touch the same screens) | M | See the design below |
+| 🔶 | **Areas → Projects → Tasks** | M | Built on dev (migration 007, notify function updated); testing before production |
 | ⬜ | **Checklists** (e.g. "Before we leave for the other home", "What to bring"): several lists like shopping lists, simple items with only done/not done, ticked items stay visible, closing the whole list archives it; frequent items per list; reusable versions of a list | M | Sławek. Reuse the shopping lists and items tables with a list type. Open question: closing = archive, or also "start again" (untick all) for lists used every trip? |
 | ⬜ | **A colour per person**: Sławek and Wiola each get their own colour at the top (person filter) and everywhere their name appears (assignee, comments, activity, shopping "added by") | S | Sławek. Open question: which colours; pick them under People? |
 
@@ -81,7 +81,7 @@ Notes from daily use go here, then we pick what to improve.
 | ✅ | Today view, My day, quick add, postpone, search everywhere | | |
 | ✅ | Recurring tasks, default due date tomorrow | | |
 | ✅ | Create tasks from text (one new parent task) | | |
-| ⬜ | Progress bar per project | S | Part of Areas → Projects → Tasks |
+| 🔶 | Progress bar per project | S | Part of Areas → Projects → Tasks |
 | ⬜ | Templates (reusable checklists) | S | |
 | ⬜ | Calendar view (month grid) | M | |
 | ⬜ | Attachments and photos (quotes, invoices) | M | Supabase Storage |

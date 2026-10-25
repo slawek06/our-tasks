@@ -122,7 +122,18 @@ h1 { font: 700 34px/1.05 var(--f-display); letter-spacing: -.02em; margin: 0; te
 .date.today { color: var(--doing); }
 .prio-high { color: var(--danger); font-weight: 600; }
 .prio-low { opacity: .8; }
-.progress { font: 500 12px var(--f-mono); font-variant-numeric: tabular-nums; }
+.progress { font: 500 12px var(--f-mono); font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 5px; }
+.pbar { display: inline-block; width: 38px; height: 5px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.pbar i { display: block; height: 100%; background: var(--done); }
+.row.area { margin-top: 6px; }
+.row.area .title { font: 600 16.5px var(--f-display); }
+.area-ico { width: 28px; display: flex; justify-content: center; color: var(--accent); }
+.areas-foot { display: flex; gap: 8px; padding: 14px 10px 4px; }
+.group-head .linkish { margin-left: auto; border: 0; background: none; padding: 0; font: 600 12.5px var(--f-body, inherit); letter-spacing: 0; text-transform: none; color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.sort-row { display: flex; flex-direction: column; gap: 6px; border-bottom: 1px solid var(--line); padding: 10px 0; }
+.sort-row b { font-weight: 600; overflow-wrap: anywhere; }
+.sort-row .hint { font-size: 12.5px; }
+.sort-row select { border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 8px 10px; width: 100%; }
 .add { width: 32px; height: 32px; font-size: 20px; color: var(--muted); opacity: 0; }
 @media (hover: none) { .add, .day { opacity: .7; } .handle { opacity: .8; } }
 .group-head { display: flex; gap: 8px; align-items: baseline; padding: 14px 10px 4px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
@@ -376,26 +387,26 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
     <div class="panel-head"><h2 id="ed-title">Task</h2><button class="x" type="button" data-close aria-label="Close">×</button></div>
     <div class="fields">
       <div class="field"><label for="f-title">Title</label><input type="text" id="f-title" required maxlength="200"></div>
-      <label class="check private-check" id="private-wrap"><input type="checkbox" id="f-private"> Private: only you can see it (and its subtasks)</label>
-      <div class="field"><span class="lbl">Status</span>
+      <label class="check private-check" id="private-wrap"><input type="checkbox" id="f-private"> <span id="private-label">Private: only you can see it (and its subtasks)</span></label>
+      <div class="field task-only"><span class="lbl">Status</span>
         <div class="status-pick" role="radiogroup" aria-label="Status">
           <input type="radio" name="status" id="s-todo" value="todo"><label for="s-todo" class="s-todo"></label>
           <input type="radio" name="status" id="s-doing" value="doing"><label for="s-doing" class="s-doing"></label>
           <input type="radio" name="status" id="s-done" value="done"><label for="s-done" class="s-done"></label>
         </div>
       </div>
-      <div class="two">
+      <div class="two task-only">
         <div class="field" id="assignee-field"><label for="f-assignee">Assigned to</label><select id="f-assignee"></select></div>
         <div class="field"><label for="f-priority">Priority</label>
           <select id="f-priority"><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option></select></div>
       </div>
       <p class="hint" id="assigned-by" hidden></p>
-      <div class="two">
+      <div class="two task-only">
         <div class="field"><label for="f-due">Due date</label><input type="date" id="f-due"></div>
         <div class="field"><label for="f-repeat">Repeats</label><select id="f-repeat"></select></div>
       </div>
       <p class="hint" id="repeat-hint" hidden>When you close it, the next one is created with the due date moved forward.</p>
-      <div class="field"><label for="f-parent">Belongs under</label><select id="f-parent"></select></div>
+      <div class="field task-only"><label for="f-parent">Belongs under</label><select id="f-parent"></select></div>
       <div class="field"><label for="f-notes">Notes</label><textarea id="f-notes" maxlength="5000"></textarea></div>
       <div class="extras" id="extras">
         <div class="field"><span class="lbl">To buy</span>
@@ -507,6 +518,20 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
       <input type="text" id="list-new-name" maxlength="40" placeholder="New list, e.g. Drugstore" aria-label="New list name">
       <button class="btn" type="submit">Add list</button>
     </form>
+  </div>
+</aside>
+
+<aside class="panel" id="sort-panel" hidden aria-labelledby="so-title">
+  <div class="panel-head"><h2 id="so-title">Sort into areas</h2><button class="x" type="button" data-close aria-label="Close">×</button></div>
+  <div class="fields">
+    <p class="hint">Choose an area for each task in the Inbox. Everything under a task moves with it. A task that is really a theme itself can become an area.</p>
+    <button class="btn" type="button" id="sort-suggest" hidden>Suggest areas with Claude</button>
+    <div id="sort-rows"></div>
+  </div>
+  <div class="panel-foot">
+    <span class="spacer"></span>
+    <button class="btn" type="button" data-close>Cancel</button>
+    <button class="btn primary" type="button" id="sort-apply">Move</button>
   </div>
 </aside>
 
@@ -624,7 +649,7 @@ let byParent = new Map(), byParentAll = new Map(), commentsBy = new Map();
 let editingId = null;
 let view = (() => { try { return localStorage.getItem("view") || "today"; } catch { return "today"; } })();
 let searchMode = false, searchSnippets = new Map(), flashId = null;
-let todayPins = {}, pinsSupported = true, perListSupported = true;
+let todayPins = {}, pinsSupported = true, perListSupported = true, areasSupported = true, editingArea = false;
 // New tasks are due tomorrow unless you pick another date (or clear it).
 const defaultDue = () => addDays(todayStr(), 1);
 const filter = { who: "all", hideDone: false, q: "" };
@@ -656,6 +681,7 @@ const ICON = {
   done: '<circle cx="9" cy="9" r="8" fill="currentColor"/><path d="M5.4 9.3l2.4 2.4 4.8-5" fill="none" stroke="var(--surface)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
   chevron: '<path d="M7 4.5L11.5 9 7 13.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
   clock: '<circle cx="9" cy="9" r="7" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9 5.3V9l2.6 1.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
+  area: '<rect x="2.5" y="4" width="13" height="10.5" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M2.5 7.5h13" stroke="currentColor" stroke-width="1.8"/>',
   grip: '<g fill="currentColor"><circle cx="6.5" cy="4.5" r="1.4"/><circle cx="11.5" cy="4.5" r="1.4"/><circle cx="6.5" cy="9" r="1.4"/><circle cx="11.5" cy="9" r="1.4"/><circle cx="6.5" cy="13.5" r="1.4"/><circle cx="11.5" cy="13.5" r="1.4"/></g>',
 };
 
@@ -898,6 +924,8 @@ const store = {
     // My day pins need a column added by supabase/migrations/002_my_day.sql; until then the feature explains itself.
     if (/[?&](briefing|task)=/.test(location.search)) { const url = location.href; history.replaceState(null, "", location.pathname); setTimeout(() => handleOpen(url), 300); }
     sb.client.from("user_state").select("today").limit(1).then(({ error }) => { pinsSupported = !error || isNetworkError(error); });
+    // Areas need the kind column from supabase/migrations/007_areas.sql; until then the Tasks view says so.
+    sb.client.from("tasks").select("kind").limit(1).then(({ error }) => { areasSupported = !error || isNetworkError(error); render(); });
     // Per-list frequent items need supabase/migrations/003_catalog_per_list.sql; until then Frequent is shared.
     sb.client.from("catalog").select("list_counts").limit(1).then(({ error }) => { perListSupported = !error || isNetworkError(error); if (view === "shopping") renderChips(); });
   },
@@ -1142,6 +1170,11 @@ const archiveRoots = () => [...tasks.values()].filter((t) => t.archived && !task
 function descendants(id, out = []) { for (const c of childrenOf(id)) { out.push(c.id); descendants(c.id, out); } return out; }
 function descendantsAll(id, out = []) { for (const c of childrenAll(id)) { out.push(c.id); descendantsAll(c.id, out); } return out; }
 const openDescendants = (id) => descendants(id).map((i) => tasks.get(i)).filter((d) => d.status !== "done");
+// Areas are top-level themes (kind "area"): no status, dates or assignee, never closed. Projects are tasks with tasks under them.
+const isArea = (t) => t?.kind === "area";
+const openTasksIn = (id) => descendants(id).map((i) => tasks.get(i)).filter((d) => !isArea(d) && d.status !== "done");
+const activeAreas = () => childrenOf("").filter(isArea);
+const inboxTasks = () => childrenOf("").filter((t) => !isArea(t));
 function pathOf(t) { const names = []; for (let p = tasks.get(t.parentId); p; p = tasks.get(p.parentId)) names.unshift(p.title || "Untitled"); return names.join(" › "); }
 function sortTasks(arr) {
   const a = [...arr], byOrder = (x, y) => (x.order || 0) - (y.order || 0);
@@ -1238,7 +1271,7 @@ function renderLinkBanner() {
   el.hidden = false;
 }
 function renderSummary() {
-  const all = [...tasks.values()].filter((t) => !t.archived), today = todayStr();
+  const all = [...tasks.values()].filter((t) => !t.archived && !isArea(t)), today = todayStr();
   const open = all.filter((t) => t.status !== "done").length;
   const doing = all.filter((t) => t.status === "doing").length;
   const over = all.filter((t) => t.status !== "done" && t.due && t.due < today).length;
@@ -1252,6 +1285,7 @@ function renderSummary() {
   if (over) el.append(h("span", { class: "over" }, h("b", {}, String(over)), " overdue"));
 }
 function renderTask(t, depth) {
+  if (isArea(t)) return renderArea(t, depth);
   const archived = view === "archive" || (searchMode && !!t.archived), flat = view === "upcoming" || view === "today" || searchMode;
   const kids = kidsInView(t.id), counted = archived ? kids : childrenOf(t.id);
   const shown = sortTasks(kids.filter(visible));
@@ -1276,7 +1310,10 @@ function renderTask(t, depth) {
     meta.append(h("span", { class: "date" + cls }, (cls === " over" ? "Overdue · " : cls === " today" ? "Today · " : "Due ") + fmtDate(t.due)));
   }
   if (t.repeat) meta.append(h("span", {}, "↻ " + REPEAT[t.repeat]));
-  if (counted.length) meta.append(h("span", { class: "progress" }, counted.filter((k) => k.status === "done").length + "/" + counted.length + " done"));
+  if (counted.length) {
+    const nd = counted.filter((k) => k.status === "done").length;
+    meta.append(h("span", { class: "progress", title: `${nd} of ${counted.length} done` }, h("span", { class: "pbar" }, h("i", { style: `width:${Math.round(100 * nd / counted.length)}%` })), nd + "/" + counted.length + " done"));
+  }
   const nb = toBuyBy.get(t.id) || 0;
   if (nb) meta.append(h("span", {}, nb + " to buy"));
   const nc = (commentsBy.get(t.id) || []).length;
@@ -1302,6 +1339,35 @@ function renderTask(t, depth) {
       ? h("button", { type: "button", class: "add", title: "Add subtask", "aria-label": "Add subtask under " + t.title, onclick: () => openEditor(null, t.id) }, "+")
       : h("span"));
 
+  if (t.id === flashId) row.classList.add("flash");
+  const node = h("div", { class: "node", "data-id": t.id }, row);
+  if (shown.length && !isCollapsed) node.append(h("div", { class: "kids" }, shown.map((k) => renderTask(k, depth + 1))));
+  return node;
+}
+function renderArea(t, depth) {
+  const archived = view === "archive" || (searchMode && !!t.archived), flat = view === "upcoming" || view === "today" || searchMode;
+  const kids = kidsInView(t.id), shown = sortTasks(kids.filter(visible));
+  const isCollapsed = !filterActive() && collapsed.has(t.id), today = todayStr();
+  const open = openTasksIn(t.id), over = open.filter((d) => d.due && d.due < today).length;
+  const meta = h("span", { class: "meta" });
+  if (t.private) meta.append(h("span", { class: "chip private", title: "Only you can see this area" }, "Private"));
+  if (archived && t.archivedAt) meta.append(h("span", { class: "date" }, "Archived " + new Date(t.archivedAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })));
+  meta.append(h("span", {}, open.length ? `${open.length} open` : "Nothing open"));
+  if (over) meta.append(h("span", { class: "date over" }, `${over} overdue`));
+  if (t.notes) meta.append(h("span", { title: "Has notes" }, "Notes"));
+  const row = h("div", { class: "row area" + (matches(t) ? "" : " ctx"), style: "--d:" + depth, "data-depth": depth },
+    h("button", { type: "button", class: "handle", title: "Drag to reorder (or use the arrow keys)", "aria-label": "Reorder " + t.title,
+      onpointerdown: (e) => startDrag(e), onkeydown: (e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); moveBy(t, e.key === "ArrowUp" ? -1 : 1); } } }, svg(ICON.grip, 16)),
+    kids.length
+      ? h("button", { type: "button", class: "caret" + (isCollapsed ? "" : " open"), "aria-expanded": String(!isCollapsed), "aria-label": (isCollapsed ? "Expand " : "Collapse ") + t.title,
+          onclick: () => { collapsed.has(t.id) ? collapsed.delete(t.id) : collapsed.add(t.id); saveCollapsed(); render(); } }, svg(ICON.chevron, 16))
+      : h("span"),
+    h("span", { class: "area-ico", title: "Area" }, svg(ICON.area)),
+    h("button", { type: "button", class: "main", onclick: () => openEditor(t.id) }, h("span", { class: "title" }, t.title || "Untitled"), meta),
+    h("span"),
+    canWrite() && !archived && !flat
+      ? h("button", { type: "button", class: "add", title: "Add a task or project", "aria-label": "Add a task under " + t.title, onclick: () => openEditor(null, t.id) }, "+")
+      : h("span"));
   if (t.id === flashId) row.classList.add("flash");
   const node = h("div", { class: "node", "data-id": t.id }, row);
   if (shown.length && !isCollapsed) node.append(h("div", { class: "kids" }, shown.map((k) => renderTask(k, depth + 1))));
@@ -1360,16 +1426,30 @@ function render() {
     return;
   }
 
-  const roots = sortTasks(childrenOf("").filter(visible));
+  const roots = sortTasks(childrenOf("").filter(visible)), areas = roots.filter(isArea), inbox = roots.filter((t) => !isArea(t));
+  const newArea = canWrite() && areasSupported && h("button", { type: "button", class: "btn", onclick: () => openEditor(null, "", { area: true }) }, "+ New area");
   if (!tasks.size) {
     list.replaceChildren(h("div", { class: "empty" },
       h("strong", {}, "No tasks yet"),
-      h("span", {}, "Start with a big area like “Home” or “Holiday 2027”, then add subtasks under it with the + button."),
-      canWrite() && h("button", { type: "button", class: "btn primary", onclick: () => openEditor(null) }, "+ Add your first task")));
+      h("span", {}, areasSupported
+        ? "Start with your areas: the big themes of your life, like a home, Insurance or Finances. Then add projects and tasks inside them with the + button."
+        : "Start with a big topic like “Home” or “Holiday 2027”, then add subtasks under it with the + button."),
+      canWrite() && (areasSupported
+        ? h("button", { type: "button", class: "btn primary", onclick: () => openEditor(null, "", { area: true }) }, "+ Add your first area")
+        : h("button", { type: "button", class: "btn primary", onclick: () => openEditor(null) }, "+ Add your first task"))));
   } else if (!roots.length) {
     list.replaceChildren(noMatch());
   } else {
-    list.replaceChildren(...roots.map((t) => renderTask(t, 0)));
+    // The Inbox holds top-level tasks that aren't in an area yet (quick add, or tasks from before areas existed).
+    const inboxAll = inboxTasks().length;
+    fill(list,
+      inbox.length > 0 && h("section", { class: "inbox" },
+        h("div", { class: "group-head" }, "Inbox", h("span", { class: "n" }, String(inbox.length)),
+          canWrite() && areasSupported && !filterActive() && h("button", { type: "button", class: "linkish", onclick: openSortPanel }, "Sort into areas")),
+        h("div", { class: "inbox-list" }, inbox.map((t) => renderTask(t, 0)))),
+      areas.length > 0 && h("div", { class: "areas" }, areas.map((t) => renderTask(t, 0))),
+      newArea && !filterActive() && h("div", { class: "areas-foot" }, newArea),
+      !areasSupported && inboxAll > 0 && h("p", { class: "hint", style: "padding: 8px 10px" }, "Areas need the database update: run supabase/migrations/007_areas.sql in Supabase."));
   }
 }
 function clearFilters() { filter.who = "all"; filter.hideDone = false; filter.q = ""; $("#hide-done").checked = false; $("#search").value = ""; render(); }
@@ -1682,7 +1762,7 @@ async function saveOrder(ids) {
 }
 async function moveBy(t, delta) {
   if (!canDrag()) return;
-  const ids = childrenOf(parentKey(t)).map((s) => s.id), i = ids.indexOf(t.id), j = i + delta;
+  const ids = childrenOf(parentKey(t)).filter((s) => isArea(s) === isArea(t)).map((s) => s.id), i = ids.indexOf(t.id), j = i + delta;
   if (j < 0 || j >= ids.length) return;
   [ids[i], ids[j]] = [ids[j], ids[i]];
   await saveOrder(ids);
@@ -1736,11 +1816,13 @@ function confirmCascade(title, open) {
 function confirmArchiveUnfinished(t, openCount) {
   return showModal((m, finish) => {
     const subs = openCount ? `${openCount} open subtask${openCount > 1 ? "s" : ""}` : "";
-    const why = t.status !== "done"
+    const why = isArea(t)
+      ? `The area “${t.title}” still has ${openCount} open task${openCount > 1 ? "s" : ""}.`
+      : t.status !== "done"
       ? `“${t.title}” isn't finished${subs ? " and has " + subs : ""}.`
       : `“${t.title}” still has ${subs}.`;
     m.replaceChildren(
-      h("h2", { id: "modal-title" }, "Archive an unfinished task?"),
+      h("h2", { id: "modal-title" }, isArea(t) ? "Archive this area?" : "Archive an unfinished task?"),
       h("p", {}, why + " Everything keeps its status in the archive, and you can restore it anytime."),
       h("div", { class: "actions" }, cancelBtn(finish), h("button", { class: "btn primary", type: "button", id: "modal-yes", onclick: () => finish(true) }, "Archive anyway")));
     m.querySelector("#modal-yes").focus();
@@ -1758,6 +1840,7 @@ async function reopenAncestors(parentId) {
   }
 }
 async function changeStatus(t, next) {
+  if (isArea(t)) return;
   try {
     if (next === "done") {
       const open = openDescendants(t.id);
@@ -1791,8 +1874,8 @@ async function archiveTask(id) {
   } catch (err) { writeFailed(err); }
 }
 async function askArchive(id) {
-  const t = tasks.get(id), openCount = openDescendants(id).length;
-  if ((t.status !== "done" || openCount) && !(await confirmArchiveUnfinished(t, openCount))) return;
+  const t = tasks.get(id), openCount = isArea(t) ? openTasksIn(id).length : openDescendants(id).length;
+  if ((isArea(t) ? openCount : t.status !== "done" || openCount) && !(await confirmArchiveUnfinished(t, openCount))) return;
   closePanels();
   await archiveTask(id);
 }
@@ -1818,11 +1901,13 @@ function closePanels() {
   for (const p of document.querySelectorAll(".panel")) p.hidden = true;
   editingId = null; editingItem = null; resetFoot(); lastFocus?.focus?.();
 }
-function openEditor(id, parentId = "") {
-  const t = id ? tasks.get(id) : { status: "todo", priority: "normal", assignee: "", repeat: "", parentId, due: defaultDue(), private: !!tasks.get(parentId)?.private };
+function openEditor(id, parentId = "", opts = {}) {
+  const t = id ? tasks.get(id) : { status: "todo", priority: "normal", assignee: "", repeat: "", parentId, due: opts.area ? "" : defaultDue(), private: !!tasks.get(parentId)?.private };
   if (!t) return;
   editingId = id;
-  $("#ed-title").textContent = id ? (t.archived ? "Archived task" : "Edit task") : parentId ? "New subtask" : "New task";
+  const area = editingArea = id ? isArea(t) : !!opts.area;
+  $("#ed-title").textContent = area ? (id ? (t.archived ? "Archived area" : "Edit area") : "New area")
+    : id ? (t.archived ? "Archived task" : "Edit task") : isArea(tasks.get(parentId)) ? "New task in " + tasks.get(parentId).title : parentId ? "New subtask" : "New task";
   $("#f-title").value = t.title || "";
   for (const s of Object.keys(STATUS)) { $("#s-" + s).checked = (t.status || "todo") === s; $("label[for=s-" + s + "]").replaceChildren(svg(ICON[s], 16), h("span", {}, STATUS[s])); }
   const asg = $("#f-assignee");
@@ -1842,7 +1927,9 @@ function openEditor(id, parentId = "") {
   fillParents(t, id, !!t.private, t.parentId);
   for (const el of $("#editor .fields").querySelectorAll("input, select, textarea")) el.disabled = !canWrite() || !!t.archived;
   applyPrivateUI(!!t.private);
-  $("#extras").hidden = !id;
+  for (const el of document.querySelectorAll("#editor .task-only")) el.hidden = area;
+  $("#private-label").textContent = area ? "Private: only you can see this area (and everything in it)" : "Private: only you can see it (and its subtasks)";
+  $("#extras").hidden = !id || area;
   if (id) {
     $("#f-comment").value = "";
     $("#ts-input").value = "";
@@ -1861,7 +1948,7 @@ $("#f-repeat").addEventListener("change", (e) => { $("#repeat-hint").hidden = !e
 // and a shared task can't sit under a private one (the other person couldn't see its parent).
 function fillParents(t, id, isPrivate, keep) {
   const banned = new Set(id ? [id, ...descendantsAll(id)] : []);
-  const opts = [h("option", { value: "" }, "Top level")];
+  const opts = [h("option", { value: "" }, areasSupported ? "Inbox (no area yet)" : "Top level")];
   (function walk(pid, depth) {
     for (const c of childrenOf(pid)) {
       if (banned.has(c.id) || (!isPrivate && c.private)) continue;
@@ -1889,6 +1976,7 @@ $("#f-private").addEventListener("change", (e) => {
 $("#ed-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   if (!canWrite()) return;
+  if (editingArea) return saveArea();
   const data = {
     title: $("#f-title").value.trim(),
     status: $("#ed-form").elements.status.value || "todo",
@@ -1935,6 +2023,46 @@ $("#ed-form").addEventListener("submit", async (e) => {
     else if (id && (before.status !== "done" || choice === "archive")) await afterClose({ ...before, ...data, id }, choice);
   } catch (err) { writeFailed(err); }
 });
+async function saveArea() {
+  const title = $("#f-title").value.trim();
+  if (!title) { $("#f-title").focus(); return; }
+  const id = editingId, before = id ? tasks.get(id) : null;
+  if (before?.archived) return;
+  const data = { title, notes: $("#f-notes").value.trim(), private: $("#f-private").checked && privateAvailable(), parentId: "" };
+  closePanels();
+  try {
+    if (id) {
+      if (!!before.private !== data.private) {
+        await setPrivacy(id, data.private, data);
+        toast(data.private ? "Now private: only you can see this area" : "Now shared with " + (slotName(mySlot() === "a" ? "b" : "a") || "the other person"));
+      } else await updTask(id, { title: data.title, notes: data.notes });
+      if (before.title !== title && !data.private) log(id, `renamed the area to “${title}”`, title);
+    } else {
+      const newId = await addTask({ ...newAreaData(title), ...data });
+      if (!data.private) log(newId, "created the area", title);
+      toast(`Added the area “${title}”. Use its + to add projects and tasks.`);
+    }
+  } catch (err) { writeFailed(err); }
+}
+// A top-level task that is really a theme becomes an area, keeping everything under it; and back.
+const TO_AREA = { kind: "area", status: "todo", assignee: "", assignedBy: "", assignedAt: 0, due: "", repeat: "", priority: "normal" };
+const newAreaData = (title) => ({ ...TO_AREA, title, notes: "", private: false, parentId: "", order: Date.now(), createdAt: Date.now() });
+async function makeArea(id) {
+  const t = tasks.get(id); closePanels();
+  try {
+    await updTask(id, TO_AREA);
+    if (!t.private) log(id, "turned it into an area");
+    toast(`“${t.title}” is now an area`);
+  } catch (err) { writeFailed(err); }
+}
+async function makeTask(id) {
+  const t = tasks.get(id); closePanels();
+  try {
+    await updTask(id, { kind: "task" });
+    if (!t.private) log(id, "turned the area back into a task");
+    toast(`“${t.title}” is a task again, in the Inbox`);
+  } catch (err) { writeFailed(err); }
+}
 function resetFoot() {
   const t = editingId && tasks.get(editingId), w = canWrite();
   const del = w && t && h("button", { class: "btn danger", type: "button", onclick: askDelete }, "Delete");
@@ -1943,6 +2071,8 @@ function resetFoot() {
        h("button", { class: "btn", type: "button", onclick: closePanels }, "Close"),
        w && h("button", { class: "btn primary", type: "button", onclick: () => { const id = editingId; closePanels(); restoreTask(id); } }, "Restore")]
     : [del, w && t && h("button", { class: "btn", type: "button", onclick: () => askArchive(editingId) }, "Move to archive"),
+       w && t && areasSupported && !isArea(t) && !parentKey(t) && h("button", { class: "btn", type: "button", onclick: () => makeArea(editingId) }, "Make this an area"),
+       w && t && isArea(t) && h("button", { class: "btn", type: "button", onclick: () => makeTask(editingId) }, "Make this a task"),
        h("span", { class: "spacer" }),
        h("button", { class: "btn", type: "button", onclick: closePanels }, "Cancel"),
        w && h("button", { class: "btn primary", type: "submit" }, "Save")];
@@ -1985,6 +2115,92 @@ $("#comment-add").addEventListener("click", async () => {
   $("#f-comment").value = "";
   try { await store.add("comments", { taskId: editingId, text, by: mySlot() || "", byUser: meId || "", at: Date.now() }); notifyEvent("comment", editingId, text); }
   catch (err) { writeFailed(err); }
+});
+
+// ---- sort into areas: one screen to give every Inbox task an area ----
+// Each choice is "" (stay), "area" (the task becomes an area), an area id, or "new:<name>" (a new area, from Claude's suggestions).
+let sortChoice = new Map(), sortNew = [];
+function openSortPanel() {
+  sortChoice = new Map(); sortNew = [];
+  renderSortRows();
+  $("#sort-suggest").hidden = !sampleFn;
+  openPanel($("#sort-panel"));
+}
+function renderSortRows() {
+  const rows = inboxTasks(), areas = activeAreas();
+  fill($("#sort-rows"), rows.length ? rows.map((t) => {
+    const n = descendants(t.id).length;
+    // A shared task can't go into a private area: the other person couldn't see where it went.
+    const opts = [["", "Leave in the Inbox"], ["area", "Make this an area"],
+      ...areas.filter((a) => t.private || !a.private).map((a) => [a.id, a.title + (a.private ? " (private)" : "")]),
+      ...sortNew.map((name) => ["new:" + name, "New area: " + name])];
+    const sel = h("select", { "aria-label": "Area for " + t.title, onchange: (e) => sortChoice.set(t.id, e.target.value) }, opts.map(([v, l]) => h("option", { value: v }, l)));
+    sel.value = sortChoice.get(t.id) || "";
+    return h("div", { class: "sort-row" }, h("b", {}, t.title || "Untitled"),
+      n > 0 && h("span", { class: "hint" }, `${n} item${n > 1 ? "s" : ""} under it move${n > 1 ? "" : "s"} too`), sel);
+  }) : h("p", { class: "hint" }, "The Inbox is empty."));
+  $("#sort-apply").disabled = !rows.length;
+}
+$("#sort-suggest").addEventListener("click", async () => {
+  if (!(await ensureClaude("Suggesting areas"))) return;
+  const btn = $("#sort-suggest"), rows = inboxTasks(), areas = activeAreas();
+  if (!rows.length) return;
+  btn.disabled = true; btn.textContent = "Thinking…";
+  const steps = (t) => childrenOf(t.id).slice(0, 6).map((c) => c.title).join("; ");
+  const prompt =
+    "A couple sorts their household tasks into areas: big themes that never finish, such as one of their homes, Insurance, Finances, Health or Car.\n" +
+    `Existing areas (id | name):\n${areas.map((a) => a.id + " | " + a.title).join("\n") || "(none yet)"}\n\n` +
+    `Tasks to sort (id | title | some steps under it):\n${rows.slice(0, 150).map((t) => `${t.id} | ${t.title}${steps(t) ? " | " + steps(t) : ""}`).join("\n")}\n\n` +
+    "For each task choose one:\n" +
+    "- an existing area id, when the task clearly belongs there;\n" +
+    "- \"new:<name>\" for a new area: a short name in the language of the tasks; give tasks that belong together the same name; only when no existing area fits;\n" +
+    "- \"area\" when the task is itself a broad theme rather than something to do (e.g. \"Insurance\", \"Kraków apartment\");\n" +
+    "- \"\" when unsure.\n" +
+    'Reply with only JSON: {"choices":[{"id":"task id","to":"area id, new:<name>, area, or empty"}]}';
+  try {
+    const r = await sampleFn.json(prompt, { modelTier: "quick" });
+    const ids = new Set(rows.map((t) => t.id)), byName = new Map(areas.map((a) => [norm(a.title), a.id]));
+    let n = 0;
+    for (const c of Array.isArray(r?.choices) ? r.choices : []) {
+      const id = String(c?.id || ""); let to = String(c?.to || "").trim();
+      if (!ids.has(id)) continue;
+      if (to.startsWith("new:")) {
+        const name = to.slice(4).trim().slice(0, 60);
+        if (!name) continue;
+        if (byName.has(norm(name))) to = byName.get(norm(name));
+        else { if (!sortNew.includes(name)) sortNew.push(name); sortChoice.set(id, "new:" + name); n++; continue; }
+      }
+      const a = tasks.get(to);
+      if (to !== "area" && !(isArea(a) && !a.archived && (tasks.get(id).private || !a.private))) continue;
+      sortChoice.set(id, to); n++;
+    }
+    renderSortRows();
+    toast(n ? "Check the suggestions, change any you like, then tap Move." : "Claude had no suggestions. Choose the areas yourself.");
+  } catch (e) { sampleFailed(e, "Suggesting areas"); }
+  finally { btn.disabled = false; btn.textContent = "Suggest areas with Claude"; }
+});
+$("#sort-apply").addEventListener("click", async () => {
+  const choices = [...sortChoice].filter(([id, to]) => to && tasks.has(id));
+  if (!choices.length) { toast("Choose an area for at least one task first."); return; }
+  closePanels();
+  let moved = 0, made = 0;
+  try {
+    const created = new Map();
+    for (const [id, to] of choices) {
+      const t = tasks.get(id);
+      if (to === "area") { await updTask(id, TO_AREA); if (!t.private) log(id, "turned it into an area"); made++; continue; }
+      let areaId = to;
+      if (to.startsWith("new:")) {
+        const name = to.slice(4);
+        if (!created.has(name)) { const nid = await addTask(newAreaData(name)); log(nid, "created the area", name); created.set(name, nid); made++; }
+        areaId = created.get(name);
+      }
+      await updTask(id, { parentId: areaId, order: Date.now() + moved });
+      if (!t.private) log(id, `moved it to the area “${tasks.get(areaId)?.title || ""}”`);
+      moved++;
+    }
+    toast([moved && `Moved ${moved} task${moved > 1 ? "s" : ""}`, made && `${made} new area${made > 1 ? "s" : ""}`].filter(Boolean).join(", "));
+  } catch (err) { writeFailed(err); }
 });
 
 // ---- ideas for the app ----
@@ -2361,23 +2577,23 @@ async function suggestTasks() {
   renderImportFoot(true);
   const me = mySlot(), today = todayStr();
   const tree = [];
-  (function walk(pid) { for (const c of childrenOf(pid)) { if (c.status !== "done") tree.push(c.id + " | " + (pathOf(c) ? pathOf(c) + " › " : "") + (c.title || "Untitled")); walk(c.id); } })("");
+  (function walk(pid) { for (const c of childrenOf(pid)) { if (c.status !== "done") tree.push(c.id + " | " + (pathOf(c) ? pathOf(c) + " › " : "") + (c.title || "Untitled") + (isArea(c) ? " [area]" : "")); walk(c.id); } })("");
   const listLines = allLists().map((l) => l.id + " | " + l.name);
   const prompt =
     `You help a couple turn text into tasks for their shared task app. Person "a" is ${people.a}, person "b" is ${people.b}.\n` +
     (me ? `The person pasting this is ${slotName(me)} ("${me}"), so "I" and "me" in the text mean them.\n` : "") +
     `Today is ${new Date().toLocaleDateString("en-GB", { weekday: "long" })}, ${today}.\n\n` +
-    `Existing open tasks (id | path):\n${tree.slice(0, 300).join("\n") || "(none)"}\n\n` +
+    `Existing areas and open tasks (id | path; areas are the big themes, marked [area]):\n${tree.slice(0, 300).join("\n") || "(none)"}\n\n` +
     `Shopping lists (id | name):\n${listLines.join("\n")}\n\n` +
     "From the text below, extract only concrete to-dos and things to buy. Skip ideas that were rejected, questions and general discussion.\n" +
     "Reply with only JSON in this shape:\n" +
-    '{"group":{"title":"short, specific name for one new task that groups all the tasks below","parentId":"id of an existing task to put the group under, or \\"\\""},' +
+    '{"group":{"title":"short, specific name for one new project that groups all the tasks below","parentId":"id of the existing area (or task) to put the project in, or \\"\\""},' +
     '"tasks":[{"title":"short action title","parentIndex":null,"assignee":"a, b, both or \\"\\"","due":"YYYY-MM-DD or \\"\\"","priority":"low, normal or high","notes":"useful details from the text, or \\"\\"","toBuy":["3 cement bags"],"buyList":"shopping list id"}],' +
     '"items":[{"text":"2 milk","list":"shopping list id"}]}\n' +
     "Rules:\n" +
     "- Write titles in the language of the text.\n" +
     "- Always propose a group: name what the tasks have in common, specific rather than generic (e.g. \"Garage floor screed\", \"Weekend trip to Gdańsk\", not \"Tasks\" or \"To-dos\"). " +
-    "All tasks go under the group. Put the group under an existing task only when the whole topic clearly belongs there.\n" +
+    "All tasks go under the group. Put the group in the existing area where the topic belongs, or under an existing task when the whole topic is part of it; use \"\" only when nothing fits (it then waits in the Inbox).\n" +
     "- Use parentIndex (0-based position of an earlier task in your array) only for a task that is a step of another new task; otherwise null.\n" +
     "- Assign only when the text says who will do it. Turn relative dates into dates using today's date.\n" +
     "- Every purchase must appear: things needed for a specific task go in that task's toBuy (with quantity if known) and its buyList; any other purchases go in items.\n" +
@@ -2427,19 +2643,19 @@ function renderImportPreview() {
   const g = impData.group;
   const newLabel = (p) => "New: " + (p.title.trim() || "Untitled");
   if (impData.tasks.length) {
-    out.push(h("div", { class: "imp-section" }, "New parent task"));
+    out.push(h("div", { class: "imp-section" }, "New project"));
     out.push(h("div", { class: "imp-row" + (g.on ? "" : " off") },
       h("div", { class: "imp-head" },
         h("input", { type: "checkbox", checked: g.on, "aria-label": "Put the tasks under one new task", onchange: (e) => { g.on = e.target.checked; renderImportPreview(); } }),
         h("input", { type: "text", value: g.title, maxlength: "200", "aria-label": "Name of the new parent task", oninput: (e) => { g.title = e.target.value; renderImportFoot(); } })),
       h("div", { class: "imp-meta" },
-        h("div", { class: "wide" }, select([h("option", { value: "" }, "Top level"), ...existing.map((o) => o.cloneNode(true))], g.parent, (e) => { g.parent = e.target.value; }, "Parent task belongs under"))),
+        h("div", { class: "wide" }, select([h("option", { value: "" }, areasSupported ? "Inbox (no area yet)" : "Top level"), ...existing.map((o) => o.cloneNode(true))], g.parent, (e) => { g.parent = e.target.value; }, "Parent task belongs under"))),
       h("p", { class: "imp-notes" }, g.on ? "The tasks below go under this new task. Untick to add them without it." : "Not created: tasks set to go under it go where it would have gone.")));
     out.push(h("div", { class: "imp-section" }, "Tasks"));
   }
   impData.tasks.forEach((t, i) => {
     const parentOpts = [h("option", { value: "group" }, g.on ? newLabel(g) : "Same place as the parent task would go"),
-      h("option", { value: "" }, "Top level"),
+      h("option", { value: "" }, areasSupported ? "Inbox (no area yet)" : "Top level"),
       ...impData.tasks.slice(0, i).map((p, j) => h("option", { value: "new:" + j }, newLabel(p))),
       ...existing.map((o) => o.cloneNode(true))];
     out.push(h("div", { class: "imp-row" + (t.on ? "" : " off") },

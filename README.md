@@ -21,6 +21,7 @@ A new project gets its full database from `python3 scripts/make-setup-sql.py <pr
 
 ## Features
 
+- Areas (big themes like a home or Finances) holding projects and tasks; an Inbox and "Sort into areas" for the rest
 - Tasks nested to any depth, with status (not started / in progress / done), assignee, due date, priority, notes and repeats
 - Closing a task closes its open subtasks after a two-step confirmation; closed tasks take no new subtasks
 - Archive with restore, including unfinished tasks
@@ -48,7 +49,7 @@ A new project gets its full database from `python3 scripts/make-setup-sql.py <pr
   RFC 8291/8292 code), the morning/evening briefings written by Claude, and the briefing chat whose
   proposed changes the app applies only after you confirm. A pg_cron job calls it every 15 minutes.
 - `supabase/migrations/`: database updates to run once in the SQL Editor (002 My day, 003 per-list
-  frequent items, 004 notifications and briefings, 005 briefing language, 006 ideas for the app).
+  frequent items, 004 notifications and briefings, 005 briefing language, 006 ideas for the app, 007 areas).
 
 ## Setup notes
 

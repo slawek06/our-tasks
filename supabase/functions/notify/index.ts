@@ -146,7 +146,9 @@ async function snapshot(uid: string) {
   const byId = new Map(all.map((t) => [t.id, t]));
   const path = (t: { parent_id: string }) => { const n: string[] = []; for (let p = byId.get(t.parent_id); p; p = byId.get(p.parent_id)) n.unshift(p.title); return n.join(" > "); };
   const pins = (stateRes.data?.today ?? {}) as Record<string, string>;
-  const open = all.filter((t) => t.status !== "done");
+  const isArea = (t: { kind?: string }) => t.kind === "area"; // themes that hold projects and tasks, never "done"
+  const open = all.filter((t) => t.status !== "done" && !isArea(t));
+  const areas = all.filter(isArea).map((t) => `${t.title} (id=${t.id}${t.private ? ", private" : ""})`);
   const lines = open.slice(0, 250).map((t) => [
     `id=${t.id}`, `"${t.title}"`, t.status === "doing" ? "in progress" : "not started",
     t.due ? `due ${t.due}${t.due < now.date ? " (OVERDUE)" : t.due === now.date ? " (TODAY)" : ""}` : "no due date",
@@ -165,6 +167,7 @@ async function snapshot(uid: string) {
   const text = [
     `People: "a" = ${ppl.a}, "b" = ${ppl.b}. You are talking to ${nameOf(ppl, me) || "one of them"} ("${me}").`,
     `Now: ${now.weekday} ${now.date}, ${now.time} (${prefs.tz}).`,
+    `Areas (big themes; tasks and projects sit inside them, shown as "under <area> > ..."): ${areas.length ? areas.join(", ") : "none"}`,
     `Open tasks (${open.length}):`, ...(lines.length ? lines : ["(none)"]),
     `Shopping lists (ids: ${lists.map((l) => `${l.name}=${l.id}`).join(", ")}):`,
     ...([...shopping].map(([ln, xs]) => `${ln}: ${xs.join(", ")}`) || []), ...(shopping.size ? [] : ["(all empty)"]),
