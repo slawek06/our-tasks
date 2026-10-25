@@ -612,8 +612,16 @@ const store = {
     this.mode = "supabase";
     try { await sb.load(); }
     catch { this.mode = "off"; loaded = true; showBanner("Couldn't reach the server. Check your connection and reload the page."); render(); return; }
+    // A failed or used-up email link comes back with the reason in the address (#error=…&error_description=…).
+    const back = new URLSearchParams(location.hash.slice(1) || location.search.slice(1));
+    const linkError = back.get("error_description") || back.get("error");
     const { data } = await sb.client.auth.getSession();
-    if (!data.session) { showSignIn(); return; }
+    if (linkError || back.has("access_token")) history.replaceState(null, "", location.pathname);
+    if (!data.session) {
+      showSignIn();
+      if (linkError) $("#signin-msg").textContent = `That link didn't work (${linkError.replace(/\+/g, " ")}). Each link works once and expires after about an hour. Send yourself a new one below.`;
+      return;
+    }
     meId = data.session.user.id;
     sb.client.auth.onAuthStateChange((event) => { if (event === "SIGNED_OUT") location.reload(); });
     sb.subscribe();
