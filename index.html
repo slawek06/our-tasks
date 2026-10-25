@@ -500,7 +500,7 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
   <input class="quick-input" id="quick-input" type="text" maxlength="200" enterkeyhint="done"
     placeholder="e.g. Call the plumber tomorrow for Wiola #garage !high" aria-describedby="quick-help">
   <div class="chips" id="quick-preview"></div>
-  <p class="hint" id="quick-help">Understands dates (today, tomorrow, Friday, next week, in 3 days, 31.10), a person (for Wiola, for me, for both), #part of a task name to put it under, and !high or !low. Polish works too: jutro, piątek, dla Wioli.</p>
+  <p class="hint" id="quick-help">Understands dates (today, tomorrow, Friday, next week, in 3 days, 31.10), a person (for Wiola, for me, for both), #part of a task name to put it under, and !high or !low. No date means tomorrow. Polish works too: jutro, piątek, dla Wioli.</p>
   <div class="actions">
     <button class="btn" type="button" id="quick-more">More details</button>
     <button class="btn" type="button" id="quick-cancel">Close</button>
@@ -533,7 +533,9 @@ let byParent = new Map(), byParentAll = new Map(), commentsBy = new Map();
 let editingId = null;
 let view = (() => { try { return localStorage.getItem("view") || "today"; } catch { return "today"; } })();
 let searchMode = false, searchSnippets = new Map(), flashId = null;
-let todayPins = {}, pinsSupported = true;
+let todayPins = {}, pinsSupported = true, perListSupported = true;
+// New tasks are due tomorrow unless you pick another date (or clear it).
+const defaultDue = () => addDays(todayStr(), 1);
 const filter = { who: "all", hideDone: false, q: "" };
 let sortMode = "manual";
 try { sortMode = localStorage.getItem("sort") || "manual"; } catch {}
@@ -797,6 +799,8 @@ const store = {
     try { startListening(); } catch (e) { connectionLost(e); }
     // My day pins need a column added by supabase/migrations/002_my_day.sql; until then the feature explains itself.
     sb.client.from("user_state").select("today").limit(1).then(({ error }) => { pinsSupported = !error || isNetworkError(error); });
+    // Per-list frequent items need supabase/migrations/003_catalog_per_list.sql; until then Frequent is shared.
+    sb.client.from("catalog").select("list_counts").limit(1).then(({ error }) => { perListSupported = !error || isNetworkError(error); if (view === "shopping") renderChips(); });
   },
   async initArtifact() {
     const [db, user] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
@@ -1469,7 +1473,7 @@ function renderQuickPreview() {
   const p = parseQuick($("#quick-input").value), parent = tasks.get(p.parentId);
   const chips = [
     p.title && "“" + p.title + "”",
-    p.due && "Due " + new Date(parseDate(p.due)).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" }),
+    p.title && "Due " + new Date(parseDate(p.due || defaultDue())).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" }) + (p.due ? "" : " (default)"),
     p.assignee && "For " + assigneeName(p.assignee),
     parent && "Under " + (pathOf(parent) ? pathOf(parent) + " › " : "") + parent.title,
     p.priority !== "normal" && PRIORITY[p.priority] + " priority",
@@ -1503,17 +1507,14 @@ $("#quick-form").addEventListener("submit", async (e) => {
   const assignee = isPrivate ? "" : p.assignee;
   try {
     const id = await addTask({
-      title: p.title, status: "todo", assignee, priority: p.priority, due: p.due, repeat: "", parentId: p.parentId, notes: "",
+      title: p.title, status: "todo", assignee, priority: p.priority, due: p.due || defaultDue(), repeat: "", parentId: p.parentId, notes: "",
       order: now, createdAt: now, private: isPrivate, ...(assignee ? { assignedBy: mySlot() || "", assignedAt: now } : {}),
     });
     if (!isPrivate) log(id, "created it" + (assignee ? ` and assigned it to ${assigneeName(assignee)}` : ""), p.title);
     if (p.parentId) { collapsed.delete(p.parentId); saveCollapsed(); }
-    // Added from Today without a date: put it in My day, so it shows where you are.
-    const pinned = view === "today" && !p.due && pinsSupported;
-    if (pinned) { todayPins = { ...todayPins, [id]: todayStr() }; saveSeen(); render(); }
     $("#quick-input").value = "";
     renderQuickPreview();
-    toast(`Added “${p.title}”${pinned ? " to My day" : ""}.`, { label: "Show", run: () => { closeQuick(); showTask(id); } });
+    toast(`Added “${p.title}”, due ${fmtDate(p.due || defaultDue())}.`, { label: "Show", run: () => { closeQuick(); showTask(id); } });
   } catch (err) { writeFailed(err); }
 });
 $("#quick-more").addEventListener("click", () => {
@@ -1521,7 +1522,7 @@ $("#quick-more").addEventListener("click", () => {
   closeQuick();
   openEditor(null, p.parentId);
   $("#f-title").value = p.title;
-  $("#f-due").value = p.due;
+  $("#f-due").value = p.due || defaultDue();
   $("#f-priority").value = p.priority;
   if (!tasks.get(p.parentId)?.private) $("#f-assignee").value = p.assignee;
 });
@@ -1712,7 +1713,7 @@ function closePanels() {
   editingId = null; editingItem = null; resetFoot(); lastFocus?.focus?.();
 }
 function openEditor(id, parentId = "") {
-  const t = id ? tasks.get(id) : { status: "todo", priority: "normal", assignee: "", repeat: "", parentId, private: !!tasks.get(parentId)?.private };
+  const t = id ? tasks.get(id) : { status: "todo", priority: "normal", assignee: "", repeat: "", parentId, due: defaultDue(), private: !!tasks.get(parentId)?.private };
   if (!t) return;
   editingId = id;
   $("#ed-title").textContent = id ? (t.archived ? "Archived task" : "Edit task") : parentId ? "New subtask" : "New task";
@@ -1982,7 +1983,9 @@ async function addEntries(entries, listId, taskId = "") {
       }
       added.push(e.name);
       const cid = catalogId(e.name), c = catalog.get(cid);
-      store.put("catalog", cid, { name: e.name, section: pickSection(e), manual: !!c?.manual, count: (c?.count || 0) + 1, lastAt: Date.now() }).catch(() => {});
+      const listCounts = { ...(c?.listCounts || {}), [listId]: ((c?.listCounts || {})[listId] || 0) + 1 };
+      store.put("catalog", cid, { name: e.name, section: pickSection(e), manual: !!c?.manual, count: (c?.count || 0) + 1, lastAt: Date.now(),
+        ...(perListSupported ? { listCounts } : {}) }).catch(() => {});
       if (taskId) log(taskId, `added “${e.name}”${e.qty ? " (" + e.qty + ")" : ""} to the ${listName(listId)} list`);
     }
   } catch (err) { writeFailed(err); }
@@ -2034,10 +2037,13 @@ function renderChips() {
   const cur = currentListId(), last = ($("#shop-input").value.split(/[,;]/).pop() || "").trim();
   const pq = last.match(/^(\d+\S*)\s+(.*)$/), qtyPrefix = pq ? pq[1] + " " : "", seg = norm(pq ? pq[2] : last);
   const onList = new Set(openItems(cur).filter((i) => !i.checked).map((i) => norm(i.name)));
+  // How often an item was added to this list; older entries (no per-list counts) count for Groceries.
+  const here = (c) => !perListSupported ? c.count || 0 : c.listCounts ? c.listCounts[cur] || 0 : cur === "groceries" ? c.count || 0 : 0;
   let pool = [...catalog.values()].filter((c) => c.name && !onList.has(norm(c.name)));
   if (seg) pool = pool.filter((c) => norm(c.name).includes(seg))
-    .sort((a, b) => (norm(a.name).startsWith(seg) ? 0 : 1) - (norm(b.name).startsWith(seg) ? 0 : 1) || (b.count || 0) - (a.count || 0)).slice(0, 8);
-  else pool = pool.sort((a, b) => (b.count || 0) - (a.count || 0)).slice(0, 12);
+    .sort((a, b) => (norm(a.name).startsWith(seg) ? 0 : 1) - (norm(b.name).startsWith(seg) ? 0 : 1)
+      || (here(b) ? 1 : 0) - (here(a) ? 1 : 0) || here(b) - here(a) || (b.count || 0) - (a.count || 0)).slice(0, 8);
+  else pool = pool.filter((c) => here(c) > 0).sort((a, b) => here(b) - here(a)).slice(0, 12);
   el.hidden = !pool.length;
   el.replaceChildren(h("span", { class: "lbl" }, seg ? "Suggestions" : "Frequent"), ...pool.map((c) => h("button", { type: "button", class: "chip-btn", onclick: async () => {
     const inp = $("#shop-input"), parts = inp.value.split(/[,;]/);
@@ -2417,7 +2423,8 @@ $("#it-form").addEventListener("submit", async (e) => {
     await store.update("items", i.id, patch);
     if (patch.section !== i.section) {
       const cid = catalogId(name), c = catalog.get(cid);
-      store.put("catalog", cid, { name, section: patch.section, manual: true, count: c?.count || 1, lastAt: Date.now() }).catch(() => {});
+      store.put("catalog", cid, { name, section: patch.section, manual: true, count: c?.count || 1, lastAt: Date.now(),
+        ...(perListSupported && c?.listCounts ? { listCounts: c.listCounts } : {}) }).catch(() => {});
     }
     if (patch.taskId && patch.taskId !== (i.taskId || "")) log(patch.taskId, `linked “${name}” from the ${listName(patch.listId)} list`);
   } catch (err) { writeFailed(err); }

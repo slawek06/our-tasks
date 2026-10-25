@@ -81,7 +81,8 @@ create table public.catalog (
   section  text not null default 'Other',
   manual   boolean not null default false,
   count    integer not null default 0,
-  last_at  bigint not null default 0
+  last_at  bigint not null default 0,
+  list_counts jsonb not null default '{}'::jsonb  -- per shopping list: {"<list id>": count}
 );
 
 -- Small shared settings, e.g. key 'people' = {"a": "...", "b": "...", "aUser": "<uuid>", "bUser": "<uuid>"}.
