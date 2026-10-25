@@ -74,6 +74,7 @@ h1 { font: 700 34px/1.05 var(--f-display); letter-spacing: -.02em; margin: 0; te
 .search { flex: 1 1 180px; min-width: 0; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 7px 12px; }
 
 .banner { border-radius: 10px; padding: 10px 14px; font-size: 14px; background: var(--warn-soft); }
+.banner.offline { background: var(--hover); border: 1px dashed var(--line); color: var(--muted); }
 .banner.link { background: var(--accent-soft); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .banner.link span { flex: 1 1 260px; }
 
@@ -303,6 +304,7 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
     <input class="search" id="search" type="search" placeholder="Search tasks and notes" aria-label="Search">
   </div>
 
+  <div class="banner offline" id="offline-note" role="status" hidden></div>
   <div class="banner" id="banner" hidden></div>
   <main class="list" id="list"><div class="empty">Loading your tasks…</div></main>
 </div>
@@ -487,6 +489,8 @@ function h(tag, props, ...kids) {
   for (const c of kids.flat()) if (c != null && c !== false) el.append(c.nodeType ? c : document.createTextNode(c));
   return el;
 }
+// replaceChildren that skips false/null, like h() does for its children.
+const fill = (el, ...kids) => el.replaceChildren(...kids.flat().filter((k) => k != null && k !== false));
 function svg(markup, size = 18) {
   const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   s.setAttribute("viewBox", "0 0 18 18"); s.setAttribute("width", size); s.setAttribute("height", size);
@@ -528,9 +532,14 @@ const DOC_TABLES = {
 };
 const docSpec = (path) => DOC_TABLES[path] || (path.endsWith("/seen") ? DOC_TABLES.seen : null);
 
-// Keeps a copy of each table in memory, filled by one query and kept current by Supabase Realtime.
+// Keeps a copy of each table in memory and on the device, filled by one query and kept current by Supabase Realtime.
+// Offline: the app starts from the device copy, changes apply locally at once and wait in an outbox
+// (also on the device) until the connection is back, then go to Supabase in the order they were made.
+// New rows get their id on the device, so subtasks and links work before anything is synced.
+const isNetworkError = (e) => !navigator.onLine || (!e?.code && /fetch|network|load failed|timed? ?out/i.test(String(e?.message || e)));
 const sb = {
-  client: null, caches: {}, queries: {}, listeners: {}, docListeners: {},
+  client: null, caches: {}, queries: {}, listeners: {}, docListeners: {}, docs: {},
+  saved: { tables: {}, docs: {} }, outbox: [], flushing: false, saveTimer: 0,
   async load() {
     await new Promise((resolve, reject) => {
       const s = document.createElement("script");
@@ -540,29 +549,76 @@ const sb = {
     this.client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   },
   check({ data, error }) { if (error) throw error; return data; },
+
+  // ---- device copy ----
+  cacheKey() { return "ot-cache-" + meId; },
+  outboxKey() { return "ot-outbox-" + meId; },
+  restore() {
+    try { this.saved = JSON.parse(localStorage.getItem(this.cacheKey()) || "null") || this.saved; } catch {}
+    try { this.outbox = JSON.parse(localStorage.getItem(this.outboxKey()) || "[]"); } catch {}
+  },
+  saveSoon() {
+    clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(() => {
+      const tables = Object.fromEntries(Object.entries(this.caches).map(([t, m]) => [t, [...m.values()]]));
+      try { localStorage.setItem(this.cacheKey(), JSON.stringify({ tables, docs: this.docs })); } catch {}
+    }, 400);
+  },
+  saveOutbox() {
+    try { localStorage.setItem(this.outboxKey(), JSON.stringify(this.outbox)); } catch {}
+    updateOfflineNotice();
+  },
+
+  // ---- reading ----
   async fetch(table) {
     const { order, limit } = this.queries[table];
     let q = this.client.from(table).select("*");
     if (order) q = q.order(toColumn(order), { ascending: false }).limit(limit);
     this.caches[table] = new Map(this.check(await q).map((r) => { const o = fromRow(r); return [o.id, o]; }));
   },
-  fire(table) { const m = this.caches[table]; if (m) for (const fn of this.listeners[table] || []) fn(new Map(m)); },
+  fire(table) {
+    const m = this.caches[table];
+    if (m) for (const fn of this.listeners[table] || []) fn(new Map(m));
+    this.saveSoon();
+  },
   async listen(table, cb, query = {}) {
     this.queries[table] = query;
     (this.listeners[table] ||= []).push(cb);
-    await this.fetch(table);
+    try { await this.fetch(table); }
+    catch (e) {
+      if (!isNetworkError(e)) throw e;
+      this.caches[table] = new Map((this.saved.tables[table] || []).map((o) => [o.id, o]));
+    }
     this.fire(table);
   },
+  docSpecFor(table) { return Object.values(DOC_TABLES).find((s) => s.table === table); },
+  async fetchDoc(table) {
+    const spec = this.docSpecFor(table);
+    const row = this.check(await this.client.from(table).select("*").eq(spec.key, spec.keyValue()).maybeSingle());
+    this.docs[table] = row ? spec.fromRow(row) : null;
+  },
   async listenDoc(path, cb) {
-    const spec = docSpec(path);
-    this.docListeners[spec.table] = cb;
-    const row = this.check(await this.client.from(spec.table).select("*").eq(spec.key, spec.keyValue()).maybeSingle());
-    cb(row ? spec.fromRow(row) : null);
+    const table = docSpec(path).table;
+    this.docListeners[table] = cb;
+    try { await this.fetchDoc(table); }
+    catch (e) { if (!isNetworkError(e)) throw e; this.docs[table] = this.saved.docs[table] ?? null; }
+    cb(this.docs[table]);
+    this.saveSoon();
+  },
+  async refreshAll() {
+    if (!navigator.onLine || this.outbox.length) return;
+    for (const t of Object.keys(this.queries)) { try { await this.fetch(t); this.fire(t); } catch {} }
+    for (const [table, cb] of Object.entries(this.docListeners)) { try { await this.fetchDoc(table); cb(this.docs[table]); } catch {} }
+    this.saveSoon();
   },
   onChange(p) {
-    const spec = Object.values(DOC_TABLES).find((s) => s.table === p.table);
+    const spec = this.docSpecFor(p.table);
     if (spec) {
-      if (p.eventType !== "DELETE" && p.new[spec.key] === spec.keyValue()) this.docListeners[p.table]?.(spec.fromRow(p.new));
+      if (p.eventType !== "DELETE" && p.new[spec.key] === spec.keyValue()) {
+        this.docs[p.table] = spec.fromRow(p.new);
+        this.docListeners[p.table]?.(this.docs[p.table]);
+        this.saveSoon();
+      }
       return;
     }
     const m = this.caches[p.table];
@@ -572,41 +628,78 @@ const sb = {
     this.fire(p.table);
   },
   subscribe() {
-    this.client.channel("changes")
-      .on("postgres_changes", { event: "*", schema: "public" }, (p) => this.onChange(p))
-      .subscribe((status) => { if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") connectionLost({ code: status }); });
-    // Catch up on anything missed while the phone slept or the tab was in the background.
-    document.addEventListener("visibilitychange", async () => {
-      if (document.visibilityState !== "visible") return;
-      for (const table of Object.keys(this.queries)) { try { await this.fetch(table); this.fire(table); } catch {} }
-    });
+    // Realtime reconnects by itself; anything missed meanwhile is caught up by refreshAll.
+    this.client.channel("changes").on("postgres_changes", { event: "*", schema: "public" }, (p) => this.onChange(p)).subscribe();
+    const catchUp = async () => { await this.flush(); await this.refreshAll(); updateOfflineNotice(); };
+    window.addEventListener("online", catchUp);
+    window.addEventListener("offline", updateOfflineNotice);
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") catchUp(); });
+    setInterval(() => { if (this.outbox.length) this.flush(); }, 30000);
   },
-  async add(table, data) {
-    const row = this.check(await this.client.from(table).insert(toRow(data)).select().single());
-    this.onChange({ table, eventType: "INSERT", new: row });
-    return row.id;
+
+  // ---- writing ----
+  applyLocal(op) {
+    if (op.kind === "setDoc") { this.docs[op.table] = op.data; this.docListeners[op.table]?.(op.data); this.saveSoon(); return; }
+    const m = (this.caches[op.table] ||= new Map());
+    if (op.kind === "remove") m.delete(op.id);
+    else if (op.kind === "update") { if (m.has(op.id)) m.set(op.id, { ...m.get(op.id), ...op.data }); }
+    else m.set(op.id, { ...(m.get(op.id) || {}), ...op.data, id: op.id });
+    this.fire(op.table);
   },
-  async update(table, id, patch) {
-    const row = this.check(await this.client.from(table).update(toRow(patch)).eq("id", id).select().maybeSingle());
-    if (row) this.onChange({ table, eventType: "UPDATE", new: row });
+  send(op) {
+    const t = this.client.from(op.table);
+    if (op.kind === "add" || op.kind === "put") return t.upsert(toRow({ ...op.data, id: op.id })).then((r) => this.check(r));
+    if (op.kind === "update") return t.update(toRow(op.data)).eq("id", op.id).then((r) => this.check(r));
+    if (op.kind === "remove") return t.delete().eq("id", op.id).then((r) => this.check(r));
+    const spec = docSpec(op.path);
+    return t.upsert(spec.toRow(op.data)).then((r) => this.check(r));
   },
-  async put(table, id, data) {
-    const row = this.check(await this.client.from(table).upsert(toRow({ ...data, id })).select().single());
-    this.onChange({ table, eventType: "UPDATE", new: row });
+  async write(op) {
+    this.applyLocal(op);
+    if (this.outbox.length || !navigator.onLine) { this.outbox.push(op); this.saveOutbox(); this.flush(); return; }
+    try { await this.send(op); }
+    catch (e) {
+      if (!isNetworkError(e)) { await this.refreshAll(); throw e; } // refused (e.g. access rules): undo the local change
+      this.outbox.push(op); this.saveOutbox();
+    }
   },
-  async remove(table, id) {
-    this.check(await this.client.from(table).delete().eq("id", id));
-    this.onChange({ table, eventType: "DELETE", old: { id } });
+  async flush() {
+    if (this.flushing) { this.flushAgain = true; return; } // run once more when the current attempt ends
+    if (!this.outbox.length || !navigator.onLine) return;
+    this.flushing = true;
+    try {
+      while (this.outbox.length) {
+        try { await this.send(this.outbox[0]); }
+        catch (e) {
+          if (isNetworkError(e)) break;
+          toast("A change made offline couldn't be saved: " + (e.message || "refused by the server"));
+        }
+        this.outbox.shift();
+        this.saveOutbox();
+      }
+    } finally { this.flushing = false; }
+    if (this.flushAgain) { this.flushAgain = false; return this.flush(); }
+    if (!this.outbox.length) await this.refreshAll();
   },
-  async setDoc(path, data) {
-    const spec = docSpec(path);
-    const row = this.check(await this.client.from(spec.table).upsert(spec.toRow(data)).select().single());
-    this.docListeners[spec.table]?.(spec.fromRow(row));
-  },
+  async add(table, data) { const id = crypto.randomUUID(); await this.write({ kind: "add", table, id, data }); return id; },
+  update(table, id, patch) { return this.write({ kind: "update", table, id, data: patch }); },
+  put(table, id, data) { return this.write({ kind: "put", table, id, data }); },
+  remove(table, id) { return this.write({ kind: "remove", table, id }); },
+  setDoc(path, data) { return this.write({ kind: "setDoc", table: docSpec(path).table, path, data }); },
   async query(table, field, value) {
-    return this.check(await this.client.from(table).select("*").eq(toColumn(field), value)).map(fromRow);
+    try { return this.check(await this.client.from(table).select("*").eq(toColumn(field), value)).map(fromRow); }
+    catch (e) { if (!isNetworkError(e)) throw e; return [...(this.caches[table]?.values() || [])].filter((r) => r[field] === value); }
   },
 };
+function updateOfflineNotice() {
+  const el = $("#offline-note");
+  if (!el) return;
+  const n = sb.outbox.length, off = !navigator.onLine;
+  el.hidden = store.mode !== "supabase" || (!off && !n);
+  el.textContent = off
+    ? `You're offline. Changes are saved on this device and sync when you're back online${n ? ` (${n} waiting)` : ""}.`
+    : `Syncing ${n} change${n === 1 ? "" : "s"}…`;
+}
 
 // ---- storage: claude.ai artifact database, Supabase on own hosting, browser storage when opened as a plain file ----
 const store = {
@@ -619,6 +712,8 @@ const store = {
   },
   async initSupabase() {
     this.mode = "supabase";
+    // The service worker keeps the app's files on the device so it opens without internet.
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
     try { await sb.load(); }
     catch { this.mode = "off"; loaded = true; showBanner("Couldn't reach the server. Check your connection and reload the page."); render(); return; }
     // A failed or used-up email link comes back with the reason in the address (#error=…&error_description=…).
@@ -633,7 +728,10 @@ const store = {
     }
     meId = data.session.user.id;
     sb.client.auth.onAuthStateChange((event) => { if (event === "SIGNED_OUT") location.reload(); });
+    sb.restore();
+    await sb.flush();  // changes left from an earlier offline session go first
     sb.subscribe();
+    updateOfflineNotice();
     try { startListening(); } catch (e) { connectionLost(e); }
   },
   async initArtifact() {
@@ -1572,7 +1670,7 @@ async function finishShopping() {
 
 function renderShopBar() {
   const cur = currentListId();
-  $("#shop-lists").replaceChildren(
+  fill($("#shop-lists"),
     h("div", { class: "seg", role: "group", "aria-label": "Shopping lists" }, allLists().map((l) => {
       const n = openItems(l.id).filter((i) => !i.checked).length;
       return h("button", { type: "button", "aria-pressed": String(l.id === cur), onclick: () => selectList(l.id) }, l.name + (n ? ` · ${n}` : ""));
@@ -2022,7 +2120,7 @@ $("#ts-input").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.p
 // ---- people ----
 function renderLinkState(slot) {
   const u = people[slot + "User"], el = $(`#p-${slot}-link`);
-  el.replaceChildren(h("span", {}, !u ? "Not linked to an account yet" : u === meId ? "Linked to your account" : "Linked to the other account"),
+  fill(el, h("span", {}, !u ? "Not linked to an account yet" : u === meId ? "Linked to your account" : "Linked to the other account"),
     u && canWrite() && h("button", { type: "button", onclick: async () => {
       try { await store.setDoc("config/people", { ...cleanPeople(), [slot + "User"]: null }); people[slot + "User"] = null; renderLinkState(slot); }
       catch (err) { writeFailed(err); } } }, "Unlink"));
@@ -2121,7 +2219,7 @@ function showBanner(msg) { const b = $("#banner"); b.textContent = msg; b.hidden
 let toastTimer;
 function toast(msg, action) {
   const t = $("#toast");
-  t.replaceChildren(h("span", {}, msg), action && h("button", { type: "button", onclick: () => { t.hidden = true; action.run(); } }, action.label));
+  t.replaceChildren(...[h("span", {}, msg), action && h("button", { type: "button", onclick: () => { t.hidden = true; action.run(); } }, action.label)].filter(Boolean));
   t.hidden = false; clearTimeout(toastTimer);
   toastTimer = setTimeout(() => (t.hidden = true), action ? 7000 : 2600);
 }
