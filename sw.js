@@ -1,7 +1,7 @@
 // Our Tasks service worker: keeps the app's files on the device so it opens without internet.
 // Data is not handled here: the app keeps its own copy of the data and syncs it with Supabase.
 // Bump VERSION when the list of files below changes.
-const VERSION = "v2";
+const VERSION = "v3";
 const CACHE = "our-tasks-" + VERSION;
 const SUPABASE_JS = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js";
 const FILES = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-32.png", "./icons/icon-192.png",
@@ -37,4 +37,28 @@ self.addEventListener("fetch", (e) => {
       return res;
     })));
   }
+});
+
+// ---- push notifications (sent by the Supabase "notify" function) ----
+self.addEventListener("push", (e) => {
+  let msg = {};
+  try { msg = e.data ? e.data.json() : {}; } catch { msg = { body: e.data ? e.data.text() : "" }; }
+  e.waitUntil(self.registration.showNotification(msg.title || "Our Tasks", {
+    body: msg.body || "",
+    icon: "icons/icon-192.png",
+    badge: "icons/icon-192.png",
+    tag: msg.tag || undefined,
+    data: { url: msg.url || self.registration.scope },
+  }));
+});
+
+// Tapping a notification opens the app (or brings it to the front) at the notification's address.
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const url = new URL(e.notification.data?.url || "./", self.registration.scope).href;
+  e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+    const open = windows.find((w) => w.url.startsWith(self.registration.scope));
+    if (open) { open.postMessage({ open: url }); return open.focus(); }
+    return self.clients.openWindow(url);
+  }));
 });

@@ -28,6 +28,11 @@ Live: https://slawek06.github.io/our-tasks/ (sign-in required; only invited peop
 - `supabase/schema.sql`: database tables and access rules (row level security).
 - `supabase/functions/claude/index.ts`: Edge Function that calls Claude for Smart add and "from text".
   The Anthropic API key is a Supabase secret (`ANTHROPIC_API_KEY`), never in this repository.
+- `supabase/functions/notify/index.ts`: Edge Function for push notifications (Web Push with its own
+  RFC 8291/8292 code), the morning/evening briefings written by Claude, and the briefing chat whose
+  proposed changes the app applies only after you confirm. A pg_cron job calls it every 15 minutes.
+- `supabase/migrations/`: database updates to run once in the SQL Editor (002 My day, 003 per-list
+  frequent items, 004 notifications and briefings).
 
 ## Setup notes
 

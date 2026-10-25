@@ -216,6 +216,22 @@ body.shop-mode .fab { display: none; }
 .result { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; width: 100%; text-align: left; border: 0; background: none; padding: 10px; border-radius: 9px; }
 .result:hover { background: var(--hover); }
 .result > span:first-child { font-weight: 500; overflow-wrap: anywhere; min-width: 0; }
+.field input[type=time] { border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 9px 11px; width: 100%; min-width: 0; }
+.brief-list { gap: 10px; flex: 1; min-height: 0; }
+.bubble { max-width: 88%; padding: 10px 12px; border-radius: 14px; font-size: 14.5px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.bubble.assistant { background: var(--bg); align-self: flex-start; border-bottom-left-radius: 4px; }
+.bubble.user { background: var(--accent); color: var(--accent-ink); align-self: flex-end; border-bottom-right-radius: 4px; }
+.bubble .when { display: block; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
+.bubble.user .when { color: inherit; opacity: .75; }
+.proposal { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.proposal .lbl { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.proposal label { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; }
+.proposal .done { color: var(--muted); font-size: 13px; }
+/* more specific than .panel form / .panel-foot, which come later in this file */
+.panel form.brief-form { flex: none; flex-direction: column; align-items: stretch; }
+.brief-form textarea { border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 9px 11px; font-size: 16px; resize: none; }
+.brief-actions { display: flex; gap: 8px; align-items: center; }
+.brief-actions .spacer { flex: 1; }
 .empty { text-align: center; padding: 40px 16px; color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .empty strong { color: var(--ink); font: 600 18px var(--f-display); }
 
@@ -298,6 +314,7 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
       <p class="summary" id="summary"></p>
     </div>
     <div class="top-actions">
+      <button class="btn" id="brief-btn" type="button" hidden>Briefing</button>
       <button class="btn" id="import-btn" type="button" hidden>From text</button>
       <button class="btn" id="people-btn" type="button">People</button>
       <button class="btn primary" id="new-btn" type="button">+ New task</button>
@@ -402,6 +419,22 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
           <button class="btn small" type="button" id="set-password-btn">Set password</button>
         </div>
       </div>
+      <div class="field" id="notify-tools" hidden>
+        <span class="lbl">Notifications</span>
+        <p class="hint" id="notify-status"></p>
+        <div class="task-shop-add">
+          <button class="btn small primary" type="button" id="notify-on">Turn on notifications on this device</button>
+          <button class="btn small" type="button" id="notify-test" hidden>Send a test</button>
+        </div>
+        <div class="two">
+          <div class="field"><label for="n-morning">Morning briefing</label><input type="time" id="n-morning"></div>
+          <div class="field"><label for="n-evening">Evening check</label><input type="time" id="n-evening"></div>
+        </div>
+        <label class="check"><input type="checkbox" id="n-assigned"> When a task is assigned to me</label>
+        <label class="check"><input type="checkbox" id="n-comment"> New comments</label>
+        <label class="check"><input type="checkbox" id="n-closed"> When the other person closes a task</label>
+        <p class="hint">Settings are per person and apply to all your devices. Quiet hours 22:00-7:00: no instant notifications then. Clear a time to skip that briefing.</p>
+      </div>
       <div class="field" id="data-tools" hidden>
         <span class="lbl">Your data</span>
         <p class="hint" id="data-hint"></p>
@@ -469,6 +502,20 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
     <div id="imp-preview" hidden></div>
   </div>
   <div class="panel-foot" id="imp-foot"></div>
+</aside>
+
+<aside class="panel" id="brief-panel" hidden aria-labelledby="br-title">
+  <div class="panel-head"><h2 id="br-title">Briefing</h2><button class="x" type="button" data-close aria-label="Close">×</button></div>
+  <div class="fields brief-list" id="brief-list" aria-live="polite"></div>
+  <form class="panel-foot brief-form" id="brief-form" autocomplete="off">
+    <textarea id="brief-input" rows="2" maxlength="2000" aria-label="Message to the assistant"
+      placeholder="Ask or tell me, e.g. “What should I do first?” or “Move the dentist to Friday”"></textarea>
+    <div class="brief-actions">
+      <button class="btn small" type="button" id="brief-now">Brief me now</button>
+      <span class="spacer"></span>
+      <button class="btn primary" type="submit">Send</button>
+    </div>
+  </form>
 </aside>
 
 <div class="scrim top" id="scrim2" hidden></div>
@@ -798,6 +845,7 @@ const store = {
     updateOfflineNotice();
     try { startListening(); } catch (e) { connectionLost(e); }
     // My day pins need a column added by supabase/migrations/002_my_day.sql; until then the feature explains itself.
+    if (/[?&](briefing|task)=/.test(location.search)) { const url = location.href; history.replaceState(null, "", location.pathname); setTimeout(() => handleOpen(url), 300); }
     sb.client.from("user_state").select("today").limit(1).then(({ error }) => { pinsSupported = !error || isNetworkError(error); });
     // Per-list frequent items need supabase/migrations/003_catalog_per_list.sql; until then Frequent is shared.
     sb.client.from("catalog").select("list_counts").limit(1).then(({ error }) => { perListSupported = !error || isNetworkError(error); if (view === "shopping") renderChips(); });
@@ -1215,6 +1263,7 @@ function render() {
   // Claude features exist on claude.ai and on own hosting (via the Edge Function), not in plain-file preview mode.
   const claudeHere = store.mode === "remote" || store.mode === "supabase";
   $("#import-btn").hidden = !claudeHere || !canWrite();
+  $("#brief-btn").hidden = store.mode !== "supabase";
   $("#smart-btn").hidden = $("#smart-hint").hidden = !claudeHere;
   const searching = !!filter.q && ["tasks", "today", "upcoming"].includes(view);
   $("#hide-done-wrap").hidden = view !== "tasks" || searching;
@@ -1511,6 +1560,7 @@ $("#quick-form").addEventListener("submit", async (e) => {
       order: now, createdAt: now, private: isPrivate, ...(assignee ? { assignedBy: mySlot() || "", assignedAt: now } : {}),
     });
     if (!isPrivate) log(id, "created it" + (assignee ? ` and assigned it to ${assigneeName(assignee)}` : ""), p.title);
+    if (assignee) notifyEvent("assigned", id);
     if (p.parentId) { collapsed.delete(p.parentId); saveCollapsed(); }
     $("#quick-input").value = "";
     renderQuickPreview();
@@ -1661,6 +1711,7 @@ async function changeStatus(t, next) {
       if (!choice) return;
       await closeSubtasks(open, t.title);
       await updTask(t.id, { status: "done" });
+      notifyEvent("closed", t.id);
       log(t.id, open.length ? `closed it together with ${open.length} subtask${open.length > 1 ? "s" : ""}` : "changed the status to Done");
       await afterClose(t, choice);
     } else {
@@ -1816,9 +1867,12 @@ $("#ed-form").addEventListener("submit", async (e) => {
         const { private: _p, ...patch } = data;
         await updTask(id, patch);
       }
+      if ((before.assignee || "") !== data.assignee && data.assignee) notifyEvent("assigned", id);
+      if (data.status === "done" && before.status !== "done") notifyEvent("closed", id);
       if (changes && !data.private) log(id, changes + (open.length ? ` (and closed ${open.length} subtask${open.length > 1 ? "s" : ""})` : ""), data.title);
     } else {
       const newId = await addTask({ ...data, order: Date.now(), createdAt: Date.now() });
+      if (data.assignee) notifyEvent("assigned", newId);
       if (!data.private) log(newId, "created it" + (data.assignee ? ` and assigned it to ${assigneeName(data.assignee)}` : ""), data.title);
       toast("Task added");
     }
@@ -1874,7 +1928,7 @@ $("#comment-add").addEventListener("click", async () => {
   const text = $("#f-comment").value.trim();
   if (!text || !editingId) return;
   $("#f-comment").value = "";
-  try { await store.add("comments", { taskId: editingId, text, by: mySlot() || "", byUser: meId || "", at: Date.now() }); }
+  try { await store.add("comments", { taskId: editingId, text, by: mySlot() || "", byUser: meId || "", at: Date.now() }); notifyEvent("comment", editingId, text); }
   catch (err) { writeFailed(err); }
 });
 
@@ -2333,6 +2387,7 @@ async function importAdd() {
       ids[key] = id; nt++;
       if (parentId) collapsed.delete(parentId);
       collapsed.delete(id);
+      if (fields.assignee) notifyEvent("assigned", id);
       log(id, "created it from text" + (fields.assignee ? ` and assigned it to ${assigneeName(fields.assignee)}` : ""), fields.title.trim());
     };
     const base = Date.now();
@@ -2519,6 +2574,8 @@ $("#people-btn").addEventListener("click", () => {
   $("#p-a").value = people.a; $("#p-b").value = people.b;
   $("#signout-btn").hidden = store.mode !== "supabase";
   $("#password-tools").hidden = store.mode !== "supabase";
+  $("#notify-tools").hidden = store.mode !== "supabase";
+  if (store.mode === "supabase") { loadNotifyPrefs(); updateNotifyStatus(); }
   $("#new-password").value = "";
   // Moving from claude.ai: export your private tasks there, import the file on your own hosting.
   const onClaude = store.mode === "remote", onOwn = store.mode === "supabase";
@@ -2700,6 +2757,184 @@ $("#wipe-btn").addEventListener("click", wipeAll);
 $("#export-private-btn").addEventListener("click", exportPrivate);
 $("#import-file-btn").addEventListener("click", () => $("#import-file").click());
 $("#import-file").addEventListener("change", (e) => { const f = e.target.files[0]; e.target.value = ""; if (f) importFile(f); });
+
+// ---- notifications (own hosting): turn on per device, settings, instant events ----
+const pushSupported = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+const isStandalone = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const keyBytes = (s) => { s = s.replace(/-/g, "+").replace(/_/g, "/"); while (s.length % 4) s += "="; return Uint8Array.from(atob(s), (c) => c.charCodeAt(0)); };
+const deviceName = () => /iPhone/.test(navigator.userAgent) ? "iPhone" : /iPad/.test(navigator.userAgent) ? "iPad" : /Macintosh/.test(navigator.userAgent) ? "Mac" : "Browser";
+const NEEDS_UPDATE = "Notifications need the database update: run supabase/migrations/004_notifications.sql in Supabase.";
+// Explains a failed call to the notify function in plain words.
+async function fnErrorText(error) {
+  let code = "";
+  try { code = (await error.context?.json())?.error || ""; } catch {}
+  if (!navigator.onLine || isNetworkError(error)) return "This needs an internet connection.";
+  if (code === "not_configured" || error.context?.status === 404) return "Not set up on the server yet: the notify function, its API key, or the database update is missing.";
+  if (code === "rate_limited") return "Too many requests just now. Try again in a minute.";
+  return "Something went wrong on the server. Try again in a moment.";
+}
+async function loadNotifyPrefs() {
+  const { data, error } = await sb.client.from("notify_prefs").select("*").eq("user_id", meId).maybeSingle();
+  if (error) { $("#notify-status").textContent = NEEDS_UPDATE; return; }
+  const p = data || { morning: "07:30", evening: "20:00", on_assigned: true, on_comment: true, on_closed: true };
+  $("#n-morning").value = p.morning || "";
+  $("#n-evening").value = p.evening || "";
+  $("#n-assigned").checked = p.on_assigned; $("#n-comment").checked = p.on_comment; $("#n-closed").checked = p.on_closed;
+}
+async function saveNotifyPrefs(quiet) {
+  const row = {
+    user_id: meId, tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Warsaw",
+    morning: $("#n-morning").value, evening: $("#n-evening").value,
+    on_assigned: $("#n-assigned").checked, on_comment: $("#n-comment").checked, on_closed: $("#n-closed").checked,
+  };
+  const { error } = await sb.client.from("notify_prefs").upsert(row);
+  if (error) toast(/notify_prefs|42P01|schema cache/i.test(error.message + error.code) ? NEEDS_UPDATE : "Couldn't save the notification settings: " + error.message);
+  else if (!quiet) toast("Notification settings saved");
+  return !error;
+}
+async function updateNotifyStatus() {
+  const el = $("#notify-status");
+  if (!pushSupported()) {
+    el.textContent = /iPhone|iPad/.test(navigator.userAgent) && !isStandalone()
+      ? "On iPhone, notifications work in the home-screen app: open Our Tasks from its icon, then turn them on here."
+      : "This browser can't show notifications. On a Mac, use the app from the Dock.";
+    $("#notify-on").hidden = $("#notify-test").hidden = true;
+    return;
+  }
+  const sub = await (await navigator.serviceWorker.getRegistration())?.pushManager.getSubscription();
+  const on = !!sub && Notification.permission === "granted";
+  el.textContent = on ? "Notifications are on for this device."
+    : Notification.permission === "denied" ? "Notifications are blocked for this app. Allow them in the device's settings (iPhone: Settings > Notifications > Our Tasks; Mac: System Settings > Notifications), then come back."
+    : "Notifications are off on this device.";
+  $("#notify-on").hidden = on || Notification.permission === "denied";
+  $("#notify-test").hidden = !on;
+}
+async function enablePush() {
+  try {
+    if (await Notification.requestPermission() !== "granted") { updateNotifyStatus(); return; }
+    const reg = await navigator.serviceWorker.ready;
+    const { data, error } = await sb.client.functions.invoke("notify", { body: { action: "vapid" } });
+    if (error || !data?.publicKey) { toast(error ? await fnErrorText(error) : "Not set up on the server yet."); return; }
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(data.publicKey) });
+    const j = sub.toJSON();
+    const { error: e2 } = await sb.client.from("push_subscriptions").upsert({ endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, device: deviceName() }, { onConflict: "endpoint" });
+    if (e2) { toast(/push_subscriptions|42P01|schema cache/i.test(e2.message + e2.code) ? NEEDS_UPDATE : "Couldn't save this device: " + e2.message); return; }
+    if (await saveNotifyPrefs(true)) toast("Notifications are on for this device");
+  } catch (e) { toast("Couldn't turn on notifications: " + (e.message || e)); }
+  finally { updateNotifyStatus(); }
+}
+// Tells the other person about a change (the server checks their settings, quiet hours and privacy).
+function notifyEvent(type, taskId, text) {
+  if (store.mode !== "supabase" || !navigator.onLine || !taskId || tasks.get(taskId)?.private) return;
+  sb.client.functions.invoke("notify", { body: { action: "event", type, taskId, text } }).catch(() => {});
+}
+$("#notify-on").addEventListener("click", enablePush);
+$("#notify-test").addEventListener("click", async () => {
+  const { data, error } = await sb.client.functions.invoke("notify", { body: { action: "test" } });
+  toast(error ? await fnErrorText(error) : data?.sent ? "Test sent: it should appear in a few seconds." : "No device received it. Turn notifications on again on this device.");
+});
+for (const id of ["#n-morning", "#n-evening", "#n-assigned", "#n-comment", "#n-closed"]) $(id).addEventListener("change", () => saveNotifyPrefs());
+
+// ---- briefing and the conversation about it ----
+let briefRows = [];
+async function openBriefing() {
+  if (store.mode !== "supabase") return;
+  closePanels();
+  openPanel($("#brief-panel"));
+  await loadBriefing();
+  setTimeout(() => $("#brief-input").focus(), 50);
+}
+async function loadBriefing() {
+  const { data, error } = await sb.client.from("briefings").select("*").order("created_at", { ascending: false }).limit(40);
+  if (error) { fill($("#brief-list"), h("p", { class: "hint" }, /briefings|42P01|schema cache/i.test(error.message + error.code) ? "The briefing needs the database update: run supabase/migrations/004_notifications.sql in Supabase." : "Couldn't load the briefing: " + error.message)); return; }
+  briefRows = (data || []).reverse();
+  renderBriefing();
+}
+function renderBriefing(thinking) {
+  const list = $("#brief-list"), out = [];
+  const when = (r) => new Date(r.created_at).toLocaleString(undefined, { weekday: "short", hour: "2-digit", minute: "2-digit" });
+  if (!briefRows.length) out.push(h("p", { class: "hint" }, "No briefing yet. Your morning briefing arrives at the time set under People, or tap Brief me now. You can also just ask, e.g. “What should I do first?”"));
+  for (const r of briefRows) {
+    const label = r.kind === "morning" ? "Briefing" : r.kind === "evening" ? "Evening check" : "";
+    out.push(h("div", { class: "bubble " + (r.role === "assistant" ? "assistant" : "user") },
+      h("span", { class: "when" }, (label ? label + " · " : "") + when(r)), r.text));
+    if (r.role === "assistant" && (r.actions?.length || r.applied)) out.push(proposalCard(r));
+  }
+  if (thinking) out.push(h("div", { class: "bubble assistant" }, h("span", { class: "when" }, "Claude"), "Thinking…"));
+  fill(list, out);
+  list.scrollTop = list.scrollHeight;
+}
+function proposalCard(r) {
+  if (r.applied) return h("div", { class: "proposal" }, h("span", { class: "done" }, r.actions.length ? "Applied: " + r.actions.map((a) => a.label).join("; ") : "Dismissed"));
+  return h("div", { class: "proposal" },
+    h("span", { class: "lbl" }, "Suggested changes"),
+    ...r.actions.map((a, i) => h("label", {}, h("input", { type: "checkbox", checked: true, "data-i": String(i) }), h("span", {}, a.label))),
+    h("div", { class: "brief-actions" },
+      h("button", { class: "btn small", type: "button", onclick: () => resolveProposal(r, []) }, "Dismiss"),
+      h("span", { class: "spacer" }),
+      h("button", { class: "btn small primary", type: "button", onclick: (e) => resolveProposal(r, [...e.target.closest(".proposal").querySelectorAll("input:checked")].map((x) => r.actions[+x.dataset.i])) }, "Apply")));
+}
+async function resolveProposal(r, chosen) {
+  if (!canWrite()) return;
+  try {
+    if (chosen.length) await executeActions(chosen);
+    await sb.client.from("briefings").update({ applied: true, actions: chosen }).eq("id", r.id);
+    r.applied = true; r.actions = chosen;
+    renderBriefing();
+    if (chosen.length) toast(`Applied ${chosen.length} change${chosen.length > 1 ? "s" : ""}`);
+  } catch (err) { writeFailed(err); }
+}
+// Runs the changes you confirmed, through the same paths as the rest of the app (history, offline queue, notifications).
+async function executeActions(actions) {
+  for (const a of actions) {
+    const t = tasks.get(a.taskId);
+    if (a.type === "complete" && t && t.status !== "done") await changeStatus(t, "done");
+    else if (a.type === "set_due" && t) await setDue(t, a.due);
+    else if (a.type === "pin_today" && t && !isPinned(t)) await togglePin(t);
+    else if (a.type === "assign" && t && !t.private) {
+      const now = Date.now();
+      await updTask(t.id, a.assignee ? { assignee: a.assignee, assignedBy: mySlot() || "", assignedAt: now } : { assignee: "", assignedBy: "", assignedAt: 0 });
+      log(t.id, a.assignee ? `assigned it to ${assigneeName(a.assignee)}` : "removed the assignee");
+      if (a.assignee) notifyEvent("assigned", t.id);
+    } else if (a.type === "add_task" && a.title) {
+      const parent = tasks.get(a.parentId), now = Date.now(), isPrivate = !!parent?.private;
+      const assignee = isPrivate || !["a", "b", "both"].includes(a.assignee) ? "" : a.assignee;
+      const id = await addTask({ title: a.title, status: "todo", assignee, priority: "normal", due: /^\d{4}-\d{2}-\d{2}$/.test(a.due) ? a.due : defaultDue(),
+        repeat: "", parentId: parent ? parent.id : "", notes: "", order: now, createdAt: now, private: isPrivate, ...(assignee ? { assignedBy: mySlot() || "", assignedAt: now } : {}) });
+      if (!isPrivate) log(id, "created it from the briefing chat", a.title);
+      if (assignee) notifyEvent("assigned", id);
+    } else if (a.type === "add_item" && a.text) await addItems(a.text, allLists().some((l) => l.id === a.listId) ? a.listId : "groceries");
+  }
+}
+async function sendBriefingMessage(text, action) {
+  if (!navigator.onLine) { toast("The briefing needs an internet connection."); return; }
+  if (text) briefRows.push({ id: "pending", role: "user", kind: "chat", text, created_at: new Date().toISOString(), actions: [] });
+  renderBriefing(true);
+  const { error } = await sb.client.functions.invoke("notify", { body: action === "brief_now" ? { action } : { action: "chat", message: text } });
+  if (error) toast(await fnErrorText(error));
+  await loadBriefing();
+}
+$("#brief-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const text = $("#brief-input").value.trim();
+  if (!text) return;
+  $("#brief-input").value = "";
+  sendBriefingMessage(text);
+});
+$("#brief-input").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#brief-form").requestSubmit(); } });
+$("#brief-now").addEventListener("click", () => sendBriefingMessage("", "brief_now"));
+$("#brief-btn").addEventListener("click", openBriefing);
+
+// Opening the app from a notification: ?briefing=1 opens the briefing, ?task=<id> opens that task.
+function handleOpen(url) {
+  const p = new URL(url, location.href).searchParams;
+  if (p.has("briefing")) openBriefing();
+  else if (p.get("task")) {
+    const id = p.get("task"), go = (tries = 0) => tasks.has(id) ? openEditor(id) : tries < 10 && setTimeout(() => go(tries + 1), 500);
+    go();
+  }
+}
+navigator.serviceWorker?.addEventListener("message", (e) => { if (e.data?.open) handleOpen(e.data.open); });
 
 // ---- misc UI ----
 function showBanner(msg) { const b = $("#banner"); b.textContent = msg; b.hidden = false; }
