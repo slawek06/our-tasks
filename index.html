@@ -192,6 +192,7 @@ body.shop-mode #lists-mode { display: none; }
 .cl-head .meta { font-size: 13px; color: var(--muted); display: inline-flex; gap: 8px; align-items: center; }
 .item .box.tpl { color: var(--muted); width: 22px; justify-content: center; font-size: 18px; line-height: 1; }
 .who-init { flex: none; font: 600 11px/18px var(--f-mono); width: 18px; height: 18px; text-align: center; border-radius: 50%; background: var(--hover); border: 1px solid var(--line); color: var(--muted); text-decoration: none; }
+.cl-row { grid-template-columns: minmax(0, 1fr) auto; }
 .cl-row-act { margin-right: 6px; }
 .cl-items .item { grid-template-columns: 22px minmax(0, 1fr) 40px; }
 .cl-items .group-head { align-items: center; padding-left: 0; }
@@ -2425,7 +2426,7 @@ function renderChecklists(list) {
   const standing = all.filter((x) => x.standing).sort(byOrder);
   const active = all.filter((x) => !x.template && !x.closed && !x.standing).sort(byOrder), templates = all.filter((x) => x.template).sort((a, b) => a.title.localeCompare(b.title));
   const closed = all.filter((x) => !x.template && x.closed).sort((a, b) => (b.closedAt || 0) - (a.closedAt || 0));
-  const row = (x, extra, act) => h("div", { class: "item" },
+  const row = (x, extra, act) => h("div", { class: "item cl-row" },
     h("button", { type: "button", class: "item-main", onclick: () => showChecklist(x.id) },
       h("span", { class: "item-text" }, h("span", { class: "item-name" }, x.title), x.private && h("span", { class: "chip private" }, "Private"), h("span", { class: "item-meta" }, extra))),
     act || h("span"));
