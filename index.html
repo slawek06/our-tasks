@@ -1983,7 +1983,9 @@ async function addEntries(entries, listId, taskId = "") {
       }
       added.push(e.name);
       const cid = catalogId(e.name), c = catalog.get(cid);
-      const listCounts = { ...(c?.listCounts || {}), [listId]: ((c?.listCounts || {})[listId] || 0) + 1 };
+      // Older entries keep their earlier history under Groceries.
+      const before = c?.listCounts && Object.keys(c.listCounts).length ? c.listCounts : c?.count ? { groceries: c.count } : {};
+      const listCounts = { ...before, [listId]: (before[listId] || 0) + 1 };
       store.put("catalog", cid, { name: e.name, section: pickSection(e), manual: !!c?.manual, count: (c?.count || 0) + 1, lastAt: Date.now(),
         ...(perListSupported ? { listCounts } : {}) }).catch(() => {});
       if (taskId) log(taskId, `added “${e.name}”${e.qty ? " (" + e.qty + ")" : ""} to the ${listName(listId)} list`);
@@ -2037,8 +2039,13 @@ function renderChips() {
   const cur = currentListId(), last = ($("#shop-input").value.split(/[,;]/).pop() || "").trim();
   const pq = last.match(/^(\d+\S*)\s+(.*)$/), qtyPrefix = pq ? pq[1] + " " : "", seg = norm(pq ? pq[2] : last);
   const onList = new Set(openItems(cur).filter((i) => !i.checked).map((i) => norm(i.name)));
-  // How often an item was added to this list; older entries (no per-list counts) count for Groceries.
-  const here = (c) => !perListSupported ? c.count || 0 : c.listCounts ? c.listCounts[cur] || 0 : cur === "groceries" ? c.count || 0 : 0;
+  // How often an item was added to this list. Older entries have no per-list counts (the database update
+  // gave them an empty {}), so they count for Groceries.
+  const here = (c) => {
+    if (!perListSupported) return c.count || 0;
+    const counts = c.listCounts && Object.keys(c.listCounts).length ? c.listCounts : null;
+    return counts ? counts[cur] || 0 : cur === "groceries" ? c.count || 0 : 0;
+  };
   let pool = [...catalog.values()].filter((c) => c.name && !onList.has(norm(c.name)));
   if (seg) pool = pool.filter((c) => norm(c.name).includes(seg))
     .sort((a, b) => (norm(a.name).startsWith(seg) ? 0 : 1) - (norm(b.name).startsWith(seg) ? 0 : 1)
