@@ -235,7 +235,8 @@ body.shop-mode .fab { display: none; }
 /* more specific than .panel form / .panel-foot, which come later in this file */
 .panel form.brief-form { flex: none; flex-direction: column; align-items: stretch; }
 .brief-form textarea { border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 9px 11px; font-size: 16px; resize: none; }
-.brief-actions { display: flex; gap: 8px; align-items: center; }
+.brief-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.listen-btn { display: block; margin-top: 6px; border: 0; background: none; padding: 2px 0; font-size: 13px; font-weight: 600; color: var(--accent); }
 .brief-actions .spacer { flex: 1; }
 .empty { text-align: center; padding: 40px 16px; color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .empty strong { color: var(--ink); font: 600 18px var(--f-display); }
@@ -517,9 +518,12 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
       placeholder="Ask or tell me, e.g. “What should I do first?” or “Move the dentist to Friday”"></textarea>
     <div class="brief-actions">
       <button class="btn small" type="button" id="brief-now">Brief me now</button>
+      <button class="btn small" type="button" id="talk-btn">Talk</button>
+      <select class="sort" id="voice-lang" aria-label="Language I listen for"><option value="en-GB">English</option><option value="pl-PL">Polski</option></select>
       <span class="spacer"></span>
       <button class="btn primary" type="submit">Send</button>
     </div>
+    <p class="hint" id="talk-state" role="status"></p>
   </form>
 </aside>
 
@@ -1765,6 +1769,7 @@ let lastFocus = null;
 function openPanel(el) { lastFocus = document.activeElement; $("#scrim").hidden = false; el.hidden = false; }
 function closePanels() {
   $("#scrim").hidden = true;
+  if (talk?.on) stopTalk();
   for (const p of document.querySelectorAll(".panel")) p.hidden = true;
   editingId = null; editingItem = null; resetFoot(); lastFocus?.focus?.();
 }
@@ -2846,6 +2851,7 @@ async function openBriefing() {
   if (store.mode !== "supabase") return;
   closePanels();
   openPanel($("#brief-panel"));
+  setTalkUI();
   await loadBriefing();
   setTimeout(() => $("#brief-input").focus(), 50);
 }
@@ -2862,12 +2868,15 @@ function renderBriefing(thinking) {
   for (const r of briefRows) {
     const label = r.kind === "morning" ? "Briefing" : r.kind === "evening" ? "Evening check" : "";
     out.push(h("div", { class: "bubble " + (r.role === "assistant" ? "assistant" : "user") },
-      h("span", { class: "when" }, (label ? label + " · " : "") + when(r)), r.text));
+      h("span", { class: "when" }, (label ? label + " · " : "") + when(r)), r.text,
+      r.role === "assistant" && synth && h("button", { type: "button", class: "listen-btn", "data-text": r.text,
+        onclick: () => (talk.speaking && talk.speaking.text === r.text ? stopSpeaking() : speak(r.text)) }, "▶ Listen")));
     if (r.role === "assistant" && (r.actions?.length || r.applied)) out.push(proposalCard(r));
   }
   if (thinking) out.push(h("div", { class: "bubble assistant" }, h("span", { class: "when" }, "Claude"), "Thinking…"));
   fill(list, out);
   list.scrollTop = list.scrollHeight;
+  renderListenButtons();
 }
 function proposalCard(r) {
   if (r.applied) return h("div", { class: "proposal" }, h("span", { class: "done" }, r.actions.length ? "Applied: " + r.actions.map((a) => a.label).join("; ") : "Dismissed"));
@@ -2929,6 +2938,136 @@ $("#brief-form").addEventListener("submit", (e) => {
 $("#brief-input").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#brief-form").requestSubmit(); } });
 $("#brief-now").addEventListener("click", () => sendBriefingMessage("", "brief_now"));
 $("#brief-btn").addEventListener("click", openBriefing);
+
+// ---- voice: Listen buttons, and a hands-free conversation mode in the Briefing panel ----
+// Uses the device's built-in speech (free, no account). Speaking needs a tap first, as browsers require.
+const synth = window.speechSynthesis;
+const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+var talk = { on: false, rec: null, silent: 0, speaking: null }; // var: closePanels may check it before this line runs
+let voiceLang = "en-GB";
+try { voiceLang = localStorage.getItem("voiceLang") || (navigator.language.toLowerCase().startsWith("pl") ? "pl-PL" : "en-GB"); } catch {}
+const looksPolish = (t) => /[ąćęłńóśźż]/i.test(t) && /\b(jest|nie|się|masz|dzisiaj|jutro|już|też|żeby|albo|zadanie|zadania)\b/i.test(t);
+// Natural voices first; Apple's novelty voices (Bad News, Bubbles, ...) never.
+const NOVELTY_VOICES = /albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|junior|ralph|fred|kathy|princess|deranged|hysterical|grandma|grandpa|rocko|shelley|flo|eddy|reed|sandy/i;
+const GOOD_VOICES = /samantha|daniel|karen|moira|serena|kate|arthur|martha|ava|allison|zosia|ewa|krzysztof/i;
+function pickVoice(lang) {
+  const base = lang.slice(0, 2);
+  const candidates = (synth?.getVoices() || []).filter((v) => v.lang.replace("_", "-").startsWith(base) && !NOVELTY_VOICES.test(v.name));
+  const score = (v) => (/premium/i.test(v.name) ? 4 : 0) + (/enhanced|siri/i.test(v.name) ? 3 : 0) + (GOOD_VOICES.test(v.name) ? 2 : 0) + (v.lang.replace("_", "-") === lang ? 1 : 0);
+  return candidates.sort((a, b) => score(b) - score(a))[0];
+}
+// Reads text aloud; resolves when it's finished (or stopped). Polish replies get a Polish voice.
+function speak(text) {
+  return new Promise((resolve) => {
+    if (!synth || !text) return resolve();
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = looksPolish(text) || /^(Zrobione|Do usłyszenia|Słucham|Dobrze, niczego)/.test(text) ? "pl-PL" : "en-GB";
+    const v = pickVoice(u.lang);
+    if (v) u.voice = v;
+    let done = false;
+    const finish = () => { if (done) return; done = true; if (talk.speaking === u) talk.speaking = null; renderListenButtons(); resolve(); };
+    u.onend = u.onerror = finish;
+    setTimeout(finish, 2000 + text.length * 120); // some devices never report the end
+    talk.speaking = u;
+    synth.speak(u);
+    renderListenButtons();
+  });
+}
+function stopSpeaking() { synth?.cancel(); talk.speaking = null; renderListenButtons(); }
+function renderListenButtons() {
+  for (const b of document.querySelectorAll(".listen-btn")) b.textContent = talk.speaking && talk.speaking.text === b.dataset.text ? "■ Stop" : "▶ Listen";
+}
+const confirmPrompt = (text) => looksPolish(text) ? "Powiedz tak, żeby zatwierdzić, albo nie." : "Say yes to apply, or no.";
+const pendingProposalRow = () => [...briefRows].reverse().find((r) => r.role === "assistant" && r.actions?.length && !r.applied);
+
+function setTalkUI(state) {
+  const btn = $("#talk-btn");
+  btn.textContent = talk.on ? "Stop talking" : "Talk";
+  btn.classList.toggle("primary", talk.on);
+  $("#talk-state").textContent = state || (talk.on ? "" : Recognition ? "Talk: I read the briefing, then listen. Say “stop” to end." : "Voice input isn't available here: use the keyboard microphone. Talk still reads replies aloud.");
+}
+async function startTalk() {
+  if (!navigator.onLine) { toast("The briefing needs an internet connection."); return; }
+  talk.on = true; talk.silent = 0;
+  setTalkUI("Reading…");
+  const last = [...briefRows].reverse().find((r) => r.role === "assistant");
+  if (last) await speak(last.text + (pendingProposalRow() === last ? " " + confirmPrompt(last.text) : ""));
+  else await speak(voiceLang.startsWith("pl") ? "Słucham." : "I'm listening.");
+  if (talk.on) listen();
+}
+function stopTalk() {
+  if (!talk || !talk.on) return;
+  talk.on = false;
+  try { talk.rec?.abort(); } catch {}
+  talk.rec = null;
+  stopSpeaking();
+  setTalkUI();
+}
+function listen() {
+  if (!Recognition) { setTalkUI("Speak with the keyboard microphone, then tap Send: I'll read the reply aloud."); $("#brief-input").focus(); return; }
+  const rec = new Recognition();
+  talk.rec = rec;
+  rec.lang = voiceLang;
+  rec.interimResults = true;
+  rec.continuous = false;
+  let heard = "";
+  rec.onresult = (e) => {
+    heard = [...e.results].map((r) => r[0].transcript).join("");
+    $("#brief-input").value = heard;
+  };
+  rec.onerror = (e) => {
+    if (e.error === "not-allowed" || e.error === "service-not-allowed") { toast("Microphone access is blocked for this app. Allow it in the device's settings, or use the keyboard microphone."); stopTalk(); }
+  };
+  rec.onend = async () => {
+    if (talk.rec === rec) talk.rec = null;
+    if (!talk.on) return;
+    const said = heard.trim();
+    if (!said) {
+      if (++talk.silent >= 3) { stopTalk(); toast("Conversation ended: I didn't hear anything."); }
+      else listen();
+      return;
+    }
+    talk.silent = 0;
+    $("#brief-input").value = "";
+    await handleSpoken(said);
+  };
+  setTalkUI(voiceLang.startsWith("pl") ? "Słucham…" : "Listening…");
+  try { rec.start(); } catch { setTalkUI("Couldn't start listening. Tap Talk again."); talk.on = false; }
+}
+// What you said: end the conversation, answer a pending "apply these changes?", or send it to Claude.
+async function handleSpoken(said) {
+  const n = norm(said).replace(/[.!?,]/g, "");
+  // Answer in Polish when you speak Polish (or chose Polski), even for one-word replies like "tak" or "dziękuję".
+  const pl = voiceLang.startsWith("pl") || looksPolish(said) || /^(koniec|dziekuje|dzieki|pa|tak|jasne|zrob|zatwierdz|nie|anuluj)\b/.test(n);
+  if (/^(stop|end|koniec|that's all|thats all|thank you|thanks|dziekuje|dzieki|bye|pa)\b/.test(n)) {
+    await speak(pl ? "Do usłyszenia." : "Okay, talk later.");
+    stopTalk();
+    return;
+  }
+  const open = pendingProposalRow();
+  if (open && /^(yes|yeah|yep|sure|apply|do it|ok|okay|tak|jasne|zrob to|zatwierdz)\b/.test(n)) {
+    await resolveProposal(open, open.actions);
+    await speak(pl ? "Zrobione." : "Done.");
+    if (talk.on) listen();
+    return;
+  }
+  if (open && /^(no|nope|nie|dismiss|cancel|anuluj)\b/.test(n)) {
+    await resolveProposal(open, []);
+    await speak(pl ? "Dobrze, niczego nie zmieniam." : "Okay, I won't change anything.");
+    if (talk.on) listen();
+    return;
+  }
+  setTalkUI("Thinking…");
+  await sendBriefingMessage(said);
+  const reply = [...briefRows].reverse().find((r) => r.role === "assistant");
+  if (reply && talk.on) await speak(reply.text + (pendingProposalRow() === reply ? " " + confirmPrompt(reply.text) : ""));
+  if (talk.on) listen();
+}
+$("#talk-btn").addEventListener("click", () => (talk.on ? stopTalk() : startTalk()));
+$("#voice-lang").value = voiceLang.startsWith("pl") ? "pl-PL" : "en-GB";
+$("#voice-lang").addEventListener("change", (e) => { voiceLang = e.target.value; try { localStorage.setItem("voiceLang", voiceLang); } catch {} });
+synth?.addEventListener?.("voiceschanged", () => {}); // loads the voice list early on some browsers
 
 // Opening the app from a notification: ?briefing=1 opens the briefing, ?task=<id> opens that task.
 function handleOpen(url) {
