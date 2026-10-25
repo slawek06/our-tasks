@@ -15,3 +15,6 @@
 # Dependencies and build output (for later)
 node_modules/
 dist/
+
+# Exported personal data (never on GitHub)
+data/

@@ -366,6 +366,15 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
       <p class="hint">The two of you. Each name is linked to the claude.ai account of the person who picked it, so the app knows whose tasks are whose.</p>
       <div class="field"><label for="p-a">First person</label><input type="text" id="p-a" required maxlength="40"><div class="link-state" id="p-a-link"></div></div>
       <div class="field"><label for="p-b">Second person</label><input type="text" id="p-b" required maxlength="40"><div class="link-state" id="p-b-link"></div></div>
+      <div class="field" id="data-tools" hidden>
+        <span class="lbl">Your data</span>
+        <p class="hint" id="data-hint"></p>
+        <div class="task-shop-add">
+          <button class="btn small" type="button" id="export-private-btn" hidden>Export my private tasks</button>
+          <button class="btn small" type="button" id="import-file-btn" hidden>Import from a file</button>
+          <input type="file" id="import-file" accept=".json,application/json" hidden>
+        </div>
+      </div>
     </div>
     <div class="panel-foot">
       <button class="btn" type="button" id="signout-btn" hidden>Sign out</button>
@@ -2021,6 +2030,14 @@ function renderLinkState(slot) {
 $("#people-btn").addEventListener("click", () => {
   $("#p-a").value = people.a; $("#p-b").value = people.b;
   $("#signout-btn").hidden = store.mode !== "supabase";
+  // Moving from claude.ai: export your private tasks there, import the file on your own hosting.
+  const onClaude = store.mode === "remote", onOwn = store.mode === "supabase";
+  $("#data-tools").hidden = !(onClaude || onOwn);
+  $("#export-private-btn").hidden = !onClaude;
+  $("#import-file-btn").hidden = !onOwn;
+  $("#data-hint").textContent = onClaude
+    ? "Moving to the new address? Save your private tasks to a file here, then import it there. Shared tasks are moved for both of you."
+    : "Import an Our Tasks export file, e.g. from claude.ai. Items with the same id are updated; nothing is deleted.";
   renderLinkState("a"); renderLinkState("b");
   for (const el of $("#pp-form").elements) el.disabled = !canWrite() && !el.hasAttribute("data-close");
   openPanel($("#people")); setTimeout(() => $("#p-a").focus(), 30);
@@ -2051,6 +2068,53 @@ $("#signin-form").addEventListener("submit", async (e) => {
   else msg.textContent = "Couldn't send the link: " + error.message;
 });
 $("#signout-btn").addEventListener("click", async () => { await sb.client?.auth.signOut(); location.reload(); });
+
+// ---- moving data between claude.ai and own hosting ----
+const TASK_FIELDS = ["title", "status", "assignee", "priority", "due", "repeat", "parentId", "notes", "order", "createdAt", "assignedBy", "assignedAt", "archived", "archivedAt"];
+async function exportPrivate() {
+  const mine = [...tasks.values()].filter((t) => t.private)
+    .map((t) => ({ id: t.id, ...Object.fromEntries(TASK_FIELDS.filter((k) => k in t).map((k) => [k, t[k]])), private: true }));
+  if (!mine.length) { toast("You have no private tasks to export."); return; }
+  const dl = await window.claude?.use("downloads");
+  if (!dl) { toast("Saving files isn't available here."); return; }
+  try {
+    const res = await dl.save({ filename: "our-tasks-private.json", data: JSON.stringify({ format: "our-tasks-export", version: 1, source: "claude.ai", tasks: mine }, null, 1) });
+    if (res === "saved") toast(`Saved ${mine.length} private task${mine.length > 1 ? "s" : ""}. Import the file on the new address.`);
+  } catch (e) { if (e?.code !== "unavailable") toast("Couldn't save the file. Try again."); }
+}
+async function importFile(file) {
+  let d = null;
+  try { d = JSON.parse(await file.text()); } catch {}
+  if (d?.format !== "our-tasks-export") { toast("That file isn't an Our Tasks export."); return; }
+  const count = (k) => (Array.isArray(d[k]) ? d[k].length : 0), priv = (d.tasks || []).filter((t) => t.private).length;
+  const parts = [[count("tasks"), "task", "tasks"], [count("history"), "history entry", "history entries"], [count("comments"), "comment", "comments"],
+    [count("items"), "shopping item", "shopping items"], [count("lists"), "list", "lists"], [count("catalog"), "suggestion", "suggestions"]]
+    .filter(([n]) => n).map(([n, one, many]) => `${n} ${n === 1 ? one : many}`);
+  const ok = await showModal((m, finish) => {
+    m.replaceChildren(
+      h("h2", { id: "modal-title" }, "Import this file?"),
+      h("p", {}, `It contains ${parts.join(", ") || "nothing to import"}.` + (priv ? ` ${priv} of the tasks are private: only you will see them.` : "")),
+      h("p", {}, "Anything already here with the same id is updated. Nothing is deleted, so it's safe to import the same file twice."),
+      h("div", { class: "actions" }, cancelBtn(finish), h("button", { class: "btn primary", type: "button", id: "modal-yes", onclick: () => finish(true) }, "Import")));
+    m.querySelector("#modal-yes").focus();
+  });
+  if (!ok) return;
+  closePanels();
+  toast("Importing…");
+  try {
+    for (const table of ["lists", "catalog", "tasks", "items", "comments", "history"]) {
+      // claude.ai user ids don't exist here, so they're dropped; "who" is kept as Person 1 / Person 2.
+      const rows = (d[table] || []).map(({ byUser, addedByUser, ...r }) => toRow(r));
+      for (let i = 0; i < rows.length; i += 200) sb.check(await sb.client.from(table).upsert(rows.slice(i, i + 200), { defaultToNull: false }));
+    }
+    if (d.people?.a || d.people?.b) await store.setDoc("config/people", { ...cleanPeople(), a: d.people.a || people.a, b: d.people.b || people.b });
+    for (const t of Object.keys(sb.queries)) { await sb.fetch(t); sb.fire(t); }
+    toast("Import finished");
+  } catch (err) { toast(`Import stopped: ${err.message || "unknown error"}. Importing again is safe.`); }
+}
+$("#export-private-btn").addEventListener("click", exportPrivate);
+$("#import-file-btn").addEventListener("click", () => $("#import-file").click());
+$("#import-file").addEventListener("change", (e) => { const f = e.target.files[0]; e.target.value = ""; if (f) importFile(f); });
 
 // ---- misc UI ----
 function showBanner(msg) { const b = $("#banner"); b.textContent = msg; b.hidden = false; }
