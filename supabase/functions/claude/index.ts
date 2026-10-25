@@ -11,10 +11,9 @@
 import Anthropic from "npm:@anthropic-ai/sdk";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-// Public values (the same ones are in the app's index.html); they grant nothing without a sign-in.
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "https://sjtdrnvezorxxdoitszz.supabase.co";
-const SUPABASE_KEY = "sb_publishable_M-eM_n6OUMqsPFZyTDk4aw_eh9MUU9A";
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });
+// Supabase gives every function its own project's address and service key, so the same code
+// works in both projects (production and development). Used here only to check sign-ins.
+const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", { auth: { persistSession: false } });
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",

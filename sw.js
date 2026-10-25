@@ -1,8 +1,10 @@
 // Our Tasks service worker: keeps the app's files on the device so it opens without internet.
 // Data is not handled here: the app keeps its own copy of the data and syncs it with Supabase.
 // Bump VERSION when the list of files below changes.
-const VERSION = "v3";
-const CACHE = "our-tasks-" + VERSION;
+const VERSION = "v4";
+// Production (/our-tasks/) and development (/our-tasks/dev/) share one website, so each keeps its own cache.
+const SCOPE = new URL(self.registration.scope).pathname;
+const CACHE = "our-tasks-" + VERSION + "-" + SCOPE;
 const SUPABASE_JS = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js";
 const FILES = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-32.png", "./icons/icon-192.png",
   "./icons/icon-512.png", "./icons/apple-touch-icon.png", SUPABASE_JS];
@@ -13,7 +15,8 @@ self.addEventListener("install", (e) => {
 
 self.addEventListener("activate", (e) => {
   e.waitUntil(caches.keys()
-    .then((keys) => Promise.all(keys.filter((k) => k.startsWith("our-tasks-") && k !== CACHE).map((k) => caches.delete(k))))
+    .then((keys) => Promise.all(keys.filter((k) => (k.startsWith("our-tasks-") && k.endsWith("-" + SCOPE) && k !== CACHE) || /^our-tasks-v\d+$/.test(k)) // older caches had no scope in the name
+      .map((k) => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
 

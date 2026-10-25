@@ -1,0 +1,72 @@
+# Publishes the app to GitHub Pages:
+#   main branch -> https://slawek06.github.io/our-tasks/      (production)
+#   dev branch  -> https://slawek06.github.io/our-tasks/dev/  (development, orange icon, "DEV")
+# Runs on every push to either branch. Only the files the app needs are published.
+name: Publish app
+
+on:
+  push:
+    branches: [main, dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get main (production)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: prod-src
+
+      - name: Get dev (development)
+        id: dev
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          ref: dev
+          path: dev-src
+
+      - name: Assemble the site
+        run: |
+          mkdir -p public
+          cp -r prod-src/index.html prod-src/sw.js prod-src/manifest.webmanifest prod-src/icons public/
+          if [ -f dev-src/index.html ]; then
+            mkdir -p public/dev
+            cp -r dev-src/index.html dev-src/sw.js dev-src/manifest-dev.webmanifest dev-src/icons public/dev/
+            # The dev copy gets its own name and orange icon, so its home-screen app can't be confused with production.
+            sed -i \
+              -e 's#href="manifest.webmanifest"#href="manifest-dev.webmanifest"#' \
+              -e 's#href="icons/apple-touch-icon.png"#href="icons/dev/apple-touch-icon.png"#' \
+              -e 's#href="icons/icon-32.png"#href="icons/dev/icon-32.png"#' \
+              -e 's#<title>Our Tasks</title>#<title>Our Tasks DEV</title>#' \
+              -e 's#name="apple-mobile-web-app-title" content="Our Tasks"#name="apple-mobile-web-app-title" content="Our Tasks DEV"#' \
+              -e 's#name="theme-color" content="\#2f5bd3"#name="theme-color" content="\#d9730d"#' \
+              public/dev/index.html
+          fi
+          find public -type f | sort
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

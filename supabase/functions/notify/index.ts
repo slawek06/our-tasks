@@ -18,9 +18,11 @@
 import Anthropic from "npm:@anthropic-ai/sdk";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "https://sjtdrnvezorxxdoitszz.supabase.co";
+// Each project provides its own address and service key, so this code runs unchanged in production and development.
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const APP_URL = "https://slawek06.github.io/our-tasks/";
+// Where notifications lead. Development sets the secret APP_URL to https://slawek06.github.io/our-tasks/dev/
+const APP_URL = Deno.env.get("APP_URL") ?? "https://slawek06.github.io/our-tasks/";
 // The service role reads everything; every query below therefore filters by the caller (private tasks by owner).
 const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 

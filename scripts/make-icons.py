@@ -1,7 +1,8 @@
 """Draw the Our Tasks app icon as PNG files (no extra libraries needed).
 
 Run from the project folder:  python3 scripts/make-icons.py
-Writes icons/icon-512.png, icon-192.png, apple-touch-icon.png (180) and icon-32.png.
+Writes icons/icon-512.png, icon-192.png, apple-touch-icon.png (180) and icon-32.png (blue, production)
+and the same in icons/dev/ (orange, development) so the two home-screen apps can't be confused.
 
 Design: the app's blue background with two to-do rows - a ticked circle with a long bar,
 and an open circle with a shorter bar - like the status circles in the app.
@@ -13,6 +14,7 @@ import struct
 import zlib
 
 BLUE = (47, 91, 211)
+ORANGE = (217, 115, 13)
 WHITE = (255, 255, 255)
 
 
@@ -28,14 +30,14 @@ def seg_dist(px, py, ax, ay, bx, by):
 R = 0.115  # row circle radius
 
 
-def shapes():
+def shapes(bg):
     row1, row2 = 0.37, 0.63
     cx = 0.30
     return [
         # Row 1: ticked circle + long bar
         (lambda x, y: math.hypot(x - cx, y - row1) - R, WHITE, 1.0),
         (lambda x, y: min(seg_dist(x, y, cx - 0.052, row1 + 0.002, cx - 0.012, row1 + 0.042),
-                          seg_dist(x, y, cx - 0.012, row1 + 0.042, cx + 0.058, row1 - 0.040)) - 0.020, BLUE, 1.0),
+                          seg_dist(x, y, cx - 0.012, row1 + 0.042, cx + 0.058, row1 - 0.040)) - 0.020, bg, 1.0),
         (lambda x, y: seg_dist(x, y, 0.495, row1, 0.775, row1) - 0.038, WHITE, 1.0),
         # Row 2: open circle + shorter bar
         (lambda x, y: abs(math.hypot(x - cx, y - row2) - (R - 0.018)) - 0.018, WHITE, 0.92),
@@ -43,16 +45,16 @@ def shapes():
     ]
 
 
-def render(size):
+def render(size, bg=BLUE):
     px = 1.0 / size
     rows = []
-    sh = shapes()
+    sh = shapes(bg)
     for j in range(size):
         y = (j + 0.5) * px
         row = bytearray([0])  # PNG filter: none
         for i in range(size):
             x = (i + 0.5) * px
-            r, g, b = BLUE
+            r, g, b = bg
             for sdf, col, alpha in sh:
                 cover = max(0.0, min(1.0, 0.5 - sdf(x, y) / px)) * alpha  # anti-aliased edge
                 if cover:
@@ -72,8 +74,9 @@ def png(size, raw):
 
 
 if __name__ == "__main__":
-    os.makedirs("icons", exist_ok=True)
-    for name, size in [("icon-512.png", 512), ("icon-192.png", 192), ("apple-touch-icon.png", 180), ("icon-32.png", 32)]:
-        with open(os.path.join("icons", name), "wb") as f:
-            f.write(png(size, render(size)))
-        print("wrote icons/" + name)
+    for folder, bg in [("icons", BLUE), (os.path.join("icons", "dev"), ORANGE)]:
+        os.makedirs(folder, exist_ok=True)
+        for name, size in [("icon-512.png", 512), ("icon-192.png", 192), ("apple-touch-icon.png", 180), ("icon-32.png", 32)]:
+            with open(os.path.join(folder, name), "wb") as f:
+                f.write(png(size, render(size, bg)))
+            print("wrote " + os.path.join(folder, name))

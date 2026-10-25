@@ -56,6 +56,7 @@ h1 { font: 700 34px/1.05 var(--f-display); letter-spacing: -.02em; margin: 0; te
 .summary .linkish { border: 0; background: none; padding: 0; color: var(--accent); font-size: 14px; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
 .summary .linkish b { color: inherit; }
 .top-actions { display: flex; gap: 8px; }
+.env-badge { margin-left: 10px; vertical-align: middle; font: 700 13px/1 var(--f-mono); letter-spacing: .08em; color: #fff; background: #d9730d; border-radius: 6px; padding: 4px 7px; }
 
 .btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 8px 14px; font-weight: 600; font-size: 14px; }
 .btn:hover { background: var(--hover); }
@@ -316,7 +317,7 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
   </div>
   <header class="top">
     <div>
-      <h1>Our Tasks</h1>
+      <h1>Our Tasks<span class="env-badge" id="env-badge" hidden>DEV</span></h1>
       <p class="summary" id="summary"></p>
     </div>
     <div class="top-actions">
@@ -634,8 +635,15 @@ function saveCollapsed() { try { localStorage.setItem("collapsed", JSON.stringif
 // ---- own hosting (GitHub Pages): Supabase ----
 // The publishable key is meant to be public. The database's access rules (supabase/schema.sql) protect the data:
 // nothing can be read or written without signing in, and only invited people can sign in.
-const SUPABASE_URL = "https://sjtdrnvezorxxdoitszz.supabase.co";
-const SUPABASE_KEY = "sb_publishable_M-eM_n6OUMqsPFZyTDk4aw_eh9MUU9A";
+// Two environments on the same site: /our-tasks/ is production, /our-tasks/dev/ is development (test data).
+const IS_DEV = /\/dev\//.test(location.pathname);
+const ENVIRONMENTS = {
+  // Production: switches to the new, clean project once it exists.
+  prod: { url: "https://sjtdrnvezorxxdoitszz.supabase.co", key: "sb_publishable_M-eM_n6OUMqsPFZyTDk4aw_eh9MUU9A" },
+  // Development: the original project, with its test data.
+  dev: { url: "https://sjtdrnvezorxxdoitszz.supabase.co", key: "sb_publishable_M-eM_n6OUMqsPFZyTDk4aw_eh9MUU9A" },
+};
+const { url: SUPABASE_URL, key: SUPABASE_KEY } = ENVIRONMENTS[IS_DEV ? "dev" : "prod"];
 const SUPABASE_JS = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js";
 
 // Database columns are snake_case; the app's fields are camelCase. BY and ORDER are reserved words in SQL.
@@ -3118,6 +3126,8 @@ $("#search").addEventListener("input", (e) => { filter.q = e.target.value.trim()
 $("#sort").value = sortMode;
 $("#sort").addEventListener("change", (e) => { sortMode = e.target.value; try { localStorage.setItem("sort", sortMode); } catch {} render(); });
 
+$("#env-badge").hidden = !IS_DEV;
+if (IS_DEV) document.title = "Our Tasks DEV";
 render();
 store.init();
 initSmartAdd();
