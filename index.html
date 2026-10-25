@@ -196,6 +196,7 @@ body.shop-mode .item .box svg { width: 26px; height: 26px; }
 .signin-card input { border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 11px 12px; font-size: 16px; }
 .signin-card .btn { padding: 11px 14px; font-size: 15px; }
 .day { width: 32px; height: 32px; color: var(--muted); opacity: 0; }
+.row.flash { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); transition: background 1s; }
 .chip.myday { background: var(--accent-soft); border-color: transparent; color: var(--accent); font-weight: 600; }
 .fab { position: fixed; z-index: 15; right: calc(20px + env(safe-area-inset-right, 0px)); bottom: calc(20px + env(safe-area-inset-bottom, 0px));
   width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--accent); color: var(--accent-ink);
@@ -531,7 +532,7 @@ let loaded = false;
 let byParent = new Map(), byParentAll = new Map(), commentsBy = new Map();
 let editingId = null;
 let view = (() => { try { return localStorage.getItem("view") || "today"; } catch { return "today"; } })();
-let searchMode = false, searchSnippets = new Map();
+let searchMode = false, searchSnippets = new Map(), flashId = null;
 let todayPins = {}, pinsSupported = true;
 const filter = { who: "all", hideDone: false, q: "" };
 let sortMode = "manual";
@@ -1197,6 +1198,7 @@ function renderTask(t, depth) {
       ? h("button", { type: "button", class: "add", title: "Add subtask", "aria-label": "Add subtask under " + t.title, onclick: () => openEditor(null, t.id) }, "+")
       : h("span"));
 
+  if (t.id === flashId) row.classList.add("flash");
   const node = h("div", { class: "node", "data-id": t.id }, row);
   if (shown.length && !isCollapsed) node.append(h("div", { class: "kids" }, shown.map((k) => renderTask(k, depth + 1))));
   return node;
@@ -1302,6 +1304,20 @@ async function togglePin(t) {
   saveSeen();
   render();
   toast(pins[t.id] ? "Added to My day" : "Removed from My day");
+}
+
+// Jump to a task in the Tasks tab: clear the search, open its parents, scroll to it and highlight it briefly.
+function showTask(id) {
+  const t = tasks.get(id);
+  if (!t) return;
+  if (filter.q || filter.who !== "all" || filter.hideDone) clearFilters();
+  for (let p = tasks.get(t.parentId); p; p = tasks.get(p.parentId)) collapsed.delete(p.id);
+  saveCollapsed();
+  flashId = id;
+  switchView("tasks");
+  render();
+  document.querySelector(`.node[data-id="${id}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  setTimeout(() => { if (flashId === id) { flashId = null; document.querySelector(".row.flash")?.classList.remove("flash"); } }, 2500);
 }
 
 // ---- postpone ("snooze") from the task row ----
@@ -1492,9 +1508,12 @@ $("#quick-form").addEventListener("submit", async (e) => {
     });
     if (!isPrivate) log(id, "created it" + (assignee ? ` and assigned it to ${assigneeName(assignee)}` : ""), p.title);
     if (p.parentId) { collapsed.delete(p.parentId); saveCollapsed(); }
+    // Added from Today without a date: put it in My day, so it shows where you are.
+    const pinned = view === "today" && !p.due && pinsSupported;
+    if (pinned) { todayPins = { ...todayPins, [id]: todayStr() }; saveSeen(); render(); }
     $("#quick-input").value = "";
     renderQuickPreview();
-    toast(`Added “${p.title}”. Add another, or close.`, { label: "Edit", run: () => { closeQuick(); openEditor(id); } });
+    toast(`Added “${p.title}”${pinned ? " to My day" : ""}.`, { label: "Show", run: () => { closeQuick(); showTask(id); } });
   } catch (err) { writeFailed(err); }
 });
 $("#quick-more").addEventListener("click", () => {
