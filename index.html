@@ -444,8 +444,14 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
     <p>Enter your email and you'll get a link to sign in. No password needed. Only invited people can sign in.</p>
     <label class="lbl" for="signin-email">Email</label>
     <input type="email" id="signin-email" required autocomplete="email" placeholder="name@example.com">
-    <button class="btn primary" type="submit" id="signin-btn">Send sign-in link</button>
+    <button class="btn primary" type="submit" id="signin-btn">Send sign-in email</button>
     <p class="hint" id="signin-msg" role="status"></p>
+    <div id="code-step" hidden>
+      <label class="lbl" for="signin-code">Code from the email</label>
+      <input type="text" id="signin-code" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456">
+      <button class="btn primary" type="button" id="code-btn">Sign in with code</button>
+      <p class="hint">Use the code when the app is in your Dock or on your home screen: links in emails open in the browser instead.</p>
+    </div>
   </form>
 </div>
 
@@ -2160,11 +2166,27 @@ $("#signin-form").addEventListener("submit", async (e) => {
   btn.disabled = true; msg.textContent = "Sending…";
   const { error } = await sb.client.auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: location.origin + location.pathname } });
   btn.disabled = false;
-  if (!error) msg.textContent = "Check your email and tap the link in it. It opens the app signed in.";
+  if (!error) {
+    msg.textContent = "Check your email. Type the code from it below, or tap the link if you're in a normal browser tab.";
+    $("#code-step").hidden = false;
+    $("#signin-code").focus();
+  }
   else if (error.status === 422 || /signup|not allowed|not found/i.test(error.message)) msg.textContent = "This email hasn't been invited. Ask the other person to invite you in Supabase.";
   else if (error.status === 429) msg.textContent = "Too many sign-in emails just now. Wait a few minutes and try again.";
   else msg.textContent = "Couldn't send the link: " + error.message;
 });
+// The code signs in this app itself (Dock / home-screen apps can't receive email links).
+async function signInWithCode() {
+  const email = $("#signin-email").value.trim(), token = $("#signin-code").value.replace(/\D/g, ""), msg = $("#signin-msg");
+  if (!email || token.length < 6) { msg.textContent = "Enter your email and the code from the email."; return; }
+  $("#code-btn").disabled = true; msg.textContent = "Checking…";
+  const { error } = await sb.client.auth.verifyOtp({ email, token, type: "email" });
+  $("#code-btn").disabled = false;
+  if (error) msg.textContent = /expired|invalid/i.test(error.message) ? "That code is wrong or has expired. Check it, or send yourself a new email." : "Couldn't sign in: " + error.message;
+  else location.reload();
+}
+$("#code-btn").addEventListener("click", signInWithCode);
+$("#signin-code").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); signInWithCode(); } });
 $("#signout-btn").addEventListener("click", async () => { await sb.client?.auth.signOut(); location.reload(); });
 
 // ---- moving data between claude.ai and own hosting ----
