@@ -38,9 +38,17 @@ Notes from daily use go here, then we pick what to improve.
 
 | | Item | Effort | Notes |
 |---|---|---|---|
-| ⬜ | Collect what's annoying or missing (Sławek and Wiola) | | |
+| ✅ | Ideas button in the app to collect feedback | | Migration 006; Copy open ideas → paste to Claude |
+| ⬜ | Collect what's annoying or missing (Sławek and Wiola) | | Use the Ideas button |
 | ⬜ | Check briefing times and tone for both | S | Times are per person under People |
 | ⬜ | Show "I'm Wiola / I'm Sławek" link button in People when not linked | S | Today only the main screen offers it |
+
+## From Ideas (25 Oct 2026)
+
+| | Item | Effort | Notes |
+|---|---|---|---|
+| ⬜ | **Checklists** (e.g. "Before we leave for the other home", "What to bring"): several lists like shopping lists, simple items with only done/not done, ticked items stay visible, closing the whole list archives it; frequent items per list; reusable versions of a list | M | Sławek. Reuse the shopping lists and items tables with a list type. Open question: closing = archive, or also "start again" (untick all) for lists used every trip? |
+| ⬜ | **A colour per person**: Sławek and Wiola each get their own colour at the top (person filter) and everywhere their name appears (assignee, comments, activity, shopping "added by") | S | Sławek. Open question: which colours; pick them under People? |
 
 ## Working as a couple
 

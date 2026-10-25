@@ -55,7 +55,7 @@ h1 { font: 700 34px/1.05 var(--f-display); letter-spacing: -.02em; margin: 0; te
 .summary .over b { color: var(--danger); }
 .summary .linkish { border: 0; background: none; padding: 0; color: var(--accent); font-size: 14px; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
 .summary .linkish b { color: inherit; }
-.top-actions { display: flex; gap: 8px; }
+.top-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .env-badge { margin-left: 10px; vertical-align: middle; font: 700 13px/1 var(--f-mono); letter-spacing: .08em; color: #fff; background: #d9730d; border-radius: 6px; padding: 4px 7px; }
 
 .btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 8px 14px; font-weight: 600; font-size: 14px; }
@@ -275,10 +275,19 @@ body.shop-mode .fab { display: none; }
 .extras { display: flex; flex-direction: column; gap: 14px; border-top: 1px solid var(--line); padding-top: 14px; }
 .comments { display: flex; flex-direction: column; gap: 8px; }
 .comment { background: var(--bg); border-radius: 9px; padding: 8px 10px; font-size: 14px; }
-.comment .who { display: flex; gap: 8px; align-items: baseline; font-size: 12px; color: var(--muted); }
+.comment .who { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; font-size: 12px; color: var(--muted); }
 .comment .who b { color: var(--ink); font-weight: 600; }
 .comment .who button { margin-left: auto; border: 0; background: none; padding: 0; font-size: 12px; color: var(--muted); text-decoration: underline; }
 .comment p { margin: 3px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.idea-kind { font: 600 11px var(--f-mono); letter-spacing: .04em; text-transform: uppercase; color: var(--accent); }
+.idea-kind.problem { color: var(--danger); }
+.comment.moved p { color: var(--muted); }
+.comment .who .idea-kind ~ * { white-space: nowrap; }
+.idea-form { display: flex; flex-direction: column; gap: 8px; }
+.idea-form div { display: flex; gap: 8px; align-items: center; }
+.idea-form select { flex: 1; }
+details.ideas-moved summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+details.ideas-moved .comments { margin-top: 8px; }
 .comment-new { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
 .field .comment-new textarea { min-height: 64px; }
 details.history summary { cursor: pointer; }
@@ -323,6 +332,7 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
     <div class="top-actions">
       <button class="btn" id="brief-btn" type="button" hidden>Briefing</button>
       <button class="btn" id="import-btn" type="button" hidden>From text</button>
+      <button class="btn" id="ideas-btn" type="button" hidden>Ideas</button>
       <button class="btn" id="people-btn" type="button">People</button>
       <button class="btn primary" id="new-btn" type="button">+ New task</button>
     </div>
@@ -497,6 +507,28 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
       <input type="text" id="list-new-name" maxlength="40" placeholder="New list, e.g. Drugstore" aria-label="New list name">
       <button class="btn" type="submit">Add list</button>
     </form>
+  </div>
+</aside>
+
+<aside class="panel" id="ideas-panel" hidden aria-labelledby="id-title">
+  <div class="panel-head"><h2 id="id-title">Ideas for the app</h2><button class="x" type="button" data-close aria-label="Close">×</button></div>
+  <div class="fields">
+    <p class="hint">Write down anything that's missing, annoying or broken. Later, copy the list into the chat with Claude to plan the next changes.</p>
+    <form class="idea-form field" id="idea-form" autocomplete="off">
+      <textarea id="idea-text" maxlength="2000" placeholder="e.g. Show what the other person added since yesterday" aria-label="Your idea"></textarea>
+      <div>
+        <select id="idea-kind" aria-label="Kind"><option value="idea">Idea</option><option value="problem">Problem</option></select>
+        <button class="btn primary" type="submit">Add</button>
+      </div>
+    </form>
+    <p class="hint" id="ideas-missing" hidden>Ideas need the database update: run supabase/migrations/006_ideas.sql in Supabase.</p>
+    <div class="comments" id="ideas-list"></div>
+    <details class="ideas-moved" id="ideas-moved" hidden><summary></summary><div class="comments" id="ideas-moved-list"></div></details>
+  </div>
+  <div class="panel-foot">
+    <button class="btn" type="button" id="ideas-copy">Copy open ideas</button>
+    <span class="spacer"></span>
+    <button class="btn" type="button" data-close>Close</button>
   </div>
 </aside>
 
@@ -989,6 +1021,7 @@ function startListening() {
   store.listen("items", (m) => { items = m; render(); if (editingId) renderTaskShop(); });
   store.listen("lists", (m) => { lists = m; render(); if (!$("#lists-panel").hidden && !$("#lists-panel").contains(document.activeElement)) renderListsPanel(); });
   store.listen("catalog", (m) => { catalog = m; if (view === "shopping") renderChips(); });
+  listenIdeas();
   if (meId) store.listenDoc("data/users/" + meId + "/seen", (d) => { seen = d?.map || {}; activitySeenAt = d?.activityAt || 0; shoppingSeenAt = d?.shoppingAt || 0; todayPins = d?.today || {}; render(); });
 }
 
@@ -1283,6 +1316,8 @@ function render() {
   const claudeHere = store.mode === "remote" || store.mode === "supabase";
   $("#import-btn").hidden = !claudeHere || !canWrite();
   $("#brief-btn").hidden = store.mode !== "supabase";
+  $("#ideas-btn").hidden = !canWrite();
+  $("#ideas-btn").textContent = openIdeas().length ? `Ideas (${openIdeas().length})` : "Ideas";
   $("#smart-btn").hidden = $("#smart-hint").hidden = !claudeHere;
   const searching = !!filter.q && ["tasks", "today", "upcoming"].includes(view);
   $("#hide-done-wrap").hidden = view !== "tasks" || searching;
@@ -1950,6 +1985,57 @@ $("#comment-add").addEventListener("click", async () => {
   $("#f-comment").value = "";
   try { await store.add("comments", { taskId: editingId, text, by: mySlot() || "", byUser: meId || "", at: Date.now() }); notifyEvent("comment", editingId, text); }
   catch (err) { writeFailed(err); }
+});
+
+// ---- ideas for the app ----
+// A shared inbox for app feedback; "Copy open ideas" makes a list to paste into the chat with Claude.
+let ideas = new Map(), ideasMissing = false;
+const openIdeas = () => [...ideas.values()].filter((i) => !i.moved).sort((a, b) => (b.at || 0) - (a.at || 0));
+function listenIdeas() {
+  const cb = (m) => { ideas = m; ideasMissing = false; render(); if (!$("#ideas-panel").hidden) renderIdeas(); };
+  // Until supabase/migrations/006_ideas.sql runs, the table is missing; the panel says so instead of the app failing.
+  if (store.mode === "supabase") sb.listen("ideas", cb).catch(() => { ideasMissing = true; });
+  else store.listen("ideas", cb);
+}
+function ideaRow(i) {
+  const mine = i.byUser && i.byUser === meId;
+  return h("div", { class: "comment" + (i.moved ? " moved" : "") },
+    h("div", { class: "who" }, h("span", { class: "idea-kind" + (i.kind === "problem" ? " problem" : "") }, i.kind === "problem" ? "Problem" : "Idea"),
+      h("b", {}, slotName(i.by) || "Someone"), h("span", {}, fmtStamp(i.at)),
+      h("button", { type: "button", onclick: () => store.update("ideas", i.id, { moved: !i.moved, movedAt: i.moved ? null : Date.now() }).catch(writeFailed) },
+        i.moved ? "Back to open" : "In backlog"),
+      mine && h("button", { type: "button", onclick: () => store.remove("ideas", i.id).catch(writeFailed) }, "Delete")),
+    h("p", {}, i.text));
+}
+function renderIdeas() {
+  const open = openIdeas(), moved = [...ideas.values()].filter((i) => i.moved).sort((a, b) => (b.movedAt || 0) - (a.movedAt || 0));
+  $("#ideas-missing").hidden = !ideasMissing;
+  $("#idea-form").hidden = ideasMissing;
+  fill($("#ideas-list"), open.length ? open.map(ideaRow) : !ideasMissing && h("p", { class: "hint" }, "No open ideas."));
+  $("#ideas-moved").hidden = !moved.length;
+  $("#ideas-moved summary").textContent = `In the backlog (${moved.length})`;
+  fill($("#ideas-moved-list"), moved.map(ideaRow));
+  $("#ideas-copy").disabled = !open.length;
+}
+$("#ideas-btn").addEventListener("click", () => { renderIdeas(); openPanel($("#ideas-panel")); if (!ideasMissing) $("#idea-text").focus(); });
+$("#idea-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const text = $("#idea-text").value.trim();
+  if (!text) return;
+  const kind = $("#idea-kind").value;
+  $("#idea-text").value = ""; $("#idea-kind").value = "idea";
+  try { await store.add("ideas", { text, kind, by: mySlot() || "", byUser: meId || "", at: Date.now() }); toast("Thanks, noted"); }
+  catch (err) { $("#idea-text").value = text; writeFailed(err); }
+});
+$("#ideas-copy").addEventListener("click", async () => {
+  const open = openIdeas().reverse();
+  const text = "Ideas for Our Tasks:\n" + open.map((i) => `- ${i.kind === "problem" ? "Problem" : "Idea"} (${slotName(i.by) || "Someone"}, ${fmtStamp(i.at)}): ${i.text.replace(/\s+/g, " ")}`).join("\n");
+  try { await navigator.clipboard.writeText(text); }
+  catch { toast("Couldn't copy. Select the ideas and copy them by hand."); return; }
+  toast(`Copied ${open.length} ${open.length === 1 ? "idea" : "ideas"}. Paste them into the chat with Claude.`, { label: "Mark all as in backlog", run: async () => {
+    try { for (const i of open) await store.update("ideas", i.id, { moved: true, movedAt: Date.now() }); }
+    catch (err) { writeFailed(err); }
+  } });
 });
 
 // ---- history ----
