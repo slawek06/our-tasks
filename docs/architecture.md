@@ -65,6 +65,7 @@ There is no own server: GitHub hosts the files, Supabase holds data, sign-in and
 | `.github/workflows/pages.yml` | Publishes `main` to `/our-tasks/` and `dev` to `/our-tasks/dev/` (renames the dev copy and gives it the orange icon) |
 | `supabase/schema.sql` | Base tables and access rules |
 | `supabase/migrations/NNN_*.sql` | Later database changes, in order, each safe to run more than once |
+| `supabase/tests/privacy-check.sql` | Paste into the SQL Editor: checks each person sees only what they should (PASS/FAIL), leaves nothing behind |
 | `scripts/make-setup-sql.py <ref>` | Writes `supabase/setup-<ref>.sql`: schema + all migrations + permissions + timer for one project |
 | `supabase/functions/claude/index.ts` | Claude proxy for the app's AI features |
 | `supabase/functions/notify/index.ts` | Push, briefings, briefing chat, timer |
@@ -92,7 +93,7 @@ Field names: the app uses camelCase, the database snake_case (`parentId` ↔ `pa
 
 **Feature checks.** Before a migration has run, the matching feature hides itself and says which file to run:
 `pinsSupported` (002), `perListSupported` (003), notifications (004), Ideas (006), `areasSupported` (007),
-checklists (008), `privateListsSupported` (009).
+checklists (008), `privateListsSupported` (009). 010 only tightens access rules; the app works the same before it.
 
 **Views.** Today · Tasks (Inbox + areas) · Upcoming · Lists (Shopping | Checklists) · Activity · Archive.
 Panels: task editor, People (names, password, notifications, data), Briefing, From text, Ideas, Sort into areas,
@@ -140,6 +141,12 @@ on the device).
 - Every table allows only signed-in users (`authenticated`); anonymous visitors get nothing.
 - `tasks`, `checklists`, `lists`: `not private or owner = auth.uid()`.
 - `checklist_items` follow their checklist; `items` follow their list (items of a private list are hidden from the other person).
+- `comments` and `history` follow their task: those of a private task only for its owner (history without a task is shared).
+- Rules that must look at the other person's private rows (`items`, `comments`, `history`) use the security definer
+  functions `private.others_private_task(id)` and `private.others_private_list(id)` (010). A plain subquery would
+  itself be filtered by the access rules, never see the private row, and let everything through (009's mistake).
+  The `private` schema isn't exposed by the API.
+- Check the rules any time with `supabase/tests/privacy-check.sql`.
 - `user_state`, `push_subscriptions`, `notify_prefs`, `briefings`: own rows only.
 - `push_config`: no rules at all, so only the server functions (service role) can read it.
 - New projects created with "Automatically expose new tables" off need explicit `grant`s; `make-setup-sql.py` adds them.
@@ -189,6 +196,7 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 | schema + 002–007 | ✅ | ✅ |
 | 008 checklists | ✅ (run early, harmless) | run before testing checklists |
 | 009 private lists, standing lists | ⬜ next release | run before testing |
+| 010 private comments and history, private list items fix | ⬜ next release | run, then the privacy check |
 
 ## 10. Configuration reference
 

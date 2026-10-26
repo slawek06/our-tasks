@@ -136,3 +136,17 @@ Notes from daily use go here, then we pick what to improve.
 | ✅ | Separate production and development environments | | Two Supabase projects, `main` / `dev` branches |
 | ✅ | Password and e-mail code sign-in | | |
 | ⬜ | Native iPhone/Mac app: widgets, Siri intents, Watch | L | $99/year Apple Developer Program |
+
+## Security (review 26 Oct 2026)
+
+Outsiders get nothing without a sign-in; the weak points are the accounts around the app, not the code.
+
+| | Item | Effort | Notes |
+|---|---|---|---|
+| 🔶 | Comments and history of a private task readable only by its owner | | Built on dev, next release (migration 010) |
+| 🔶 | Fix: items of a private shopping list were readable by the other person | | 009's rule checked the list through its own access rule; fixed in 010 |
+| 🔶 | History no longer names items added to a private list | | Migration 010 also rewrites older entries |
+| ✅ | Privacy check script | | `supabase/tests/privacy-check.sql`: PASS/FAIL per rule, leaves nothing behind |
+| ⬜ | Two-step sign-in on Gmail (both), Supabase, GitHub, Anthropic | S | Owner, in each account's security settings |
+| ⬜ | Monthly spending limit on the Anthropic key | S | console.anthropic.com → Settings → Limits |
+| ⬜ | Checksum (SRI) on the supabase-js script from jsDelivr | S | Decided: low risk, leave for now |

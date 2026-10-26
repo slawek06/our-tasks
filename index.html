@@ -2722,7 +2722,7 @@ async function addEntries(entries, listId, taskId = "") {
       added.push(e.name);
       const cid = catalogId(e.name), c = catalog.get(cid);
       // Private lists stay out of the shared suggestions, so their items can't show up for the other person.
-      if (lists.get(listId)?.private) { if (taskId) log(taskId, `added “${e.name}” to a private list`); continue; }
+      if (lists.get(listId)?.private) { if (taskId) log(taskId, "added an item to a private list"); continue; }
       // Older entries keep their earlier history under Groceries.
       const before = c?.listCounts && Object.keys(c.listCounts).length ? c.listCounts : c?.count ? { groceries: c.count } : {};
       const listCounts = { ...before, [listId]: (before[listId] || 0) + 1 };
