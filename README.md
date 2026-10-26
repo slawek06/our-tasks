@@ -4,6 +4,8 @@ A shared task tracker and shopping list for two people.
 
 Live: https://slawek06.github.io/our-tasks/ (sign-in required; only invited people)
 
+Documentation: [docs/architecture.md](docs/architecture.md) (architecture, technology, configuration, rebuild guide) · [docs/backlog.md](docs/backlog.md) (plans and decisions).
+
 ## Environments
 
 | | Production | Development |
