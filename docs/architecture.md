@@ -87,7 +87,8 @@ URL and publishable key (public by design; the access rules protect the data).
 
 **The `sb` layer.** One query per table at start, then Realtime keeps an in-memory copy current. A device copy
 (`ot-cache-<user>`) lets the app open offline. Writes apply locally at once; if offline they wait in the outbox
-(`ot-outbox-<user>`) and are sent in order later. New rows get their id on the device, so links work before syncing.
+(`ot-outbox-<user>`) and are sent in order later. Signing out deletes both from the device (after a warning if
+unsent changes remain), also when signed out from another device; "Sign out" ends every session of that person. New rows get their id on the device, so links work before syncing.
 Field names: the app uses camelCase, the database snake_case (`parentId` ↔ `parent_id`); `by` ↔ `author` and
 `order` ↔ `sort_order` because BY and ORDER are reserved words.
 
@@ -167,6 +168,7 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 - `brief_now`, `chat`: briefing and conversation, written by Claude from a snapshot of the caller's open tasks,
   shopping, standing-list topics and recent activity (never the other person's private items); proposed changes come
   back as `actions` that the app applies only after confirmation
+- Errors answer `server_error` without details; the reason goes to the function's logs.
 - `tick`: called by the timer with header `x-cron-secret` (from `push_config`); sends due morning/evening briefings
 - `APP_URL` (secret, optional): address opened from notifications; defaults to production
 

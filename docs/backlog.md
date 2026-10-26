@@ -146,7 +146,11 @@ Outsiders get nothing without a sign-in; the weak points are the accounts around
 | 🔶 | Comments and history of a private task readable only by its owner | | Built on dev, next release (migration 010) |
 | 🔶 | Fix: items of a private shopping list were readable by the other person | | 009's rule checked the list through its own access rule; fixed in 010 |
 | 🔶 | History no longer names items added to a private list | | Migration 010 also rewrites older entries |
+| 🔶 | Signing out deletes the device copy of the data (warns about unsent offline changes) | | Built on dev, next release |
+| 🔶 | notify answers errors without technical details (they go to its logs) | | Built on dev; redeploy notify in the release |
 | ✅ | Privacy check script | | `supabase/tests/privacy-check.sql`: PASS/FAIL per rule, leaves nothing behind |
 | ⬜ | Two-step sign-in on Gmail (both), Supabase, GitHub, Anthropic | S | Owner, in each account's security settings |
 | ⬜ | Monthly spending limit on the Anthropic key | S | console.anthropic.com → Settings → Limits |
+| ⬜ | Own backup: export once a month (People → Your data) into `data/` | S | Free plan has no restorable backups |
+| ⬜ | Separate web address for dev (dev and production share `slawek06.github.io`, so their browser storage) | M | Decided: leave; only our own code runs there |
 | ⬜ | Checksum (SRI) on the supabase-js script from jsDelivr | S | Decided: low risk, leave for now |

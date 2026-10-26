@@ -800,13 +800,21 @@ const sb = {
   saveSoon() {
     clearTimeout(this.saveTimer);
     this.saveTimer = setTimeout(() => {
+      if (this.forgotten) return;
       const tables = Object.fromEntries(Object.entries(this.caches).map(([t, m]) => [t, [...m.values()]]));
       try { localStorage.setItem(this.cacheKey(), JSON.stringify({ tables, docs: this.docs })); } catch {}
     }, 400);
   },
   saveOutbox() {
+    if (this.forgotten) return;
     try { localStorage.setItem(this.outboxKey(), JSON.stringify(this.outbox)); } catch {}
     updateOfflineNotice();
+  },
+  // Signing out removes this person's data from the device, so a borrowed computer keeps nothing.
+  forget() {
+    this.forgotten = true;
+    clearTimeout(this.saveTimer);
+    try { localStorage.removeItem(this.cacheKey()); localStorage.removeItem(this.outboxKey()); } catch {}
   },
 
   // ---- reading ----
@@ -967,7 +975,8 @@ const store = {
       return;
     }
     meId = data.session.user.id;
-    sb.client.auth.onAuthStateChange((event) => { if (event === "SIGNED_OUT") location.reload(); });
+    // Also when signed out from another device ("Sign out" there ends every session).
+    sb.client.auth.onAuthStateChange((event) => { if (event === "SIGNED_OUT") { sb.forget(); location.reload(); } });
     sb.restore();
     await sb.flush();  // changes left from an earlier offline session go first
     sb.subscribe();
@@ -3348,7 +3357,16 @@ $("#set-password-btn").addEventListener("click", async () => {
   $("#new-password").value = "";
   toast("Password set. Use it with your email to sign in on other devices.");
 });
-$("#signout-btn").addEventListener("click", async () => { await sb.client?.auth.signOut(); location.reload(); });
+$("#signout-btn").addEventListener("click", async () => {
+  await sb.flush();
+  const n = sb.outbox.length;
+  if (n && !(await askConfirm("Sign out anyway?", `${n} change${n > 1 ? "s" : ""} made offline ${n > 1 ? "haven't" : "hasn't"} reached the server yet. Signing out deletes ${n > 1 ? "them" : "it"} from this device.`, "Sign out"))) return;
+  sb.forget();
+  // Ends every session; offline the server can't be told, so at least this device signs out.
+  const { error } = await sb.client.auth.signOut();
+  if (error) await sb.client.auth.signOut({ scope: "local" });
+  location.reload();
+});
 
 // ---- moving data between claude.ai and own hosting ----
 const TASK_FIELDS = ["title", "status", "assignee", "priority", "due", "repeat", "parentId", "notes", "order", "createdAt", "assignedBy", "assignedAt", "archived", "archivedAt"];

@@ -379,6 +379,8 @@ Deno.serve(async (req) => {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg === "not_configured") return reply({ error: "not_configured" }, 503);
     if (e instanceof Anthropic.RateLimitError) return reply({ error: "rate_limited" }, 429);
-    return reply({ error: "server_error", detail: msg.slice(0, 200) }, 500);
+    // The reason goes to the function's logs (dashboard > Edge Functions > notify > Logs), not to the caller.
+    console.error("notify:", msg);
+    return reply({ error: "server_error" }, 500);
   }
 });
