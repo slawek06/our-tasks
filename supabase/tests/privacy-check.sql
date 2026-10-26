@@ -3,7 +3,8 @@
 -- It adds a few test rows, looks at them as each of the two people, then undoes everything, so nothing is left.
 -- The result is a table with PASS or FAIL per line. Needs migrations 009 and 010.
 --
--- "A" is the person who owns the private test task and list, "B" is the other person.
+-- "A" is the person who owns the private test task and list (the first account), "B" is the other person.
+-- Works with a single account, so also in a development project with only one user.
 
 create temp table if not exists privacy_check (n int, who text, what text, expected text, actual text, result text);
 truncate privacy_check;
@@ -53,12 +54,10 @@ declare
   ]';
   c jsonb; got boolean; i int := 0;
 begin
-  select (value->>'aUser')::uuid, (value->>'bUser')::uuid into ua, ub from public.config where key = 'people';
-  if ua is null or ub is null or ua = ub then
-    select id into ua from auth.users order by created_at limit 1;
-    select id into ub from auth.users where id <> ua order by created_at limit 1;
-  end if;
-  if ua is null or ub is null then raise exception 'The privacy check needs two users in Authentication > Users.'; end if;
+  -- A owns rows, so must be a real account; B only looks, so any made-up id stands in for "the other person".
+  select id into ua from auth.users order by created_at limit 1;
+  if ua is null then raise exception 'The privacy check needs a user in Authentication > Users.'; end if;
+  ub := gen_random_uuid();
 
   begin
     insert into public.tasks (id, title, private, owner) values
