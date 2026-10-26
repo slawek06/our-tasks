@@ -8,7 +8,7 @@ A shared task tracker, shopping lists and checklists for two people. Read these 
 
 ## The owner
 Doesn't write code (was a developer long ago: C, C++, Java, databases). Explain in plain words, give step-by-step
-instructions with exact menu paths and links for anything he does in Supabase or GitHub, and say what to check after.
+instructions with exact menu paths and links for anything to do in Supabase or GitHub, and say what to check after.
 
 ## Never
 - Ask for, handle or commit secrets: database password, `sb_secret` / service role key, Anthropic API key, Gmail app
