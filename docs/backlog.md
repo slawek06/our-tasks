@@ -149,8 +149,8 @@ Outsiders get nothing without a sign-in; the weak points are the accounts around
 | 🔶 | Signing out deletes the device copy of the data (warns about unsent offline changes) | | Built on dev, next release |
 | 🔶 | notify answers errors without technical details (they go to its logs) | | Built on dev; redeploy notify in the release |
 | ✅ | Privacy check script | | `supabase/tests/privacy-check.sql`: PASS/FAIL per rule, leaves nothing behind |
-| ⬜ | Two-step sign-in on Gmail (both), Supabase, GitHub, Anthropic | S | Owner, in each account's security settings |
-| ⬜ | Monthly spending limit on the Anthropic key | S | console.anthropic.com → Settings → Limits |
+| 🔶 | Two-step sign-in on Gmail (both), Supabase, GitHub, Anthropic | S | Done: Sławek's Gmail, GitHub (27 Oct 2026). Open: Wiola's Gmail, Supabase (authenticator app). Anthropic has no own setting: sign-in goes through Gmail, so Gmail's two-step covers it |
+| ✅ | Monthly spending limit on the Anthropic key | S | Set to $5 a month (27 Oct 2026), console.anthropic.com → Settings → Limits |
 | ⬜ | Own backup: export once a month (People → Your data) into `data/` | S | Free plan has no restorable backups |
 | ⬜ | Separate web address for dev (dev and production share `slawek06.github.io`, so their browser storage) | M | Decided: leave; only our own code runs there |
 | ⬜ | Checksum (SRI) on the supabase-js script from jsDelivr | S | Decided: low risk, leave for now |
