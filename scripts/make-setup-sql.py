@@ -38,7 +38,7 @@ grant usage on schema public to authenticated, service_role;
 grant select, insert, update, delete on
   public.tasks, public.comments, public.history, public.lists, public.items, public.catalog,
   public.config, public.user_state, public.push_subscriptions, public.notify_prefs, public.briefings, public.ideas,
-  public.checklists, public.checklist_items
+  public.checklists, public.checklist_items, public.seen_marks
   to authenticated;
 grant all on all tables in schema public to service_role;
 """)

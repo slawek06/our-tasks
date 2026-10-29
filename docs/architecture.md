@@ -94,11 +94,20 @@ Field names: the app uses camelCase, the database snake_case (`parentId` ↔ `pa
 
 **Feature checks.** Before a migration has run, the matching feature hides itself and says which file to run:
 `pinsSupported` (002), `perListSupported` (003), notifications (004), Ideas (006), `areasSupported` (007),
-checklists (008), `privateListsSupported` (009). 010 only tightens access rules; the app works the same before it.
+checklists (008), `privateListsSupported` (009), seen markers (011: no marks until it runs). 010 only tightens access
+rules; the app works the same before it.
 
 **Views.** Today · Tasks (Inbox + areas) · Upcoming · Lists (Shopping | Checklists) · Activity · Archive.
 Panels: task editor, People (names, password, notifications, data), Briefing, From text, Ideas, Sort into areas,
 shopping list editor.
+
+**Seen markers.** Opening a task that the other person assigned to you, or seeing their comment, writes a row in
+`seen_marks` the first time (`markOpened`, only while the app is visible, never for private tasks). The editor shows
+the other person's marks: "Assigned by … · Wiola saw it 10:42" on tasks for them, and "Wiola saw it …" on your
+comments. You never see your own marks.
+
+**Mentions.** Typing `@` in a comment offers the other person's name (`#mention-pick`); `@Name` is shown in that
+person's colour (`withMentions`). The push is decided by `notify` (see §7).
 
 **People.** `config` row `people` = `{a, b, aUser, bUser}`: the two names and which account is which. The first person
 is shown blue, the second green (`--p-a`, `--p-b`).
@@ -120,7 +129,8 @@ on the device).
 | `items` | Shopping items | `list_id`, `name`, `qty`, `section`, `checked`, `bought`, `task_id`, `added_by`, … | schema |
 | `catalog` | Items bought before: suggestions and shop sections | `name`, `section`, `manual`, `count`, `list_counts` | schema, 003 |
 | `config` | Shared settings (`people`) | `key`, `value` (json) | schema |
-| `user_state` | Per person: seen markers, My day pins | `user_id`, `seen`, `activity_at`, `shopping_at`, `today` | schema, 002 |
+| `seen_marks` | "Wiola saw it 10:42": first time a person saw an assignment or comment | `id` (`<user>:<task>:<kind>:<ref>`), `user_id`, `task_id` (deleted with the task), `kind` (`assigned`/`comment`), `ref` (assigned_at or comment id), `at` | 011 |
+| `user_state` | Per person: "new for you" and Activity/Shopping read markers, My day pins | `user_id`, `seen`, `activity_at`, `shopping_at`, `today` | schema, 002 |
 | `push_subscriptions` | Devices that get push | `user_id`, `endpoint`, `p256dh`, `auth`, `device` | 004 |
 | `notify_prefs` | Notification settings per person | `lang`, `tz`, `morning`, `evening`, `quiet_from/to`, `on_assigned/comment/closed`, `morning_sent`, `evening_sent` | 004, 005 |
 | `briefings` | Briefings and chat messages | `user_id`, `kind`, `role`, `text`, `actions` (json), `applied` | 004 |
@@ -148,6 +158,8 @@ on the device).
   itself be filtered by the access rules, never see the private row, and let everything through (009's mistake).
   The `private` schema isn't exposed by the API.
 - Check the rules any time with `supabase/tests/privacy-check.sql`.
+- `seen_marks` (011): everyone writes only their own rows (the id must match what they mark); both read them, except
+  marks on the other person's private task.
 - `user_state`, `push_subscriptions`, `notify_prefs`, `briefings`: own rows only.
 - `push_config`: no rules at all, so only the server functions (service role) can read it.
 - New projects created with "Automatically expose new tables" off need explicit `grant`s; `make-setup-sql.py` adds them.
@@ -164,7 +176,9 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 **`notify`.** Body `{action, …}`:
 - `vapid`: public push key (keys are created and stored in `push_config` on first use)
 - `test`: push to the caller's devices
-- `event` (`assigned`, `comment`, `closed`): instant push to the other person, respecting their switches and quiet hours
+- `event` (`assigned`, `comment`, `closed`): instant push to the other person, respecting their switches and quiet hours.
+  A comment with `@<their name>` is a mention: it pushes even with their Comments switch off, titled
+  "Sławek mentioned you in …" (one push, never two); quiet hours still apply
 - `brief_now`, `chat`: briefing and conversation, written by Claude from a snapshot of the caller's open tasks,
   shopping, standing-list topics and recent activity (never the other person's private items); proposed changes come
   back as `actions` that the app applies only after confirmation
@@ -199,6 +213,7 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 | 008 checklists | ✅ (run again 29 Oct 2026) | ✅ |
 | 009 private lists, standing lists | ✅ 29 Oct 2026 | ✅ |
 | 010 private comments and history, private list items fix | ✅ 29 Oct 2026, privacy check all PASS | ✅ privacy check all PASS (26 Oct 2026) |
+| 011 seen markers | ⬜ next release | ⬜ to run (then the privacy check) |
 
 ## 10. Configuration reference
 

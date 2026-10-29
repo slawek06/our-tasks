@@ -89,8 +89,8 @@ Notes from daily use go here, then we pick what to improve.
 | ✅ | Assign to each other, "new for you", activity feed, comments | | |
 | ➖ | **"I'm going to the shop"**: one tap tells the other person, items they add appear live | S | Dropped 30 Oct 2026: not practical for us |
 | ⬜ | ⭐ **"Can you take this?"**: ask instead of assign; Take it / Can't, because… | S | Top pick; pairs with seen markers |
-| ⬜ | **Seen markers**: "Wiola saw it 10:42" on assigned tasks and comments | S | Next release (chosen 30 Oct 2026) |
-| ⬜ | **Mentions in comments**: @Wiola sends her a push | S | Next release (chosen 30 Oct 2026). Comments already push the other person (switch `on_comment`), so a mention must add something: decide in its session |
+| 🔶 | **Seen markers**: "Wiola saw it 10:42" on assigned tasks and comments | S | Built on dev 30 Oct 2026 (migration 011). Shown in the task editor: on tasks you assigned to the other person and on your comments; the time is when they first opened it. Not on task rows (could follow) |
+| 🔶 | **Mentions in comments**: @Wiola sends her a push | S | Built on dev 30 Oct 2026 (notify updated). Decided 30 Oct 2026: typing @ offers the other's name, shown in their colour; a mention pushes even with their Comments switch off, titled "Sławek mentioned you in …", one push only; quiet hours still apply; no new switch, not in the briefing |
 | ⬜ | **Gentle nudge**: "Remind Wiola" push worded by Claude, at most once a day per task | S | |
 | ⬜ | ⭐ **"Where are we this week?"**: which home each of you is at; that home's tasks first in Today, briefing mentions it, "Next time in Warsaw" lists | M | Top pick; pairs with Checklists and areas |
 | ⬜ | **Decisions and approvals**: options (with photos) to vote on or approve ("OK to order this sofa?"); result kept in the task | M | Replaces the old "Approvals" item |

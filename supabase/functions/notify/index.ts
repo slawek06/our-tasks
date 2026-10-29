@@ -116,6 +116,11 @@ async function people() {
 }
 const slotOf = (p: Awaited<ReturnType<typeof people>>, uid: string) => (p.aUser === uid ? "a" : p.bUser === uid ? "b" : "");
 const nameOf = (p: Awaited<ReturnType<typeof people>>, slot: string) => (slot === "a" ? p.a : slot === "b" ? p.b : slot === "both" ? "both of you" : "") || "";
+// "@Wiola" in a comment, not followed by more letters (so "@Wiolka" isn't a mention of Wiola).
+const mentions = (text: string, name: string) => {
+  const n = name.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return !!n && new RegExp(`@${n}(?![\\p{L}\\p{N}])`, "iu").test(text);
+};
 const PREF_DEFAULTS = { lang: "en", tz: "Europe/Warsaw", morning: "07:30", evening: "20:00", quiet_from: "22:00", quiet_to: "07:00", on_assigned: true, on_comment: true, on_closed: true, morning_sent: "", evening_sent: "" };
 async function prefsOf(uid: string) {
   const { data } = await db.from("notify_prefs").select("*").eq("user_id", uid).maybeSingle();
@@ -355,10 +360,12 @@ Deno.serve(async (req) => {
       if (inQuiet(p, localNow(p.tz).time)) return reply({ sent: 0, quiet: true });
       const who = nameOf(ppl, sender) || "Someone", url = APP_URL + "?task=" + encodeURIComponent(task.id);
       let message: { title: string; body: string } | null = null;
+      const mentioned = body.type === "comment" && mentions(String(body.text ?? ""), nameOf(ppl, otherSlot));
       if (body.type === "assigned" && p.on_assigned && [otherSlot, "both"].includes(task.assignee))
         message = { title: `${who} assigned you a task`, body: task.title + (task.due ? ` (due ${task.due})` : "") };
-      else if (body.type === "comment" && p.on_comment)
-        message = { title: `${who} commented on ${task.title}`, body: String(body.text ?? "").slice(0, 160) };
+      else if (body.type === "comment" && (p.on_comment || mentioned))
+        // An @mention reaches them even with the Comments switch off, under its own title (one push, never two).
+        message = { title: `${who} ${mentioned ? "mentioned you in" : "commented on"} ${task.title}`, body: String(body.text ?? "").slice(0, 160) };
       else if (body.type === "closed" && p.on_closed)
         message = { title: `${who} closed a task`, body: task.title };
       return reply({ sent: message ? await pushTo(other, { ...message, url, tag: `${body.type}-${task.id}` }) : 0 });

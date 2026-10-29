@@ -324,6 +324,10 @@ body.shop-mode .fab { display: none; }
 .comment .who { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; font-size: 12px; color: var(--muted); }
 .comment .who b { color: var(--ink); font-weight: 600; }
 .comment .who button { margin-left: auto; border: 0; background: none; padding: 0; font-size: 12px; color: var(--muted); text-decoration: underline; }
+.seen-mark b { font-weight: 600; }
+.mention { font-weight: 600; }
+.mention-pick { align-self: flex-start; }
+.mention-pick button { font: inherit; font-size: 14px; padding: 3px 10px; cursor: pointer; }
 .comment p { margin: 3px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .idea-kind { font: 600 11px var(--f-mono); letter-spacing: .04em; text-transform: uppercase; color: var(--accent); }
 .idea-kind.problem { color: var(--danger); }
@@ -473,6 +477,7 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
           <div class="comments" id="comment-list"></div>
           <div class="comment-new" id="comment-new">
             <textarea id="f-comment" maxlength="2000" placeholder="Write a comment" aria-label="New comment"></textarea>
+            <div class="mention-pick" id="mention-pick" hidden></div>
             <button class="btn small" type="button" id="comment-add">Add comment</button>
           </div>
         </div>
@@ -1114,6 +1119,7 @@ function startListening() {
   store.listen("catalog", (m) => { catalog = m; if (view === "shopping") renderChips(); });
   listenIdeas();
   listenChecklists();
+  listenSeenMarks();
   if (meId) store.listenDoc("data/users/" + meId + "/seen", (d) => { seen = d?.map || {}; activitySeenAt = d?.activityAt || 0; shoppingSeenAt = d?.shoppingAt || 0; todayPins = d?.today || {}; render(); });
 }
 
@@ -1138,6 +1144,42 @@ async function markSeen(ids) {
 function saveSeen() {
   if (meId) store.setDoc("data/users/" + meId + "/seen", { map: seen, activityAt: activitySeenAt, shoppingAt: shoppingSeenAt, today: todayPins }).catch(() => {});
 }
+
+// ---- seen markers: "Wiola saw it 10:42" ----
+// A mark is written the first time you open a task the other person assigned to you, or see their comment
+// (supabase/migrations/011_seen_marks.sql; until it runs there are no marks). You see only the other person's marks.
+let seenMarks = new Map(), marksSupported = false, marking = false;
+function listenSeenMarks() {
+  const cb = (m) => { seenMarks = m; marksSupported = true; if (editingId) { renderAssignedBy(tasks.get(editingId)); renderComments(); } };
+  if (store.mode === "supabase") sb.listen("seen_marks", cb).catch(() => { marksSupported = false; });
+  else store.listen("seen_marks", cb);
+}
+const markId = (uid, taskId, kind, ref) => [uid, taskId, kind, ref].join(":");
+const otherSlot = () => ({ a: "b", b: "a" })[mySlot()] || null;
+function theirMark(taskId, kind, ref) {
+  const o = otherSlot(), uid = o && people[o + "User"];
+  return uid ? seenMarks.get(markId(uid, taskId, kind, ref)) || null : null;
+}
+function markOpened(t) {
+  const me = mySlot();
+  if (!marksSupported || marking || !me || !t || t.private || !canWrite() || document.visibilityState !== "visible") return;
+  const want = [];
+  if (isMine(t, me) && t.assignedBy && t.assignedBy !== me && t.assignedAt) want.push(["assigned", String(t.assignedAt)]);
+  for (const c of commentsBy.get(t.id) || []) if (c.by && c.by !== me) want.push(["comment", c.id]);
+  marking = true; // writing fires the listener, which renders the comments again
+  try {
+    for (const [kind, ref] of want) {
+      const id = markId(meId, t.id, kind, ref);
+      if (!seenMarks.has(id)) store.put("seen_marks", id, { userId: meId, taskId: t.id, kind, ref, at: Date.now() }).catch(() => {});
+    }
+  } finally { marking = false; }
+}
+function seenWhen(ms) {
+  const d = new Date(ms), y = new Date(), time = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  y.setDate(y.getDate() - 1);
+  return d.toDateString() === new Date().toDateString() ? time : d.toDateString() === y.toDateString() ? "yesterday " + time : fmtStamp(ms);
+}
+const seenLabel = (m) => h("span", { class: "seen-mark" }, h("b", { class: pc(otherSlot()) || null }, slotName(otherSlot())), " saw it " + seenWhen(m.at));
 // Activity and Shopping highlight what the other person did since you last looked at them.
 function switchView(k) {
   if (k === view) return;
@@ -1985,9 +2027,6 @@ function openEditor(id, parentId = "", opts = {}) {
   const asg = $("#f-assignee");
   asg.replaceChildren(...[["", "No one"], ["a", people.a], ["b", people.b], ["both", "Both"]].map(([v, l]) => h("option", { value: v }, l)));
   asg.value = t.assignee || "";
-  const ab = $("#assigned-by");
-  ab.hidden = !(t.assignee && t.assignedBy && t.assignedAt);
-  if (!ab.hidden) ab.textContent = `Assigned by ${slotName(t.assignedBy)} on ${fmtStamp(t.assignedAt)}`;
   $("#f-priority").value = t.priority || "normal";
   $("#f-due").value = t.due || "";
   $("#f-repeat").replaceChildren(...Object.entries(REPEAT).map(([v, l]) => h("option", { value: v }, l)));
@@ -1995,6 +2034,7 @@ function openEditor(id, parentId = "", opts = {}) {
   $("#repeat-hint").hidden = !t.repeat;
   $("#f-notes").value = t.notes || "";
   $("#f-private").checked = !!t.private;
+  renderAssignedBy(id ? t : null);
   $("#private-wrap").hidden = !privateAvailable();
   fillParents(t, id, !!t.private, t.parentId);
   for (const el of $("#editor .fields").querySelectorAll("input, select, textarea")) el.disabled = !canWrite() || !!t.archived;
@@ -2004,6 +2044,8 @@ function openEditor(id, parentId = "", opts = {}) {
   $("#extras").hidden = !id || area;
   if (id) {
     $("#f-comment").value = "";
+    $("#f-comment").placeholder = otherSlot() ? `Write a comment (type @ to mention ${slotName(otherSlot())})` : "Write a comment";
+    $("#mention-pick").hidden = true;
     $("#ts-input").value = "";
     renderTaskShop();
     renderComments();
@@ -2016,6 +2058,14 @@ function openEditor(id, parentId = "", opts = {}) {
   setTimeout(() => { if (!id) $("#f-title").focus(); }, 30);
 }
 $("#f-repeat").addEventListener("change", (e) => { $("#repeat-hint").hidden = !e.target.value; });
+// "Assigned by Sławek on 30 Oct, 10:00 · Wiola saw it 10:42" (the mark only on tasks for the other person).
+function renderAssignedBy(t) {
+  const ab = $("#assigned-by");
+  ab.hidden = !(t?.assignee && t.assignedBy && t.assignedAt) || $("#f-private").checked;
+  if (ab.hidden) return;
+  const o = otherSlot(), m = [o, "both"].includes(t.assignee) && t.assignedBy !== o && theirMark(t.id, "assigned", String(t.assignedAt));
+  fill(ab, `Assigned by ${slotName(t.assignedBy)} on ${fmtStamp(t.assignedAt)}`, m && " · ", m && seenLabel(m));
+}
 // Parent choices: open tasks in tree order, never this task or anything below it. Closed tasks take no new subtasks,
 // and a shared task can't sit under a private one (the other person couldn't see its parent).
 function fillParents(t, id, isPrivate, keep) {
@@ -2174,19 +2224,51 @@ function askDelete() {
 // ---- comments ----
 function renderComments() {
   const id = editingId; if (!id) return;
-  const t = tasks.get(id), items = commentsBy.get(id) || [];
+  const t = tasks.get(id), items = commentsBy.get(id) || [], me = mySlot();
+  const mark = (c) => { const m = me && c.by === me && theirMark(id, "comment", c.id); return m && seenLabel(m); };
   $("#comment-list").replaceChildren(...(items.length ? items.map((c) => h("div", { class: "comment" },
-    h("div", { class: "who" }, h("b", { class: pc(c.by) || null }, slotName(c.by) || "Someone"), h("span", {}, fmtStamp(c.at)),
+    h("div", { class: "who" }, h("b", { class: pc(c.by) || null }, slotName(c.by) || "Someone"), h("span", {}, fmtStamp(c.at)), mark(c),
       c.byUser && c.byUser === meId && canWrite() && !t?.archived && h("button", { type: "button", onclick: () => store.remove("comments", c.id).catch(writeFailed) }, "Delete")),
-    h("p", {}, c.text))) : [h("p", { class: "hint" }, "No comments yet.")]));
+    h("p", {}, withMentions(c.text)))) : [h("p", { class: "hint" }, "No comments yet.")]));
   $("#comment-new").hidden = !canWrite() || !!t?.archived;
+  markOpened(t);
 }
 $("#comment-add").addEventListener("click", async () => {
   const text = $("#f-comment").value.trim();
   if (!text || !editingId) return;
   $("#f-comment").value = "";
+  $("#mention-pick").hidden = true;
   try { await store.add("comments", { taskId: editingId, text, by: mySlot() || "", byUser: meId || "", at: Date.now() }); notifyEvent("comment", editingId, text); }
   catch (err) { writeFailed(err); }
+});
+
+// ---- mentions: "@Wiola" in a comment pushes her even with her Comments switch off (the notify function decides) ----
+const escRe = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function withMentions(text) {
+  const names = ["a", "b"].filter((s) => slotName(s).trim());
+  if (!names.length) return text;
+  const re = new RegExp(`@(${names.map((s) => escRe(slotName(s).trim())).join("|")})(?![\\p{L}\\p{N}])`, "giu");
+  const out = []; let last = 0;
+  for (const m of text.matchAll(re)) {
+    const slot = names.find((s) => slotName(s).trim().toLowerCase() === m[1].toLowerCase());
+    out.push(text.slice(last, m.index), h("span", { class: "mention " + pc(slot) }, m[0]));
+    last = m.index + m[0].length;
+  }
+  out.push(text.slice(last));
+  return out;
+}
+// Typing "@" (or "@Wi") offers the other person's name; tapping it completes the mention.
+$("#f-comment").addEventListener("input", () => {
+  const ta = $("#f-comment"), pick = $("#mention-pick"), o = otherSlot(), name = slotName(o).trim();
+  const frag = ta.value.slice(0, ta.selectionStart).match(/(?:^|\s)@([\p{L}\p{N}]*)$/u)?.[1];
+  pick.hidden = !(name && frag != null && name.toLowerCase().startsWith(frag.toLowerCase()) && frag.length < name.length);
+  if (pick.hidden) return;
+  fill(pick, h("button", { type: "button", class: "chip " + pc(o), onpointerdown: (e) => e.preventDefault(), onclick: () => {
+    const pos = ta.selectionStart, start = pos - frag.length - 1;
+    ta.value = ta.value.slice(0, start) + "@" + name + " " + ta.value.slice(pos);
+    ta.focus(); ta.setSelectionRange(start + name.length + 2, start + name.length + 2);
+    pick.hidden = true;
+  } }, "@" + name));
 });
 
 // ---- checklists: reusable templates ("Leaving Warsaw → Kraków") and the lists started from them ----
