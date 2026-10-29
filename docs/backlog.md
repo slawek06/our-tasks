@@ -100,7 +100,7 @@ Notes from daily use go here, then we pick what to improve.
 | ⬜ | ⭐ **"Thanks ❤️"**: one-tap thanks on "closed by the other" notifications | S | Top pick; covers "reactions" |
 | ⬜ | ⭐ **Weekly check-in with Claude**: 10-minute Sunday conversation (done, stuck, to talk about, who takes what), changes applied on confirm | M | Top pick; builds on the briefing chat |
 | ⬜ | Quick replies on comments | S | |
-| ⬜ | **Done + next step**: closing a task offers a follow-up task (same area/project, link "Follow-up of …"); the outcome is saved as a comment; Claude may suggest the next step | S | Proposed 30 Oct 2026 for "call someone, then a follow-up"; not chosen yet |
+| ⬜ | **Done + next step**: closing a task offers a follow-up task (same area/project, link "Follow-up of …"); the outcome is saved as a comment; Claude may suggest the next step | S | Next release (chosen 30 Oct 2026), for "call someone, then a follow-up". Needs a "follow-up of" link on tasks |
 
 ## Tasks and projects
 
