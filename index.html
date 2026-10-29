@@ -17,17 +17,20 @@
   --accent: #2f5bd3; --accent-ink: #ffffff; --accent-soft: #e8eefc;
   --todo: #8a93a6; --doing: #c97d0c; --done: #2b9460; --danger: #c93838; --danger-soft: #fbeaea;
   --warn-soft: #fdf2e0; --hover: #f0f3f8; --shadow: 0 10px 40px rgba(20, 30, 60, .16);
+  --p-a: #2563c9; --p-a-soft: #e3ecfb; --p-b: #1d8a4b; --p-b-soft: #e0f3e7; /* person colours: first person blue, second green */
   --f-display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
   --f-body: "Figtree", -apple-system, "Segoe UI", system-ui, sans-serif;
   --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --p-a: #7aa7ff; --p-a-soft: #1d2a45; --p-b: #5fd394; --p-b-soft: #17332a;
   --bg: #10131a; --surface: #181c25; --ink: #e6e9ef; --muted: #9aa3b5; --line: #2a303c;
   --accent: #7d9cff; --accent-ink: #0e1220; --accent-soft: #1e2946;
   --todo: #7f889c; --doing: #f0a63a; --done: #4cc285; --danger: #ff6f6f; --danger-soft: #3a1d20;
   --warn-soft: #3a2c14; --hover: #1f2430; --shadow: 0 10px 40px rgba(0, 0, 0, .5); color-scheme: dark;
 } }
 :root[data-theme="dark"] {
+  --p-a: #7aa7ff; --p-a-soft: #1d2a45; --p-b: #5fd394; --p-b-soft: #17332a;
   --bg: #10131a; --surface: #181c25; --ink: #e6e9ef; --muted: #9aa3b5; --line: #2a303c;
   --accent: #7d9cff; --accent-ink: #0e1220; --accent-soft: #1e2946;
   --todo: #7f889c; --doing: #f0a63a; --done: #4cc285; --danger: #ff6f6f; --danger-soft: #3a1d20;
@@ -114,6 +117,16 @@ h1 { font: 700 34px/1.05 var(--f-display); letter-spacing: -.02em; margin: 0; te
 .chip.doing, .chip.unfinished { background: var(--warn-soft); border-color: transparent; color: var(--doing); }
 .chip.new { background: var(--accent); border-color: transparent; color: var(--accent-ink); font-weight: 600; }
 .chip.private { background: var(--ink); border-color: transparent; color: var(--bg); }
+.p-a { color: var(--p-a); } .p-b { color: var(--p-b); }
+.chip.p-a { background: var(--p-a-soft); color: var(--p-a); border-color: transparent; font-weight: 600; }
+.chip.p-b { background: var(--p-b-soft); color: var(--p-b); border-color: transparent; font-weight: 600; }
+.chip.p-both { background: linear-gradient(90deg, var(--p-a-soft), var(--p-b-soft)); border-color: transparent; font-weight: 600; }
+.seg button.p-a { color: var(--p-a); font-weight: 600; } .seg button.p-b { color: var(--p-b); font-weight: 600; }
+.seg button.p-a[aria-pressed="true"] { background: var(--p-a-soft); color: var(--p-a); }
+.seg button.p-b[aria-pressed="true"] { background: var(--p-b-soft); color: var(--p-b); }
+.who-init.p-a { background: var(--p-a-soft); color: var(--p-a); border-color: transparent; }
+.who-init.p-b { background: var(--p-b-soft); color: var(--p-b); border-color: transparent; }
+.comment .who b.p-a, .act-text b.p-a { color: var(--p-a); } .comment .who b.p-b, .act-text b.p-b { color: var(--p-b); }
 .private-check { font-size: 14px; color: var(--ink); }
 .private-check input { width: 17px; height: 17px; margin: 0; }
 .crumb { overflow-wrap: anywhere; }
@@ -172,6 +185,27 @@ h1 { font: 700 34px/1.05 var(--f-display); letter-spacing: -.02em; margin: 0; te
 .item-more { border: 0; background: none; width: 40px; height: 40px; border-radius: 8px; color: var(--muted); font-size: 18px; }
 .item-more:hover { background: var(--line); }
 .basket-head .btn { margin-left: auto; text-transform: none; letter-spacing: 0; }
+.lists-mode { align-self: flex-start; }
+body.shop-mode #lists-mode { display: none; }
+.cl-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.cl-head h2 { font: 600 19px/1.2 var(--f-display); margin: 0; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.cl-head .meta { font-size: 13px; color: var(--muted); display: inline-flex; gap: 8px; align-items: center; }
+.item .box.tpl { color: var(--muted); width: 22px; justify-content: center; font-size: 18px; line-height: 1; }
+.who-init { flex: none; font: 600 11px/18px var(--f-mono); width: 18px; height: 18px; text-align: center; border-radius: 50%; background: var(--hover); border: 1px solid var(--line); color: var(--muted); text-decoration: none; }
+.cl-row { grid-template-columns: minmax(0, 1fr) auto; }
+.cl-row-act { margin-right: 6px; }
+.cl-items .item { grid-template-columns: 22px minmax(0, 1fr) 40px; }
+.cl-items .group-head { align-items: center; padding-left: 0; }
+.cl-items .group-head .item-more { margin-left: -6px; width: 32px; height: 28px; font-size: 15px; }
+.cl-items .item:hover .handle, .cl-items .group-head:hover .handle { opacity: 1; }
+.dragging > .item, .dragging > .group-head { background: var(--accent-soft); box-shadow: 0 3px 14px rgba(20, 30, 60, .18); border-radius: 9px; }
+.cl-target { display: flex; gap: 8px; align-items: center; font-size: 13.5px; color: var(--accent); font-weight: 600; }
+.cl-target button { border: 0; background: none; padding: 0 4px; font-size: 13px; color: var(--muted); text-decoration: underline; }
+.cl-foot { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 16px 10px 6px; }
+.cl-foot .spacer { flex: 1; }
+details.cl-closed summary { cursor: pointer; padding: 14px 10px 4px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.modal .pick { display: flex; flex-direction: column; gap: 6px; }
+.modal input[type=text] { border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 9px 11px; width: 100%; font-size: 16px; }
 .mode-bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--bg); padding-block: 6px; }
 .mode-bar b { font: 700 24px/1.1 var(--f-display); }
 .mode-bar span { color: var(--muted); margin-left: 8px; }
@@ -179,7 +213,8 @@ body.shop-mode header.top, body.shop-mode .tabs, body.shop-mode #shop-lists, bod
 body.shop-mode .item-main { min-height: 62px; font-size: 18px; }
 body.shop-mode .item .box svg { width: 26px; height: 26px; }
 .list-row { display: flex; gap: 8px; align-items: center; }
-.list-row input { flex: 1; min-width: 0; border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 9px 11px; }
+.list-row .check { font-size: 13px; white-space: nowrap; }
+.list-row input[type=text] { flex: 1; min-width: 0; border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 9px 11px; }
 .task-shop-row { display: flex; gap: 8px; font-size: 14px; align-items: baseline; padding: 3px 0; }
 .task-shop-row > span:first-child { overflow-wrap: anywhere; min-width: 0; }
 .task-shop-row.bought > span:first-child { color: var(--muted); text-decoration: line-through; }
@@ -353,6 +388,22 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
 
   <nav class="tabs" id="view-tabs" aria-label="View"></nav>
 
+  <div class="seg lists-mode" id="lists-mode" role="group" aria-label="Kind of list" hidden></div>
+
+  <section class="shop-bar" id="cl-bar" hidden>
+    <div class="cl-head">
+      <button class="btn small" type="button" id="cl-back">‹ Checklists</button>
+      <h2 id="cl-title"></h2>
+      <span class="meta" id="cl-meta"></span>
+    </div>
+    <form class="shop-form" id="cl-form" autocomplete="off">
+      <input type="text" id="cl-input" placeholder="Add items, or “Heading:”" aria-label="Add items" enterkeyhint="done">
+      <button class="btn primary" type="submit">Add</button>
+    </form>
+    <div class="cl-target" id="cl-target" hidden></div>
+    <div class="chips" id="cl-chips" hidden></div>
+  </section>
+
   <section class="shop-bar" id="shop-bar" hidden>
     <div class="shop-lists" id="shop-lists"></div>
     <form class="shop-form" id="shop-form" autocomplete="off">
@@ -512,12 +563,13 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
 <aside class="panel" id="lists-panel" hidden aria-labelledby="ls-title">
   <div class="panel-head"><h2 id="ls-title">Shopping lists</h2><button class="x" type="button" data-close aria-label="Close">×</button></div>
   <div class="fields">
-    <p class="hint">Rename a list by editing its name. Groceries is the default list and can't be deleted.</p>
+    <p class="hint">Rename a list by editing its name. Groceries is the default list and can't be deleted. A private list and its items are visible only to you.</p>
     <div class="field" id="lists-rows"></div>
     <form class="shop-form" id="list-new" autocomplete="off">
       <input type="text" id="list-new-name" maxlength="40" placeholder="New list, e.g. Drugstore" aria-label="New list name">
       <button class="btn" type="submit">Add list</button>
     </form>
+    <label class="check" id="list-new-private-wrap"><input type="checkbox" id="list-new-private"> New list is private</label>
   </div>
 </aside>
 
@@ -649,7 +701,7 @@ let byParent = new Map(), byParentAll = new Map(), commentsBy = new Map();
 let editingId = null;
 let view = (() => { try { return localStorage.getItem("view") || "today"; } catch { return "today"; } })();
 let searchMode = false, searchSnippets = new Map(), flashId = null;
-let todayPins = {}, pinsSupported = true, perListSupported = true, areasSupported = true, editingArea = false;
+let todayPins = {}, pinsSupported = true, perListSupported = true, areasSupported = true, privateListsSupported = true, editingArea = false;
 // New tasks are due tomorrow unless you pick another date (or clear it).
 const defaultDue = () => addDays(todayStr(), 1);
 const filter = { who: "all", hideDone: false, q: "" };
@@ -748,13 +800,21 @@ const sb = {
   saveSoon() {
     clearTimeout(this.saveTimer);
     this.saveTimer = setTimeout(() => {
+      if (this.forgotten) return;
       const tables = Object.fromEntries(Object.entries(this.caches).map(([t, m]) => [t, [...m.values()]]));
       try { localStorage.setItem(this.cacheKey(), JSON.stringify({ tables, docs: this.docs })); } catch {}
     }, 400);
   },
   saveOutbox() {
+    if (this.forgotten) return;
     try { localStorage.setItem(this.outboxKey(), JSON.stringify(this.outbox)); } catch {}
     updateOfflineNotice();
+  },
+  // Signing out removes this person's data from the device, so a borrowed computer keeps nothing.
+  forget() {
+    this.forgotten = true;
+    clearTimeout(this.saveTimer);
+    try { localStorage.removeItem(this.cacheKey()); localStorage.removeItem(this.outboxKey()); } catch {}
   },
 
   // ---- reading ----
@@ -915,7 +975,8 @@ const store = {
       return;
     }
     meId = data.session.user.id;
-    sb.client.auth.onAuthStateChange((event) => { if (event === "SIGNED_OUT") location.reload(); });
+    // Also when signed out from another device ("Sign out" there ends every session).
+    sb.client.auth.onAuthStateChange((event) => { if (event === "SIGNED_OUT") { sb.forget(); location.reload(); } });
     sb.restore();
     await sb.flush();  // changes left from an earlier offline session go first
     sb.subscribe();
@@ -924,6 +985,8 @@ const store = {
     // My day pins need a column added by supabase/migrations/002_my_day.sql; until then the feature explains itself.
     if (/[?&](briefing|task)=/.test(location.search)) { const url = location.href; history.replaceState(null, "", location.pathname); setTimeout(() => handleOpen(url), 300); }
     sb.client.from("user_state").select("today").limit(1).then(({ error }) => { pinsSupported = !error || isNetworkError(error); });
+    // Private shopping lists and standing checklists need supabase/migrations/009_private_lists_standing.sql.
+    sb.client.from("lists").select("private").limit(1).then(({ error }) => { privateListsSupported = !error || isNetworkError(error); render(); });
     // Areas need the kind column from supabase/migrations/007_areas.sql; until then the Tasks view says so.
     sb.client.from("tasks").select("kind").limit(1).then(({ error }) => { areasSupported = !error || isNetworkError(error); render(); });
     // Per-list frequent items need supabase/migrations/003_catalog_per_list.sql; until then Frequent is shared.
@@ -1050,12 +1113,15 @@ function startListening() {
   store.listen("lists", (m) => { lists = m; render(); if (!$("#lists-panel").hidden && !$("#lists-panel").contains(document.activeElement)) renderListsPanel(); });
   store.listen("catalog", (m) => { catalog = m; if (view === "shopping") renderChips(); });
   listenIdeas();
+  listenChecklists();
   if (meId) store.listenDoc("data/users/" + meId + "/seen", (d) => { seen = d?.map || {}; activitySeenAt = d?.activityAt || 0; shoppingSeenAt = d?.shoppingAt || 0; todayPins = d?.today || {}; render(); });
 }
 
 // ---- people and identity ----
 const mySlot = () => meId && people.aUser === meId ? "a" : meId && people.bUser === meId ? "b" : null;
 const slotName = (s) => s === "a" ? people.a : s === "b" ? people.b : "";
+// Each person has a colour (first person blue, second green), used wherever their name appears.
+const pc = (s) => s === "a" || s === "b" ? "p-" + s : s === "both" ? "p-both" : "";
 const assigneeName = (a) => a === "both" ? "Both" : slotName(a);
 const cleanPeople = () => ({ a: people.a, b: people.b, aUser: people.aUser || null, bUser: people.bUser || null });
 const isMine = (t, me = mySlot()) => !!me && (t.assignee === me || t.assignee === "both");
@@ -1118,7 +1184,7 @@ function renderActivity(list) {
     const label = t ? (t.title || "Untitled") + (from ? " · in " + from : "") + (t.archived ? " · archived" : "") : `“${e.title || "Untitled"}” (deleted)`;
     out.push(h("button", { type: "button", class: "act" + (!e.mine && e.at > activityHighlightSince && activityHighlightSince ? " is-new" : ""), disabled: !t, onclick: () => t && openEditor(t.id) },
       h("span", { class: "act-time" }, new Date(e.at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })),
-      h("span", { class: "act-text" }, h("b", {}, slotName(e.by) || "Someone"), " " + e.text),
+      h("span", { class: "act-text" }, h("b", { class: pc(e.by) || null }, slotName(e.by) || "Someone"), " " + e.text),
       h("span", { class: "act-task" }, label)));
   }
   list.replaceChildren(...out);
@@ -1251,7 +1317,7 @@ function renderTabs() {
   const n = archiveRoots().length;
   const fresh = view === "activity" ? 0 : newActivityCount(), freshItems = view === "shopping" ? 0 : newItemsCount();
   const nToday = Object.values(todayLists()).reduce((n, g) => n + g.length, 0);
-  $("#view-tabs").replaceChildren(...[["today", nToday ? `Today (${nToday})` : "Today"], ["tasks", "Tasks"], ["upcoming", "Upcoming"], ["shopping", freshItems ? `Shopping (${freshItems} new)` : "Shopping"],
+  $("#view-tabs").replaceChildren(...[["today", nToday ? `Today (${nToday})` : "Today"], ["tasks", "Tasks"], ["upcoming", "Upcoming"], ["shopping", freshItems ? `Lists (${freshItems} new)` : "Lists"],
     ["activity", fresh ? `Activity (${fresh} new)` : "Activity"], ["archive", n ? `Archive (${n})` : "Archive"]].map(([k, label]) =>
     h("button", { type: "button", "aria-pressed": String(view === k), onclick: () => switchView(k) }, label)));
 }
@@ -1261,13 +1327,13 @@ function renderWho() {
   if ([...tasks.values()].some((t) => t.private && !t.archived)) opts.push(["private", "Private"]);
   if (filter.who === "new") opts.push(["new", "New for me"]);
   $("#who").replaceChildren(...opts.map(([k, label]) =>
-    h("button", { type: "button", "aria-pressed": String(filter.who === k), onclick: () => { filter.who = k; render(); } }, label)));
+    h("button", { type: "button", class: pc(k) || null, "aria-pressed": String(filter.who === k), onclick: () => { filter.who = k; render(); } }, label)));
 }
 function renderLinkBanner() {
   const el = $("#link-banner"), free = ["a", "b"].filter((s) => !people[s + "User"]);
   if (!loaded || !meId || mySlot() || !free.length || !canWrite()) { el.hidden = true; return; }
   el.replaceChildren(h("span", {}, "Which one are you? Then the app can show your tasks, who assigned them, and what's new for you."),
-    ...free.map((s) => h("button", { class: "btn small", type: "button", onclick: () => linkMe(s) }, "I'm " + slotName(s))));
+    ...free.map((s) => h("button", { class: "btn small " + pc(s), type: "button", onclick: () => linkMe(s) }, "I'm " + slotName(s))));
   el.hidden = false;
 }
 function renderSummary() {
@@ -1304,7 +1370,7 @@ function renderTask(t, depth) {
   if (status === "doing" && !archived) meta.append(h("span", { class: "chip doing" }, "In progress"));
   if (t.priority === "high") meta.append(h("span", { class: "prio-high" }, "High priority"));
   if (t.priority === "low") meta.append(h("span", { class: "prio-low" }, "Low priority"));
-  if (t.assignee) meta.append(h("span", { class: "chip" }, assigneeName(t.assignee)));
+  if (t.assignee) meta.append(h("span", { class: "chip " + pc(t.assignee) }, assigneeName(t.assignee)));
   if (t.due) {
     const cls = archived ? "" : status !== "done" && t.due < today ? " over" : status !== "done" && t.due === today ? " today" : "";
     meta.append(h("span", { class: "date" + cls }, (cls === " over" ? "Overdue · " : cls === " today" ? "Today · " : "Due ") + fmtDate(t.due)));
@@ -1391,12 +1457,18 @@ function render() {
   $("#who").hidden = view === "activity" || view === "today" || searching;
   $("#fab").hidden = !canWrite() || !["tasks", "today", "upcoming"].includes(view);
   $("#toolbar").hidden = view === "shopping";
-  $("#shop-bar").hidden = view !== "shopping";
+  $("#shop-bar").hidden = view !== "shopping" || listsMode !== "shopping";
+  $("#lists-mode").hidden = view !== "shopping";
+  $("#cl-bar").hidden = view !== "shopping" || listsMode !== "checklists" || !openChecklist();
   const list = $("#list");
   list.classList.toggle("can-drag", canDrag());
   if (!loaded) return;
   if (view === "activity") return renderActivity(list);
-  if (view === "shopping") { renderShopBar(); return renderShopping(list); }
+  if (view === "shopping") {
+    renderListsMode();
+    if (listsMode === "checklists") return renderChecklists(list);
+    renderShopBar(); return renderShopping(list);
+  }
   const noMatch = () => h("div", { class: "empty" }, h("span", {}, "Nothing matches these filters."),
     h("button", { type: "button", class: "btn", onclick: clearFilters }, "Clear filters"));
   if (searching) return renderSearch(list);
@@ -1687,13 +1759,13 @@ $("#quick-form").addEventListener("submit", async (e) => {
   const p = parseQuick($("#quick-input").value);
   if (!p.title) { $("#quick-input").focus(); return; }
   const parent = tasks.get(p.parentId), now = Date.now(), isPrivate = !!parent?.private;
-  const assignee = isPrivate ? "" : p.assignee;
+  const assignee = isPrivate ? "" : p.assignee || mySlot() || ""; // new tasks are yours unless you name someone
   try {
     const id = await addTask({
       title: p.title, status: "todo", assignee, priority: p.priority, due: p.due || defaultDue(), repeat: "", parentId: p.parentId, notes: "",
       order: now, createdAt: now, private: isPrivate, ...(assignee ? { assignedBy: mySlot() || "", assignedAt: now } : {}),
     });
-    if (!isPrivate) log(id, "created it" + (assignee ? ` and assigned it to ${assigneeName(assignee)}` : ""), p.title);
+    if (!isPrivate) log(id, "created it" + (assignee && assignee !== mySlot() ? ` and assigned it to ${assigneeName(assignee)}` : ""), p.title);
     if (assignee) notifyEvent("assigned", id);
     if (p.parentId) { collapsed.delete(p.parentId); saveCollapsed(); }
     $("#quick-input").value = "";
@@ -1708,7 +1780,7 @@ $("#quick-more").addEventListener("click", () => {
   $("#f-title").value = p.title;
   $("#f-due").value = p.due || defaultDue();
   $("#f-priority").value = p.priority;
-  if (!tasks.get(p.parentId)?.private) $("#f-assignee").value = p.assignee;
+  if (!tasks.get(p.parentId)?.private) $("#f-assignee").value = p.assignee || mySlot() || "";
 });
 // Press N anywhere (not while typing) to quick-add.
 document.addEventListener("keydown", (e) => {
@@ -1720,12 +1792,12 @@ document.addEventListener("keydown", (e) => {
 
 // ---- reordering: drag the handle, or focus it and use the arrow keys ----
 let drag = null, renderQueued = false;
-function startDrag(e) {
-  if (e.button > 0 || !canDrag()) return;
+function startDrag(e, save = saveOrder, allowed = canDrag()) {
+  if (e.button > 0 || !allowed) return;
   e.preventDefault();
   // Listen on the window: moving the row in the DOM would drop a pointer capture taken on the handle.
   const node = e.currentTarget.closest(".node");
-  drag = { node, container: node.parentElement };
+  drag = { node, container: node.parentElement, save };
   node.classList.add("dragging"); document.body.classList.add("is-dragging");
   window.addEventListener("pointermove", onDragMove);
   window.addEventListener("pointerup", endDrag);
@@ -1744,7 +1816,7 @@ function onDragMove(e) {
 }
 async function endDrag() {
   if (!drag) return;
-  const { node, container } = drag;
+  const { node, container, save } = drag;
   window.removeEventListener("pointermove", onDragMove);
   window.removeEventListener("pointerup", endDrag);
   window.removeEventListener("pointercancel", endDrag);
@@ -1752,7 +1824,7 @@ async function endDrag() {
   node.classList.remove("dragging"); document.body.classList.remove("is-dragging");
   const ids = [...container.children].map((n) => n.dataset.id).filter(Boolean);
   drag = null;
-  await saveOrder(ids);
+  await save(ids);
   if (renderQueued) { renderQueued = false; render(); }
 }
 async function saveOrder(ids) {
@@ -1902,7 +1974,7 @@ function closePanels() {
   editingId = null; editingItem = null; resetFoot(); lastFocus?.focus?.();
 }
 function openEditor(id, parentId = "", opts = {}) {
-  const t = id ? tasks.get(id) : { status: "todo", priority: "normal", assignee: "", repeat: "", parentId, due: opts.area ? "" : defaultDue(), private: !!tasks.get(parentId)?.private };
+  const t = id ? tasks.get(id) : { status: "todo", priority: "normal", assignee: opts.area ? "" : mySlot() || "", repeat: "", parentId, due: opts.area ? "" : defaultDue(), private: !!tasks.get(parentId)?.private };
   if (!t) return;
   editingId = id;
   const area = editingArea = id ? isArea(t) : !!opts.area;
@@ -2016,7 +2088,7 @@ $("#ed-form").addEventListener("submit", async (e) => {
     } else {
       const newId = await addTask({ ...data, order: Date.now(), createdAt: Date.now() });
       if (data.assignee) notifyEvent("assigned", newId);
-      if (!data.private) log(newId, "created it" + (data.assignee ? ` and assigned it to ${assigneeName(data.assignee)}` : ""), data.title);
+      if (!data.private) log(newId, "created it" + (data.assignee && data.assignee !== mySlot() ? ` and assigned it to ${assigneeName(data.assignee)}` : ""), data.title);
       toast("Task added");
     }
     if (data.status !== "done") await reopenAncestors(data.parentId);
@@ -2104,7 +2176,7 @@ function renderComments() {
   const id = editingId; if (!id) return;
   const t = tasks.get(id), items = commentsBy.get(id) || [];
   $("#comment-list").replaceChildren(...(items.length ? items.map((c) => h("div", { class: "comment" },
-    h("div", { class: "who" }, h("b", {}, slotName(c.by) || "Someone"), h("span", {}, fmtStamp(c.at)),
+    h("div", { class: "who" }, h("b", { class: pc(c.by) || null }, slotName(c.by) || "Someone"), h("span", {}, fmtStamp(c.at)),
       c.byUser && c.byUser === meId && canWrite() && !t?.archived && h("button", { type: "button", onclick: () => store.remove("comments", c.id).catch(writeFailed) }, "Delete")),
     h("p", {}, c.text))) : [h("p", { class: "hint" }, "No comments yet.")]));
   $("#comment-new").hidden = !canWrite() || !!t?.archived;
@@ -2116,6 +2188,305 @@ $("#comment-add").addEventListener("click", async () => {
   try { await store.add("comments", { taskId: editingId, text, by: mySlot() || "", byUser: meId || "", at: Date.now() }); notifyEvent("comment", editingId, text); }
   catch (err) { writeFailed(err); }
 });
+
+// ---- checklists: reusable templates ("Leaving Warsaw → Kraków") and the lists started from them ----
+// Items are text + done only; ticked items stay until the whole list is closed, which archives it.
+let checklists = new Map(), clItems = new Map(), checklistsMissing = false, openChecklistId = null;
+let clTarget = null; // heading that new items go under ("Add here"); otherwise they go to the end
+let listsMode = "shopping";
+try { listsMode = localStorage.getItem("listsMode") === "checklists" ? "checklists" : "shopping"; } catch {}
+function listenChecklists() {
+  const after = () => { checklistsMissing = false; render(); };
+  const onLists = (m) => { checklists = m; after(); }, onItems = (m) => { clItems = m; after(); };
+  // Until supabase/migrations/008_checklists.sql runs, the tables are missing; the Checklists view says so.
+  if (store.mode === "supabase") {
+    sb.listen("checklists", onLists).catch(() => { checklistsMissing = true; render(); });
+    sb.listen("checklist_items", onItems).catch(() => { checklistsMissing = true; render(); });
+  } else { store.listen("checklists", onLists); store.listen("checklist_items", onItems); }
+}
+const openChecklist = () => (openChecklistId && checklists.get(openChecklistId)) || null;
+const clItemsOf = (id) => [...clItems.values()].filter((i) => i.checklistId === id).sort((a, b) => (a.order || 0) - (b.order || 0));
+const clProgress = (id) => { const xs = clItemsOf(id).filter((i) => !i.heading); return [xs.filter((i) => i.done).length, xs.length]; };
+const clDate = () => new Date().toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+function setListsMode(m) { listsMode = m; try { localStorage.setItem("listsMode", m); } catch {} render(); }
+function showChecklist(id) { openChecklistId = id; clTarget = null; $("#cl-input").value = ""; render(); window.scrollTo(0, 0); }
+function renderListsMode() {
+  const active = [...checklists.values()].filter((c) => !c.template && !c.closed && !c.standing).length;
+  fill($("#lists-mode"), [["shopping", "Shopping"], ["checklists", active ? `Checklists · ${active}` : "Checklists"]].map(([k, label]) =>
+    h("button", { type: "button", "aria-pressed": String(listsMode === k), onclick: () => setListsMode(k) }, label)));
+}
+function clBar([done, total]) {
+  return h("span", { class: "progress" }, h("span", { class: "pbar" }, h("i", { style: `width:${total ? Math.round(100 * done / total) : 0}%` })), `${done}/${total}`);
+}
+
+// Small dialogs on the shared modal.
+function askText(title, placeholder, { value = "", privacy = false, yes = "Create" } = {}) {
+  return showModal((m, finish) => {
+    const inp = h("input", { type: "text", value, maxlength: "120", placeholder, "aria-label": title });
+    const priv = privacy && privateAvailable() ? h("input", { type: "checkbox" }) : null;
+    const go = () => { const v = inp.value.trim(); if (v) finish({ text: v, private: !!priv?.checked }); else inp.focus(); };
+    inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); go(); } });
+    m.replaceChildren(h("h2", { id: "modal-title" }, title), inp,
+      priv && h("label", { class: "check" }, priv, " Private: only you can see it"),
+      h("div", { class: "actions" }, cancelBtn(finish), h("button", { class: "btn primary", type: "button", onclick: go }, yes)));
+    setTimeout(() => inp.focus(), 30);
+  });
+}
+function askConfirm(title, text, yes) {
+  return showModal((m, finish) => {
+    m.replaceChildren(h("h2", { id: "modal-title" }, title), h("p", {}, text),
+      h("div", { class: "actions" }, cancelBtn(finish), h("button", { class: "btn primary", type: "button", id: "modal-yes", onclick: () => finish(true) }, yes)));
+    m.querySelector("#modal-yes").focus();
+  });
+}
+
+// ---- creating and starting ----
+// kind: "template" (reusable version), "oneoff" (closed when done) or "standing" (never closed, e.g. "To talk about").
+async function newChecklist(kind, title) {
+  const template = kind === "template", standing = kind === "standing";
+  const r = title ? { text: title, private: false } : await askText(template ? "New template" : standing ? "New standing list" : "New list",
+    template ? "e.g. Leaving Warsaw → Kraków" : standing ? "e.g. To talk about, Gift ideas" : "e.g. Before the guests arrive", { privacy: true });
+  if (!r) return;
+  try {
+    const id = await store.add("checklists", { title: r.text, template, templateId: "", closed: false, private: r.private, order: Date.now(), createdAt: Date.now(),
+      ...(standing ? { standing: true } : {}) });
+    showChecklist(id);
+    toast(template ? "Add the items you always need. Start the template before each trip."
+      : standing ? "Add topics anytime. Tick them once you've talked, then clear the ticked ones." : "List created. Add your items.");
+  } catch (err) { writeFailed(err); }
+}
+async function clearTicked(c) {
+  const ticked = clItemsOf(c.id).filter((i) => !i.heading && i.done);
+  if (!ticked.length || !(await askConfirm("Clear the ticked items?", `${ticked.length} ticked item${ticked.length > 1 ? "s" : ""} will be removed from “${c.title}”.`, "Clear"))) return;
+  try { for (const i of ticked) await store.remove("checklist_items", i.id); toast(`Cleared ${ticked.length}`); }
+  catch (err) { writeFailed(err); }
+}
+async function startTemplate(tpl) {
+  try {
+    const id = await store.add("checklists", { title: `${tpl.title} · ${clDate()}`, template: false, templateId: tpl.id, closed: false, private: !!tpl.private, order: Date.now(), createdAt: Date.now() });
+    for (const i of clItemsOf(tpl.id)) await store.add("checklist_items", { checklistId: id, text: i.text, heading: !!i.heading, done: false, doneBy: "", order: i.order || 0 });
+    showChecklist(id);
+  } catch (err) { writeFailed(err); }
+}
+
+// ---- items ----
+async function addClItems(text, c) {
+  const parts = String(text).split(/[,;\n]/).map((x) => x.trim()).filter(Boolean);
+  const xs = clItemsOf(c.id);
+  // New items go to the end, or after the last item under the chosen heading (before the next heading).
+  let prev = Math.max(0, ...xs.map((i) => i.order || 0)), step = 1000;
+  const at = xs.findIndex((i) => i.id === clTarget);
+  if (at >= 0) {
+    let end = at + 1;
+    while (end < xs.length && !xs[end].heading) end++;
+    prev = xs[end - 1].order || 0;
+    if (end < xs.length) step = ((xs[end].order || 0) - prev) / (parts.length + 1);
+  }
+  try {
+    for (const [n, raw] of parts.entries()) {
+      const heading = raw.endsWith(":"), t = heading ? raw.slice(0, -1).trim() : raw;
+      if (t) await store.add("checklist_items", { checklistId: c.id, text: t.slice(0, 200), heading, done: false, doneBy: "", order: prev + step * (n + 1),
+        ...(privateListsSupported ? { addedBy: mySlot() || "" } : {}) });
+    }
+  } catch (err) { writeFailed(err); }
+}
+async function saveClOrder(ids) {
+  try {
+    for (const [n, id] of ids.entries()) { const o = (n + 1) * 1000; if (clItems.get(id) && clItems.get(id).order !== o) await store.update("checklist_items", id, { order: o }); }
+  } catch (err) { writeFailed(err); }
+}
+async function moveClItem(i, c, delta) {
+  const ids = clItemsOf(c.id).map((x) => x.id), k = ids.indexOf(i.id), j = k + delta;
+  if (j < 0 || j >= ids.length) return;
+  [ids[k], ids[j]] = [ids[j], ids[k]];
+  await saveClOrder(ids);
+  setTimeout(() => document.querySelector(`.node[data-id="${i.id}"] .handle`)?.focus(), 60);
+}
+function toggleClItem(i) {
+  store.update("checklist_items", i.id, i.done ? { done: false, doneBy: "", doneAt: null } : { done: true, doneBy: mySlot() || "", doneAt: Date.now() }).catch(writeFailed);
+}
+function clItemMenu(i, c) {
+  showModal((m, finish) => {
+    const act = (label, fn, cls = "btn") => h("button", { class: cls, type: "button", onclick: async () => { finish(true); await fn(); } }, label);
+    m.replaceChildren(h("h2", { id: "modal-title" }, i.text),
+      h("div", { class: "pick" },
+        !i.heading && !c.template && act(`Add to ${listName(currentListId())} (shopping)`, async () => {
+          const added = await addItems(i.text, currentListId());
+          if (added.length) toast(`Added to ${listName(currentListId())}`);
+        }),
+        !i.heading && act("Make it a task (goes to the Inbox)", async () => {
+          try {
+            const now = Date.now();
+            const id = await addTask({ title: i.text, status: "todo", assignee: c.private ? "" : mySlot() || "", priority: "normal", due: defaultDue(), repeat: "", parentId: "", notes: `From the checklist “${c.title}”`, order: now, createdAt: now, private: !!c.private });
+            if (!c.private) log(id, "created it from a checklist", i.text);
+            toast(`Added the task “${i.text}”`, { label: "Show", run: () => showTask(id) });
+          } catch (err) { writeFailed(err); }
+        }),
+        act(i.heading ? "Delete heading" : "Delete", () => store.remove("checklist_items", i.id).catch(writeFailed), "btn danger"),
+        cancelBtn(finish)));
+  });
+}
+function renderClItem(i, c) {
+  const editable = canWrite() && !c.closed;
+  const handle = editable ? h("button", { type: "button", class: "handle", title: "Drag to move (or use the arrow keys)", "aria-label": "Move " + i.text,
+    onpointerdown: (e) => startDrag(e, saveClOrder, true),
+    onkeydown: (e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); moveClItem(i, c, e.key === "ArrowUp" ? -1 : 1); } } }, svg(ICON.grip, 16)) : h("span");
+  if (i.heading) return h("div", { class: "node", "data-id": i.id }, h("div", { class: "group-head" }, handle, i.text,
+    editable && h("button", { type: "button", class: "item-more", "aria-label": "More for " + i.text, onclick: () => clItemMenu(i, c) }, "⋯"),
+    editable && h("button", { type: "button", class: "linkish", onclick: () => { clTarget = clTarget === i.id ? null : i.id; render(); if (clTarget) $("#cl-input").focus(); } },
+      clTarget === i.id ? "Adding here" : "+ Add here")));
+  const tickable = !c.template && !c.closed && canWrite();
+  const whoSlot = c.standing ? i.addedBy : i.done ? i.doneBy : "", who = slotName(whoSlot);
+  return h("div", { class: "node", "data-id": i.id }, h("div", { class: "item" + (i.done ? " checked" : "") }, handle,
+    h("button", { type: "button", class: "item-main", "aria-pressed": c.template ? null : String(!!i.done), "aria-label": c.template ? i.text : (i.done ? "Untick: " : "Tick: ") + i.text,
+      onclick: () => tickable && toggleClItem(i) },
+      c.template ? h("span", { class: "box tpl" }, "•") : h("span", { class: "box" }, svg(i.done ? ICON.done : ICON.todo, 22)),
+      h("span", { class: "item-text" }, h("span", { class: "item-name" }, i.text)),
+      who && h("span", { class: "who-init " + pc(whoSlot), title: (c.standing ? "Added by " : "Ticked by ") + who }, who[0].toUpperCase())),
+    editable ? h("button", { type: "button", class: "item-more", "aria-label": "More for " + i.text, onclick: () => clItemMenu(i, c) }, "⋯") : h("span")));
+}
+// Empty input: what this template's lists usually have; while typing: matching items from all lists.
+function renderClChips() {
+  const el = $("#cl-chips"), c = openChecklist();
+  if (!c || c.closed || !canWrite()) { el.hidden = true; return; }
+  const seg = norm(($("#cl-input").value.split(/[,;]/).pop() || "").trim());
+  const family = new Set([c.id, c.templateId, ...[...checklists.values()].filter((x) => x.templateId && x.templateId === (c.template ? c.id : c.templateId)).map((x) => x.id)].filter(Boolean));
+  const onList = new Set(clItemsOf(c.id).map((i) => norm(i.text)));
+  const score = new Map(), label = new Map();
+  for (const i of clItems.values()) {
+    const k = norm(i.text);
+    if (i.heading || !k || onList.has(k)) continue;
+    score.set(k, (score.get(k) || 0) + (family.has(i.checklistId) ? 3 : 1));
+    if (!label.has(k)) label.set(k, i.text);
+  }
+  let pool = [...score.keys()];
+  pool = seg ? pool.filter((k) => k.includes(seg)).sort((a, b) => (a.startsWith(seg) ? 0 : 1) - (b.startsWith(seg) ? 0 : 1) || score.get(b) - score.get(a)).slice(0, 8)
+    : pool.sort((a, b) => score.get(b) - score.get(a)).slice(0, 12);
+  el.hidden = !pool.length;
+  el.replaceChildren(h("span", { class: "lbl" }, seg ? "Suggestions" : "Frequent"), ...pool.map((k) => h("button", { type: "button", class: "chip-btn", onclick: async () => {
+    const inp = $("#cl-input"), parts = inp.value.split(/[,;]/);
+    parts.pop();
+    inp.value = parts.length ? parts.join(",") + ", " : "";
+    await addClItems(label.get(k), c);
+    renderClChips();
+  } }, label.get(k))));
+}
+$("#cl-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const c = openChecklist(), v = $("#cl-input").value;
+  if (!c || !v.trim()) return;
+  $("#cl-input").value = "";
+  await addClItems(v, c);
+  renderClChips();
+});
+$("#cl-input").addEventListener("input", renderClChips);
+$("#cl-back").addEventListener("click", () => { openChecklistId = null; clTarget = null; render(); });
+
+// ---- closing: archives the list, and offers to add what was added on the way to its template ----
+async function closeChecklist(c) {
+  const xs = clItemsOf(c.id), open = xs.filter((i) => !i.heading && !i.done).length;
+  if (open && !(await askConfirm("Close this list?", `${open} item${open > 1 ? "s aren't" : " isn't"} ticked. Close and archive it anyway?`, "Close anyway"))) return;
+  const tpl = checklists.get(c.templateId);
+  let learn = [];
+  if (tpl) {
+    const have = new Set(clItemsOf(tpl.id).map((i) => norm(i.text)));
+    const fresh = xs.filter((i) => !i.heading && !have.has(norm(i.text)));
+    if (fresh.length) learn = await showModal((m, finish) => {
+      const boxes = fresh.map((i) => ({ i, box: h("input", { type: "checkbox", checked: true }) }));
+      m.replaceChildren(h("h2", { id: "modal-title" }, `Add to “${tpl.title}”?`),
+        h("p", {}, "You added these on the way. Add them to the template, so they're there next time?"),
+        h("div", { class: "pick" }, boxes.map(({ i, box }) => h("label", { class: "check" }, box, " " + i.text))),
+        h("div", { class: "actions" }, h("button", { class: "btn", type: "button", onclick: () => finish([]) }, "No, just close"),
+          h("button", { class: "btn primary", type: "button", onclick: () => finish(boxes.filter((b) => b.box.checked).map((b) => b.i)) }, "Add and close")));
+    }) || [];
+  }
+  try {
+    if (tpl && learn.length) {
+      const last = Math.max(0, ...clItemsOf(tpl.id).map((i) => i.order || 0));
+      for (const [n, i] of learn.entries()) await store.add("checklist_items", { checklistId: tpl.id, text: i.text, heading: false, done: false, doneBy: "", order: last + 1000 * (n + 1) });
+    }
+    await store.update("checklists", c.id, { closed: true, closedAt: Date.now() });
+    openChecklistId = null;
+    render();
+    toast(learn.length ? `Closed. ${learn.length} item${learn.length > 1 ? "s" : ""} added to the template.` : "Closed and archived", { label: "Undo", run: () => store.update("checklists", c.id, { closed: false, closedAt: null }).catch(writeFailed) });
+  } catch (err) { writeFailed(err); }
+}
+async function deleteChecklist(c) {
+  const kind = c.template ? "template" : "list";
+  if (!(await askConfirm(`Delete this ${kind}?`, `“${c.title}” and its items will be deleted. This can't be undone.`, "Delete"))) return;
+  try {
+    for (const i of clItemsOf(c.id)) await store.remove("checklist_items", i.id);
+    await store.remove("checklists", c.id);
+    openChecklistId = null; render();
+  } catch (err) { writeFailed(err); }
+}
+async function renameChecklist(c) {
+  const r = await askText("Rename", "", { value: c.title, yes: "Save" });
+  if (r) store.update("checklists", c.id, { title: r.text }).catch(writeFailed);
+}
+
+// ---- screens ----
+function renderChecklists(list) {
+  if (checklistsMissing) { list.replaceChildren(h("div", { class: "empty" }, h("strong", {}, "Checklists need the database update"), h("span", {}, "Run supabase/migrations/008_checklists.sql in Supabase."))); return; }
+  const c = openChecklist();
+  if (c) return renderChecklist(list, c);
+  openChecklistId = null;
+  const all = [...checklists.values()], byOrder = (a, b) => (a.order || 0) - (b.order || 0);
+  const standing = all.filter((x) => x.standing).sort(byOrder);
+  const active = all.filter((x) => !x.template && !x.closed && !x.standing).sort(byOrder), templates = all.filter((x) => x.template).sort((a, b) => a.title.localeCompare(b.title));
+  const closed = all.filter((x) => !x.template && x.closed).sort((a, b) => (b.closedAt || 0) - (a.closedAt || 0));
+  const row = (x, extra, act) => h("div", { class: "item cl-row" },
+    h("button", { type: "button", class: "item-main", onclick: () => showChecklist(x.id) },
+      h("span", { class: "item-text" }, h("span", { class: "item-name" }, x.title), x.private && h("span", { class: "chip private" }, "Private"), h("span", { class: "item-meta" }, extra))),
+    act || h("span"));
+  const out = [];
+  if (!all.length) out.push(h("div", { class: "empty" }, h("strong", {}, "No checklists yet"),
+    h("span", {}, "A “To talk about” list collects topics for a calm moment together; tick them once discussed."),
+    h("span", {}, "Make a template for what you do again and again, like “Leaving Warsaw → Kraków” or “Ski trip packing”. Before each trip, tap Start: you get a fresh list to tick off together.")));
+  if (standing.length) out.push(h("div", { class: "group-head" }, "Standing lists", h("span", { class: "n" }, String(standing.length))),
+    ...standing.map((x) => { const n = clItemsOf(x.id).filter((i) => !i.heading && !i.done).length; return row(x, n ? `${n} open` : "Nothing open"); }));
+  if (active.length) out.push(h("div", { class: "group-head" }, "Active", h("span", { class: "n" }, String(active.length))),
+    ...active.map((x) => row(x, clBar(clProgress(x.id)))));
+  if (templates.length) out.push(h("div", { class: "group-head" }, "Templates", h("span", { class: "n" }, String(templates.length))),
+    ...templates.map((x) => { const n = clProgress(x.id)[1];
+      return row(x, `${n} item${n === 1 ? "" : "s"}`, canWrite() ? h("button", { type: "button", class: "btn small primary cl-row-act", onclick: () => startTemplate(x) }, "Start") : null); }));
+  if (canWrite()) out.push(h("div", { class: "cl-foot" },
+    h("button", { type: "button", class: "btn", onclick: () => newChecklist("template") }, "+ New template"),
+    h("button", { type: "button", class: "btn", onclick: () => newChecklist("oneoff") }, "+ One-off list"),
+    privateListsSupported && h("button", { type: "button", class: "btn", onclick: () => newChecklist("standing") }, "+ Standing list"),
+    privateListsSupported && !standing.some((x) => norm(x.title) === "to talk about") &&
+      h("button", { type: "button", class: "btn primary", onclick: () => newChecklist("standing", "To talk about") }, "+ “To talk about” list")));
+  if (closed.length) out.push(h("details", { class: "cl-closed" }, h("summary", {}, `Closed (${closed.length})`),
+    ...closed.map((x) => row(x, "Closed " + (x.closedAt ? fmtStamp(x.closedAt) : "")))));
+  fill(list, out);
+}
+function renderChecklist(list, c) {
+  $("#cl-title").textContent = c.title;
+  const [done, total] = clProgress(c.id), tpl = checklists.get(c.templateId);
+  fill($("#cl-meta"), c.private && h("span", { class: "chip private" }, "Private"),
+    c.template ? h("span", {}, "Template") : c.standing ? h("span", {}, "Standing list") : c.closed ? h("span", {}, "Closed " + (c.closedAt ? fmtStamp(c.closedAt) : "")) : clBar([done, total]));
+  $("#cl-form").hidden = c.closed || !canWrite();
+  renderClChips();
+  const xs = clItemsOf(c.id), w = canWrite(), target = xs.find((i) => i.id === clTarget && i.heading);
+  if (!target) clTarget = null;
+  const tl = $("#cl-target");
+  tl.hidden = !target || c.closed;
+  if (target) fill(tl, h("span", {}, `New items go under “${target.text}”`), h("button", { type: "button", onclick: () => { clTarget = null; render(); } }, "Add at the end instead"));
+  const out = xs.length ? [h("div", { class: "cl-items" + (w && !c.closed ? " can-drag" : "") }, xs.map((i) => renderClItem(i, c)))] : [h("div", { class: "empty" }, h("span", {}, c.template
+    ? "Add the things you always need, several at once with commas. A line ending with “:” becomes a heading, e.g. “Before we go:” or “Bring:”."
+    : c.standing ? "Add topics anytime, several at once with commas. Tick them once you've talked about them."
+    : "Add items above, several at once with commas."))];
+  out.push(h("div", { class: "cl-foot" },
+    w && h("button", { type: "button", class: "btn danger", onclick: () => deleteChecklist(c) }, "Delete"),
+    w && !c.closed && h("button", { type: "button", class: "btn", onclick: () => renameChecklist(c) }, "Rename"),
+    h("span", { class: "spacer" }),
+    w && c.template && h("button", { type: "button", class: "btn primary", onclick: () => startTemplate(c) }, "Start a list from it"),
+    w && c.standing && h("button", { type: "button", class: "btn", onclick: () => clearTicked(c) }, "Clear ticked"),
+    w && !c.template && !c.closed && !c.standing && h("button", { type: "button", class: "btn done", onclick: () => closeChecklist(c) }, "Close list"),
+    w && c.closed && h("button", { type: "button", class: "btn", onclick: () => store.update("checklists", c.id, { closed: false, closedAt: null }).catch(writeFailed) }, "Reopen")));
+  if (tpl && !c.template) out.push(h("p", { class: "hint", style: "padding: 0 10px" }, `Started from the template “${tpl.title}”.`));
+  fill(list, out);
+}
 
 // ---- sort into areas: one screen to give every Inbox task an area ----
 // Each choice is "" (stay), "area" (the task becomes an area), an area id, or "new:<name>" (a new area, from Claude's suggestions).
@@ -2217,7 +2588,7 @@ function ideaRow(i) {
   const mine = i.byUser && i.byUser === meId;
   return h("div", { class: "comment" + (i.moved ? " moved" : "") },
     h("div", { class: "who" }, h("span", { class: "idea-kind" + (i.kind === "problem" ? " problem" : "") }, i.kind === "problem" ? "Problem" : "Idea"),
-      h("b", {}, slotName(i.by) || "Someone"), h("span", {}, fmtStamp(i.at)),
+      h("b", { class: pc(i.by) || null }, slotName(i.by) || "Someone"), h("span", {}, fmtStamp(i.at)),
       h("button", { type: "button", onclick: () => store.update("ideas", i.id, { moved: !i.moved, movedAt: i.moved ? null : Date.now() }).catch(writeFailed) },
         i.moved ? "Back to open" : "In backlog"),
       mine && h("button", { type: "button", onclick: () => store.remove("ideas", i.id).catch(writeFailed) }, "Delete")),
@@ -2262,7 +2633,7 @@ async function loadHistory(id) {
     const items = (await store.query("history", "taskId", id)).sort((a, b) => (b.at || 0) - (a.at || 0));
     if (editingId !== id) return;
     ol.replaceChildren(...(items.length
-      ? items.map((e) => h("li", {}, h("b", {}, slotName(e.by) || "Someone"), " " + e.text + " · ", h("span", {}, fmtStamp(e.at))))
+      ? items.map((e) => h("li", {}, h("b", { class: pc(e.by) || null }, slotName(e.by) || "Someone"), " " + e.text + " · ", h("span", {}, fmtStamp(e.at))))
       : [h("li", {}, "No changes recorded yet.")]));
   } catch { ol.replaceChildren(h("li", {}, "Couldn't load the history.")); }
 }
@@ -2359,6 +2730,8 @@ async function addEntries(entries, listId, taskId = "") {
       }
       added.push(e.name);
       const cid = catalogId(e.name), c = catalog.get(cid);
+      // Private lists stay out of the shared suggestions, so their items can't show up for the other person.
+      if (lists.get(listId)?.private) { if (taskId) log(taskId, "added an item to a private list"); continue; }
       // Older entries keep their earlier history under Groceries.
       const before = c?.listCounts && Object.keys(c.listCounts).length ? c.listCounts : c?.count ? { groceries: c.count } : {};
       const listCounts = { ...before, [listId]: (before[listId] || 0) + 1 };
@@ -2397,7 +2770,7 @@ function renderShopBar() {
   fill($("#shop-lists"),
     h("div", { class: "seg", role: "group", "aria-label": "Shopping lists" }, allLists().map((l) => {
       const n = openItems(l.id).filter((i) => !i.checked).length;
-      return h("button", { type: "button", "aria-pressed": String(l.id === cur), onclick: () => selectList(l.id) }, l.name + (n ? ` · ${n}` : ""));
+      return h("button", { type: "button", "aria-pressed": String(l.id === cur), title: l.private ? "Private: only you can see this list" : null, onclick: () => selectList(l.id) }, (l.private ? "🔒 " : "") + l.name + (n ? ` · ${n}` : ""));
     })),
     canWrite() && h("button", { type: "button", class: "btn small", onclick: openListsPanel }, "Edit lists"),
     h("span", { class: "spacer" }),
@@ -2438,7 +2811,8 @@ function renderChips() {
 }
 function renderItem(i) {
   const t = i.taskId && tasks.get(i.taskId), fresh = isNewItem(i, shoppingHighlightSince);
-  const meta = [fresh && "New", t && "For " + (t.title || "a task"), i.addedBy && "Added by " + slotName(i.addedBy)].filter(Boolean).join(" · ");
+  const meta = [fresh && "New", t && "For " + (t.title || "a task"), i.addedBy && h("span", { class: pc(i.addedBy) || null }, "Added by " + slotName(i.addedBy))]
+    .filter(Boolean).flatMap((m, k) => k ? [" · ", m] : [m]);
   return h("div", { class: "item" + (i.checked ? " checked" : "") + (fresh ? " is-new" : "") },
     h("button", { type: "button", class: "item-main", "aria-pressed": String(!!i.checked), "aria-label": (i.checked ? "Put back: " : "In the basket: ") + i.name,
       onclick: () => canWrite() && toggleItem(i) },
@@ -2824,12 +3198,21 @@ $("#it-delete").addEventListener("click", async () => {
 
 function openListsPanel() { renderListsPanel(); openPanel($("#lists-panel")); }
 function renderListsPanel() {
+  $("#list-new-private-wrap").hidden = !privateListsSupported || store.mode !== "supabase" && store.mode !== "local";
   $("#lists-rows").replaceChildren(...allLists().map((l) => h("div", { class: "list-row" },
     h("input", { type: "text", value: l.name, maxlength: "40", "aria-label": "Name of list " + l.name, onchange: (e) => {
       const name = e.target.value.trim();
-      if (name) store.put("lists", l.id, { name, order: l.order || 0 }).catch(writeFailed);
+      if (name) store.put("lists", l.id, { name, order: l.order || 0, ...(privateListsSupported ? { private: !!l.private } : {}) }).catch(writeFailed);
     } }),
+    l.id !== "groceries" && privateListsSupported && h("label", { class: "check", title: "Only you can see a private list and its items" },
+      h("input", { type: "checkbox", checked: !!l.private, onchange: (e) => setListPrivate(l, e.target.checked) }), " Private"),
     l.id !== "groceries" && h("button", { type: "button", class: "btn small danger", onclick: () => deleteList(l) }, "Delete"))));
+}
+async function setListPrivate(l, on) {
+  try {
+    await store.update("lists", l.id, on ? { private: true, ...(store.mode === "supabase" ? { owner: meId } : {}) } : { private: false });
+    toast(on ? `“${l.name}” is now private: only you can see it` : `“${l.name}” is now shared`);
+  } catch (err) { writeFailed(err); renderListsPanel(); }
 }
 async function deleteList(l) {
   const its = openItems(l.id);
@@ -2852,7 +3235,9 @@ $("#list-new").addEventListener("submit", async (e) => {
   const name = $("#list-new-name").value.trim();
   if (!name) return;
   $("#list-new-name").value = "";
-  try { const id = await store.add("lists", { name, order: Date.now() }); selectList(id); renderListsPanel(); }
+  const priv = privateListsSupported && $("#list-new-private").checked;
+  $("#list-new-private").checked = false;
+  try { const id = await store.add("lists", { name, order: Date.now(), ...(priv ? { private: true } : {}) }); selectList(id); renderListsPanel(); }
   catch (err) { writeFailed(err); }
 });
 
@@ -2972,7 +3357,16 @@ $("#set-password-btn").addEventListener("click", async () => {
   $("#new-password").value = "";
   toast("Password set. Use it with your email to sign in on other devices.");
 });
-$("#signout-btn").addEventListener("click", async () => { await sb.client?.auth.signOut(); location.reload(); });
+$("#signout-btn").addEventListener("click", async () => {
+  await sb.flush();
+  const n = sb.outbox.length;
+  if (n && !(await askConfirm("Sign out anyway?", `${n} change${n > 1 ? "s" : ""} made offline ${n > 1 ? "haven't" : "hasn't"} reached the server yet. Signing out deletes ${n > 1 ? "them" : "it"} from this device.`, "Sign out"))) return;
+  sb.forget();
+  // Ends every session; offline the server can't be told, so at least this device signs out.
+  const { error } = await sb.client.auth.signOut();
+  if (error) await sb.client.auth.signOut({ scope: "local" });
+  location.reload();
+});
 
 // ---- moving data between claude.ai and own hosting ----
 const TASK_FIELDS = ["title", "status", "assignee", "priority", "due", "repeat", "parentId", "notes", "order", "createdAt", "assignedBy", "assignedAt", "archived", "archivedAt"];

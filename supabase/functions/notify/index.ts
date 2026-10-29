@@ -131,13 +131,15 @@ const inQuiet = (p: typeof PREF_DEFAULTS, time: string) =>
 
 // ---- what Claude sees: the caller's open tasks, shopping and recent activity ----
 async function snapshot(uid: string) {
-  const [ppl, tasksRes, itemsRes, listsRes, stateRes, histRes] = await Promise.all([
+  const [ppl, tasksRes, itemsRes, listsRes, stateRes, histRes, clRes, clItemsRes] = await Promise.all([
     people(),
     db.from("tasks").select("*").eq("archived", false),
     db.from("items").select("*").eq("bought", false),
     db.from("lists").select("*"),
     db.from("user_state").select("today").eq("user_id", uid).maybeSingle(),
     db.from("history").select("*").gt("at", Date.now() - 36 * 3600 * 1000).order("at", { ascending: false }).limit(25),
+    db.from("checklists").select("*").eq("standing", true), // missing before migration 009: then just no topics
+    db.from("checklist_items").select("*").eq("done", false),
   ]);
   const prefs = await prefsOf(uid);
   const now = localNow(prefs.tz);
@@ -155,14 +157,22 @@ async function snapshot(uid: string) {
     t.private ? "private" : t.assignee ? `for ${nameOf(ppl, t.assignee)}` : "unassigned",
     t.priority !== "normal" ? `${t.priority} priority` : "", path(t) ? `under ${path(t)}` : "", pins[t.id] === now.date ? "in MY DAY" : "",
   ].filter(Boolean).join(" | "));
-  const listName = new Map((listsRes.data ?? []).map((l) => [l.id, l.name]));
+  // Never another person's private shopping lists or checklists.
+  const visibleLists = (listsRes.data ?? []).filter((l) => !l.private || l.owner === uid);
+  const hiddenLists = new Set((listsRes.data ?? []).filter((l) => l.private && l.owner !== uid).map((l) => l.id));
+  const listName = new Map(visibleLists.map((l) => [l.id, l.name]));
   const shopping = new Map<string, string[]>();
   for (const i of itemsRes.data ?? []) {
+    if (hiddenLists.has(i.list_id)) continue;
     const ln = listName.get(i.list_id) ?? "Groceries";
     if (!shopping.has(ln)) shopping.set(ln, []);
     shopping.get(ln)!.push(i.name + (i.qty ? ` (quantity: ${i.qty})` : "") + (i.checked ? " (already in the basket)" : ""));
   }
-  const lists = [{ id: "groceries", name: "Groceries" }, ...(listsRes.data ?? []).filter((l) => l.id !== "groceries")];
+  const lists = [{ id: "groceries", name: "Groceries" }, ...visibleLists.filter((l) => l.id !== "groceries")];
+  const topics = (clRes.data ?? []).filter((c) => !c.private || c.owner === uid).map((c) => {
+    const xs = (clItemsRes.data ?? []).filter((i) => i.checklist_id === c.id && !i.heading).map((i) => i.text + (i.added_by ? ` (from ${nameOf(ppl, i.added_by)})` : ""));
+    return xs.length ? `${c.title}: ${xs.join("; ")}` : "";
+  }).filter(Boolean);
   const activity = (histRes.data ?? []).filter((h) => byId.has(h.task_id) || !h.task_id).map((h) => `${nameOf(ppl, h.author) || "Someone"} ${h.text} ("${h.title}")`);
   const text = [
     `People: "a" = ${ppl.a}, "b" = ${ppl.b}. You are talking to ${nameOf(ppl, me) || "one of them"} ("${me}").`,
@@ -171,6 +181,7 @@ async function snapshot(uid: string) {
     `Open tasks (${open.length}):`, ...(lines.length ? lines : ["(none)"]),
     `Shopping lists (ids: ${lists.map((l) => `${l.name}=${l.id}`).join(", ")}):`,
     ...([...shopping].map(([ln, xs]) => `${ln}: ${xs.join(", ")}`) || []), ...(shopping.size ? [] : ["(all empty)"]),
+    `Standing lists, e.g. topics to talk about together (mention only when it fits, e.g. a calm evening or the weekend): ${topics.length ? topics.join(" | ") : "none"}`,
     `Recent activity (last 36 h): ${activity.length ? activity.join("; ") : "none"}`,
   ].join("\n");
   return { ppl, me, myName: nameOf(ppl, me) || "there", now, prefs, text, byId, lists, open };
@@ -368,6 +379,8 @@ Deno.serve(async (req) => {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg === "not_configured") return reply({ error: "not_configured" }, 503);
     if (e instanceof Anthropic.RateLimitError) return reply({ error: "rate_limited" }, 429);
-    return reply({ error: "server_error", detail: msg.slice(0, 200) }, 500);
+    // The reason goes to the function's logs (dashboard > Edge Functions > notify > Logs), not to the caller.
+    console.error("notify:", msg);
+    return reply({ error: "server_error" }, 500);
   }
 });

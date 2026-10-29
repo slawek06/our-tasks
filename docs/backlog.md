@@ -48,8 +48,24 @@ Notes from daily use go here, then we pick what to improve.
 | | Item | Effort | Notes |
 |---|---|---|---|
 | ✅ | **Areas → Projects → Tasks** | | Live 26 Oct 2026 (migration 007, notify function updated) |
-| ⬜ | **Checklists** (e.g. "Before we leave for the other home", "What to bring"): several lists like shopping lists, simple items with only done/not done, ticked items stay visible, closing the whole list archives it; frequent items per list; reusable versions of a list | M | Sławek. Reuse the shopping lists and items tables with a list type. Open question: closing = archive, or also "start again" (untick all) for lists used every trip? |
-| ⬜ | **A colour per person**: Sławek and Wiola each get their own colour at the top (person filter) and everywhere their name appears (assignee, comments, activity, shopping "added by") | S | Sławek. Open question: which colours; pick them under People? |
+| ✅ | **Checklists** (Sławek): see the design below | | Released 29 Oct 2026 (migration 008) |
+| ✅ | **A colour per person**: Sławek blue, Wiola green, at the top and wherever a name appears | | Released 29 Oct 2026 |
+| ✅ | **New tasks belong to whoever creates them** (unless you pick or name someone else) | | Released 29 Oct 2026 |
+
+### Design: Checklists (agreed 26 Oct 2026)
+
+- Lives in a **Lists** tab with two parts: Shopping and Checklists (no seventh tab).
+- **Templates** are the reusable versions ("Leaving Warsaw → Kraków", "Ski trip packing"); never ticked.
+- **Start** a template → a fresh list ("Leaving Warsaw · Fri 31 Oct"); blank one-off lists too.
+- Items are text + done only. Ticked items stay visible (struck through) with the initial of who ticked it (trial: keep it?).
+- Headings inside a list: a line ending with ":" (e.g. "Before we go:", "Bring:").
+- Frequent suggestions: this template's past lists first, then all lists.
+- **Close list** archives it (asks if items are open) and offers to add items added during the trip to the template.
+- Closed lists stay viewable. Shared or private like tasks. Works offline.
+- Item actions: send to Shopping, make it a task.
+- "+ Add here" on a heading puts new items under it; drag (or arrow keys) to move items and headings.
+- Later: belong to an area and show in Today; "Start Leaving Warsaw?" when switching home; Claude drafts a template;
+  standing lists (never closed, for "To talk about"); templates that start on a schedule.
 
 ### Design: Areas → Projects → Tasks (agreed 26 Oct 2026)
 
@@ -78,7 +94,7 @@ Notes from daily use go here, then we pick what to improve.
 | ⬜ | **Gentle nudge**: "Remind Wiola" push worded by Claude, at most once a day per task | S | |
 | ⬜ | ⭐ **"Where are we this week?"**: which home each of you is at; that home's tasks first in Today, briefing mentions it, "Next time in Warsaw" lists | M | Top pick; pairs with Checklists and areas |
 | ⬜ | **Decisions and approvals**: options (with photos) to vote on or approve ("OK to order this sofa?"); result kept in the task | M | Replaces the old "Approvals" item |
-| ⬜ | **"To talk about" list**: topics that aren't tasks yet; one tap turns one into a project | S | Feeds the weekly check-in |
+| ✅ | **"To talk about" list**: a standing checklist (never closed); shows who raised each topic; tick when discussed, then Clear ticked; briefings may mention topics | | Released 29 Oct 2026 (migration 009) |
 | ⬜ | **Our week**: who's doing what this week and what each finished, incl. planning and shopping; awareness, not scorekeeping | S | Replaces "Who's doing what this week" |
 | ⬜ | **Rotating chores**: repeating tasks alternate the assignee ("Bins: Sławek this week, Wiola next") | S | |
 | ⬜ | ⭐ **"Thanks ❤️"**: one-tap thanks on "closed by the other" notifications | S | Top pick; covers "reactions" |
@@ -94,7 +110,7 @@ Notes from daily use go here, then we pick what to improve.
 | ✅ | Recurring tasks, default due date tomorrow | | |
 | ✅ | Create tasks from text (one new parent task) | | |
 | ✅ | Progress bar per project | | Part of Areas → Projects → Tasks |
-| ⬜ | Templates (reusable checklists) | S | |
+| ✅ | Templates (reusable checklists) | | Covered by Checklists |
 | ⬜ | Calendar view (month grid) | M | |
 | ⬜ | Attachments and photos (quotes, invoices) | M | Supabase Storage |
 | ⬜ | Cost tracking per project | M | |
@@ -106,7 +122,7 @@ Notes from daily use go here, then we pick what to improve.
 |---|---|---|---|
 | ✅ | Lists, sections, suggestions, smart add, shopping mode, items for tasks | | |
 | ✅ | Frequent items per list | | |
-| ⬜ | Private shopping items | S | Today all items are shared |
+| ✅ | Private shopping lists (whole list private; private items not needed) | | Released 29 Oct 2026 (migration 009) |
 | ⬜ | Recurring shopping ("coffee every 2 weeks") | S | |
 | ⬜ | Shop-specific order (learned from ticking order) | S | |
 | ⬜ | Prices and budget per list / trip | M | |
@@ -120,3 +136,21 @@ Notes from daily use go here, then we pick what to improve.
 | ✅ | Separate production and development environments | | Two Supabase projects, `main` / `dev` branches |
 | ✅ | Password and e-mail code sign-in | | |
 | ⬜ | Native iPhone/Mac app: widgets, Siri intents, Watch | L | $99/year Apple Developer Program |
+
+## Security (review 26 Oct 2026)
+
+Outsiders get nothing without a sign-in; the weak points are the accounts around the app, not the code.
+
+| | Item | Effort | Notes |
+|---|---|---|---|
+| ✅ | Comments and history of a private task readable only by its owner | | Released 29 Oct 2026 (migration 010) |
+| ✅ | Fix: items of a private shopping list were readable by the other person | | 009's rule checked the list through its own access rule; fixed in 010. Released 29 Oct 2026; never live without 010 |
+| ✅ | History no longer names items added to a private list | | Migration 010 also rewrites older entries. Released 29 Oct 2026 |
+| ✅ | Signing out deletes the device copy of the data (warns about unsent offline changes) | | Released 29 Oct 2026 |
+| ✅ | notify answers errors without technical details (they go to its logs) | | Released 29 Oct 2026 |
+| ✅ | Privacy check script | | `supabase/tests/privacy-check.sql`: PASS/FAIL per rule, leaves nothing behind |
+| 🔶 | Two-step sign-in on Gmail (both), Supabase, GitHub, Anthropic | S | Done: Sławek's Gmail, GitHub (27 Oct 2026). Open: Wiola's Gmail, Supabase (authenticator app). Anthropic has no own setting: sign-in goes through Gmail, so Gmail's two-step covers it |
+| ✅ | Monthly spending limit on the Anthropic key | S | Set to $5 a month (27 Oct 2026), console.anthropic.com → Settings → Limits |
+| ⬜ | Own backup: export once a month (People → Your data) into `data/` | S | Free plan has no restorable backups |
+| ⬜ | Separate web address for dev (dev and production share `slawek06.github.io`, so their browser storage) | M | Decided: leave; only our own code runs there |
+| ⬜ | Checksum (SRI) on the supabase-js script from jsDelivr | S | Decided: low risk, leave for now |

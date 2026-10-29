@@ -284,12 +284,119 @@ do $$ begin
   alter table public.tasks add constraint tasks_kind_check check (kind in ('task', 'area'));
 exception when duplicate_object then null; end $$;
 
+-- ======== 008_checklists.sql ========
+-- Checklists: reusable templates and the lists started from them (e.g. "Leaving Warsaw · Fri 31 Oct").
+-- Shared or private like tasks. Run once: Supabase dashboard > SQL Editor > New query > paste > Run. Safe to run more than once.
+create table if not exists public.checklists (
+  id           text primary key default gen_random_uuid()::text,
+  title        text not null,
+  template     boolean not null default false,   -- a reusable version; never ticked
+  template_id  text not null default '',         -- the template a list was started from
+  closed       boolean not null default false,
+  closed_at    bigint,
+  sort_order   double precision not null default 0,
+  created_at   bigint not null default 0,
+  private      boolean not null default false,
+  owner        uuid default auth.uid() references auth.users on delete set null
+);
+create table if not exists public.checklist_items (
+  id            text primary key default gen_random_uuid()::text,
+  checklist_id  text not null,
+  text          text not null,
+  heading       boolean not null default false,  -- "Before we go:", "Bring:"
+  done          boolean not null default false,
+  done_by       text not null default '',
+  done_at       bigint,
+  sort_order    double precision not null default 0
+);
+create index if not exists checklist_items_checklist_id_idx on public.checklist_items (checklist_id);
+alter table public.checklists enable row level security;
+alter table public.checklist_items enable row level security;
+drop policy if exists "checklists: shared or own private" on public.checklists;
+create policy "checklists: shared or own private" on public.checklists for all to authenticated
+  using (not private or owner = auth.uid()) with check (not private or owner = auth.uid());
+-- Items follow their list: readable and writable when the list is.
+drop policy if exists "checklist_items: like their list" on public.checklist_items;
+create policy "checklist_items: like their list" on public.checklist_items for all to authenticated
+  using (exists (select 1 from public.checklists c where c.id = checklist_id and (not c.private or c.owner = auth.uid())))
+  with check (exists (select 1 from public.checklists c where c.id = checklist_id and (not c.private or c.owner = auth.uid())));
+grant select, insert, update, delete on public.checklists, public.checklist_items to authenticated;
+grant all on public.checklists, public.checklist_items to service_role;
+do $$ begin
+  alter publication supabase_realtime add table public.checklists, public.checklist_items;
+exception when duplicate_object then null; end $$;
+
+-- ======== 009_private_lists_standing.sql ========
+-- Private shopping lists (only the owner sees the list and its items) and standing checklists
+-- (never closed, e.g. "To talk about"). Run once: Supabase dashboard > SQL Editor > New query > paste > Run.
+-- Safe to run more than once.
+alter table public.lists add column if not exists private boolean not null default false;
+alter table public.lists add column if not exists owner uuid default auth.uid() references auth.users on delete set null;
+drop policy if exists "lists: signed-in users" on public.lists;
+drop policy if exists "lists: shared or own private" on public.lists;
+create policy "lists: shared or own private" on public.lists for all to authenticated
+  using (not private or owner = auth.uid()) with check (not private or owner = auth.uid());
+-- Items follow their list (items of the default Groceries list, which has no row, stay shared).
+drop policy if exists "items: signed-in users" on public.items;
+drop policy if exists "items: like their list" on public.items;
+create policy "items: like their list" on public.items for all to authenticated
+  using (not exists (select 1 from public.lists l where l.id = list_id and l.private and l.owner is distinct from auth.uid()))
+  with check (not exists (select 1 from public.lists l where l.id = list_id and l.private and l.owner is distinct from auth.uid()));
+
+alter table if exists public.checklists add column if not exists standing boolean not null default false;
+alter table if exists public.checklist_items add column if not exists added_by text not null default '';
+
+-- ======== 010_private_comments_history.sql ========
+-- Comments and history of a private task are readable only by its owner, and items of a private shopping list
+-- really are hidden from the other person (the 009 rule looked the list up through its own access rule, so the
+-- other person's private list was invisible to the check and its items showed).
+-- Run once: Supabase dashboard > SQL Editor > New query > paste > Run. Safe to run more than once.
+-- Check afterwards with supabase/tests/privacy-check.sql.
+
+-- The checks look past the access rules (security definer), so they can see the other person's private rows.
+-- They live in a schema the app's API doesn't expose, so they can't be called from outside.
+create schema if not exists private;
+grant usage on schema private to authenticated;
+
+-- True when the task is someone else's private task.
+create or replace function private.others_private_task(tid text) returns boolean
+  language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.tasks t where t.id = tid and t.private and t.owner is distinct from auth.uid());
+$$;
+-- True when the shopping list is someone else's private list.
+create or replace function private.others_private_list(lid text) returns boolean
+  language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.lists l where l.id = lid and l.private and l.owner is distinct from auth.uid());
+$$;
+revoke all on function private.others_private_task(text), private.others_private_list(text) from public, anon;
+grant execute on function private.others_private_task(text), private.others_private_list(text) to authenticated;
+
+drop policy if exists "comments: signed-in users" on public.comments;
+drop policy if exists "comments: not the other's private tasks" on public.comments;
+create policy "comments: not the other's private tasks" on public.comments for all to authenticated
+  using (not private.others_private_task(task_id)) with check (not private.others_private_task(task_id));
+
+-- History without a task (task_id '') stays shared.
+drop policy if exists "history: signed-in users" on public.history;
+drop policy if exists "history: not the other's private tasks" on public.history;
+create policy "history: not the other's private tasks" on public.history for all to authenticated
+  using (not private.others_private_task(task_id)) with check (not private.others_private_task(task_id));
+
+drop policy if exists "items: like their list" on public.items;
+create policy "items: like their list" on public.items for all to authenticated
+  using (not private.others_private_list(list_id)) with check (not private.others_private_list(list_id));
+
+-- Older history named the item added to a private list from a shared task; keep the note, drop the name.
+update public.history set text = 'added an item to a private list'
+  where text like 'added “%” to a private list';
+
 -- ======== permissions ========
 -- Only signed-in users (subject to the access rules above) and the server functions may use these tables.
 -- Anonymous visitors get nothing. push_config stays server-only.
 grant usage on schema public to authenticated, service_role;
 grant select, insert, update, delete on
   public.tasks, public.comments, public.history, public.lists, public.items, public.catalog,
-  public.config, public.user_state, public.push_subscriptions, public.notify_prefs, public.briefings, public.ideas
+  public.config, public.user_state, public.push_subscriptions, public.notify_prefs, public.briefings, public.ideas,
+  public.checklists, public.checklist_items
   to authenticated;
 grant all on all tables in schema public to service_role;

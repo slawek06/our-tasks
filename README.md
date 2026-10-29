@@ -4,6 +4,8 @@ A shared task tracker and shopping list for two people.
 
 Live: https://slawek06.github.io/our-tasks/ (sign-in required; only invited people)
 
+Documentation: [docs/architecture.md](docs/architecture.md) (architecture, technology, configuration, rebuild guide) · [docs/backlog.md](docs/backlog.md) (plans and decisions).
+
 ## Environments
 
 | | Production | Development |
@@ -30,6 +32,7 @@ A new project gets its full database from `python3 scripts/make-setup-sql.py <pr
 - Comments, per-task history, "new for you" markers, drag-to-reorder
 - Shopping lists: quick add with quantities, suggestions, automatic shop sections, basket, shopping mode, several lists
 - Items to buy linked to tasks
+- Checklists: reusable templates (e.g. leaving one home for the other); start a fresh list, tick together, close to archive
 - Smart add and "create tasks from text" using Claude
 - Ideas: a shared inbox for app feedback, copied into the chat with Claude to plan changes
 - Works offline: changes wait on the device and sync when back online
@@ -49,7 +52,7 @@ A new project gets its full database from `python3 scripts/make-setup-sql.py <pr
   RFC 8291/8292 code), the morning/evening briefings written by Claude, and the briefing chat whose
   proposed changes the app applies only after you confirm. A pg_cron job calls it every 15 minutes.
 - `supabase/migrations/`: database updates to run once in the SQL Editor (002 My day, 003 per-list
-  frequent items, 004 notifications and briefings, 005 briefing language, 006 ideas for the app, 007 areas).
+  frequent items, 004 notifications and briefings, 005 briefing language, 006 ideas for the app, 007 areas, 008 checklists, 009 private lists and standing lists).
 
 ## Setup notes
 
