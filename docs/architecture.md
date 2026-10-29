@@ -196,9 +196,9 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 | Migration | Production | Development |
 |---|---|---|
 | schema + 002–007 | ✅ | ✅ |
-| 008 checklists | ✅ (run early, harmless) | run before testing checklists |
-| 009 private lists, standing lists | ⬜ next release | run before testing |
-| 010 private comments and history, private list items fix | ⬜ next release | ✅ privacy check all PASS (26 Oct 2026) |
+| 008 checklists | ✅ (run again 29 Oct 2026) | ✅ |
+| 009 private lists, standing lists | ✅ 29 Oct 2026 | ✅ |
+| 010 private comments and history, private list items fix | ✅ 29 Oct 2026, privacy check all PASS | ✅ privacy check all PASS (26 Oct 2026) |
 
 ## 10. Configuration reference
 

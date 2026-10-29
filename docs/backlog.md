@@ -48,9 +48,9 @@ Notes from daily use go here, then we pick what to improve.
 | | Item | Effort | Notes |
 |---|---|---|---|
 | ✅ | **Areas → Projects → Tasks** | | Live 26 Oct 2026 (migration 007, notify function updated) |
-| 🔶 | **Checklists** (Sławek): see the design below | M | Building on dev, released together with other items |
-| 🔶 | **A colour per person**: Sławek blue, Wiola green, at the top and wherever a name appears | | Built on dev, in the next release |
-| 🔶 | **New tasks belong to whoever creates them** (unless you pick or name someone else) | | Built on dev, in the next release |
+| ✅ | **Checklists** (Sławek): see the design below | | Released 29 Oct 2026 (migration 008) |
+| ✅ | **A colour per person**: Sławek blue, Wiola green, at the top and wherever a name appears | | Released 29 Oct 2026 |
+| ✅ | **New tasks belong to whoever creates them** (unless you pick or name someone else) | | Released 29 Oct 2026 |
 
 ### Design: Checklists (agreed 26 Oct 2026)
 
@@ -94,7 +94,7 @@ Notes from daily use go here, then we pick what to improve.
 | ⬜ | **Gentle nudge**: "Remind Wiola" push worded by Claude, at most once a day per task | S | |
 | ⬜ | ⭐ **"Where are we this week?"**: which home each of you is at; that home's tasks first in Today, briefing mentions it, "Next time in Warsaw" lists | M | Top pick; pairs with Checklists and areas |
 | ⬜ | **Decisions and approvals**: options (with photos) to vote on or approve ("OK to order this sofa?"); result kept in the task | M | Replaces the old "Approvals" item |
-| 🔶 | **"To talk about" list**: a standing checklist (never closed); shows who raised each topic; tick when discussed, then Clear ticked; briefings may mention topics | | Built on dev, next release (migration 009) |
+| ✅ | **"To talk about" list**: a standing checklist (never closed); shows who raised each topic; tick when discussed, then Clear ticked; briefings may mention topics | | Released 29 Oct 2026 (migration 009) |
 | ⬜ | **Our week**: who's doing what this week and what each finished, incl. planning and shopping; awareness, not scorekeeping | S | Replaces "Who's doing what this week" |
 | ⬜ | **Rotating chores**: repeating tasks alternate the assignee ("Bins: Sławek this week, Wiola next") | S | |
 | ⬜ | ⭐ **"Thanks ❤️"**: one-tap thanks on "closed by the other" notifications | S | Top pick; covers "reactions" |
@@ -110,7 +110,7 @@ Notes from daily use go here, then we pick what to improve.
 | ✅ | Recurring tasks, default due date tomorrow | | |
 | ✅ | Create tasks from text (one new parent task) | | |
 | ✅ | Progress bar per project | | Part of Areas → Projects → Tasks |
-| 🔶 | Templates (reusable checklists) | | Covered by Checklists |
+| ✅ | Templates (reusable checklists) | | Covered by Checklists |
 | ⬜ | Calendar view (month grid) | M | |
 | ⬜ | Attachments and photos (quotes, invoices) | M | Supabase Storage |
 | ⬜ | Cost tracking per project | M | |
@@ -122,7 +122,7 @@ Notes from daily use go here, then we pick what to improve.
 |---|---|---|---|
 | ✅ | Lists, sections, suggestions, smart add, shopping mode, items for tasks | | |
 | ✅ | Frequent items per list | | |
-| 🔶 | Private shopping lists (whole list private; private items not needed) | | Built on dev, next release (migration 009) |
+| ✅ | Private shopping lists (whole list private; private items not needed) | | Released 29 Oct 2026 (migration 009) |
 | ⬜ | Recurring shopping ("coffee every 2 weeks") | S | |
 | ⬜ | Shop-specific order (learned from ticking order) | S | |
 | ⬜ | Prices and budget per list / trip | M | |
@@ -143,11 +143,11 @@ Outsiders get nothing without a sign-in; the weak points are the accounts around
 
 | | Item | Effort | Notes |
 |---|---|---|---|
-| 🔶 | Comments and history of a private task readable only by its owner | | Built on dev, next release (migration 010) |
-| 🔶 | Fix: items of a private shopping list were readable by the other person | | 009's rule checked the list through its own access rule; fixed in 010 |
-| 🔶 | History no longer names items added to a private list | | Migration 010 also rewrites older entries |
-| 🔶 | Signing out deletes the device copy of the data (warns about unsent offline changes) | | Built on dev, next release |
-| 🔶 | notify answers errors without technical details (they go to its logs) | | Built on dev; redeploy notify in the release |
+| ✅ | Comments and history of a private task readable only by its owner | | Released 29 Oct 2026 (migration 010) |
+| ✅ | Fix: items of a private shopping list were readable by the other person | | 009's rule checked the list through its own access rule; fixed in 010. Released 29 Oct 2026; never live without 010 |
+| ✅ | History no longer names items added to a private list | | Migration 010 also rewrites older entries. Released 29 Oct 2026 |
+| ✅ | Signing out deletes the device copy of the data (warns about unsent offline changes) | | Released 29 Oct 2026 |
+| ✅ | notify answers errors without technical details (they go to its logs) | | Released 29 Oct 2026 |
 | ✅ | Privacy check script | | `supabase/tests/privacy-check.sql`: PASS/FAIL per rule, leaves nothing behind |
 | 🔶 | Two-step sign-in on Gmail (both), Supabase, GitHub, Anthropic | S | Done: Sławek's Gmail, GitHub (27 Oct 2026). Open: Wiola's Gmail, Supabase (authenticator app). Anthropic has no own setting: sign-in goes through Gmail, so Gmail's two-step covers it |
 | ✅ | Monthly spending limit on the Anthropic key | S | Set to $5 a month (27 Oct 2026), console.anthropic.com → Settings → Limits |
