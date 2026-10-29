@@ -1,6 +1,6 @@
 # Our Tasks: backlog
 
-Status: ✅ done · 🔶 partly done · ⬜ open. Effort: S (one session) · M · L.
+Status: ✅ done · 🔶 partly done · ⬜ open · ➖ dropped. Effort: S (one session) · M · L.
 
 ## Notifications, briefings, voice
 
@@ -16,7 +16,7 @@ Status: ✅ done · 🔶 partly done · ⬜ open. Effort: S (one session) · M �
 | ⬜ | Siri via Shortcuts: "Our briefing", "Ask Our Tasks" | M | Free, no developer account; private link per person |
 | ⬜ | Editable quiet hours (fixed 22:00-7:00 today) | S | Columns exist in `notify_prefs` |
 | ⬜ | Grouped "Wiola added 3 items to Groceries" notification | S | Not chosen yet |
-| ⬜ | Reminders at a time of day (tasks with a time, not just a date) | M | Needs a due time field |
+| ⬜ | Reminders at a time of day (tasks with a time, not just a date) | M | Next release (chosen 30 Oct 2026). Needs a due time field; the timer runs every 15 min today |
 | ⬜ | Apple Calendar feed (subscribed calendar of due tasks) | M | Read-only, refresh 15 min to hours |
 | ⬜ | Weekly summary e-mail via Gmail | M | Check Supabase mail ports first |
 | ⬜ | Weekly review by Claude ("what's stuck, what to do this weekend") | S | Can reuse the briefing |
@@ -87,10 +87,10 @@ Notes from daily use go here, then we pick what to improve.
 | | Item | Effort | Notes |
 |---|---|---|---|
 | ✅ | Assign to each other, "new for you", activity feed, comments | | |
-| ⬜ | ⭐ **"I'm going to the shop"**: one tap tells the other person, items they add appear live | S | Top pick |
+| ➖ | **"I'm going to the shop"**: one tap tells the other person, items they add appear live | S | Dropped 30 Oct 2026: not practical for us |
 | ⬜ | ⭐ **"Can you take this?"**: ask instead of assign; Take it / Can't, because… | S | Top pick; pairs with seen markers |
-| ⬜ | **Seen markers**: "Wiola saw it 10:42" on assigned tasks and comments | S | |
-| ⬜ | **Mentions in comments**: @Wiola sends her a push | S | |
+| ⬜ | **Seen markers**: "Wiola saw it 10:42" on assigned tasks and comments | S | Next release (chosen 30 Oct 2026) |
+| ⬜ | **Mentions in comments**: @Wiola sends her a push | S | Next release (chosen 30 Oct 2026). Comments already push the other person (switch `on_comment`), so a mention must add something: decide in its session |
 | ⬜ | **Gentle nudge**: "Remind Wiola" push worded by Claude, at most once a day per task | S | |
 | ⬜ | ⭐ **"Where are we this week?"**: which home each of you is at; that home's tasks first in Today, briefing mentions it, "Next time in Warsaw" lists | M | Top pick; pairs with Checklists and areas |
 | ⬜ | **Decisions and approvals**: options (with photos) to vote on or approve ("OK to order this sofa?"); result kept in the task | M | Replaces the old "Approvals" item |
@@ -100,6 +100,7 @@ Notes from daily use go here, then we pick what to improve.
 | ⬜ | ⭐ **"Thanks ❤️"**: one-tap thanks on "closed by the other" notifications | S | Top pick; covers "reactions" |
 | ⬜ | ⭐ **Weekly check-in with Claude**: 10-minute Sunday conversation (done, stuck, to talk about, who takes what), changes applied on confirm | M | Top pick; builds on the briefing chat |
 | ⬜ | Quick replies on comments | S | |
+| ⬜ | **Done + next step**: closing a task offers a follow-up task (same area/project, link "Follow-up of …"); the outcome is saved as a comment; Claude may suggest the next step | S | Proposed 30 Oct 2026 for "call someone, then a follow-up"; not chosen yet |
 
 ## Tasks and projects
 
@@ -126,7 +127,7 @@ Notes from daily use go here, then we pick what to improve.
 | ⬜ | Recurring shopping ("coffee every 2 weeks") | S | |
 | ⬜ | Shop-specific order (learned from ticking order) | S | |
 | ⬜ | Prices and budget per list / trip | M | |
-| ⬜ | Photo of an item ("this exact brand") | M | Supabase Storage |
+| ⬜ | Photo of an item ("this exact brand") | M | Next release (chosen 30 Oct 2026). Supabase Storage (free plan 1 GB, so shrink photos on the phone); private lists' photos private too |
 
 ## Platform
 
