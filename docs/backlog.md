@@ -65,7 +65,7 @@ Notes from daily use go here, then we pick what to improve.
 - Closed lists stay viewable. Shared or private like tasks. Works offline.
 - Item actions: send to Shopping, make it a task.
 - "+ Add here" on a heading puts new items under it; drag (or arrow keys) to move items and headings.
-- Later: belong to an area and show in Today; "Start Leaving Warsaw?" when switching home; Claude drafts a template;
+- Later: belong to an area and show in Today; Claude drafts a template;
   standing lists (never closed, for "To talk about"); templates that start on a schedule.
 
 ### Design: Areas → Projects → Tasks (agreed 26 Oct 2026)
