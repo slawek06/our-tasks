@@ -317,7 +317,7 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 | 014 every task has an owner (open shared tasks with nobody assigned become Both) | ✅ 30 Oct 2026, privacy check 53 lines all PASS | ✅ privacy check all PASS (30 Oct 2026) |
 | 015 photos of shopping items (`items.photo`, bucket `item-photos`, its rules, `stale_item_photos`) | ✅ 30 Oct 2026, privacy check 53 lines all PASS | ✅ privacy check all PASS (30 Oct 2026) |
 | 016 files on tasks (`attachments`, bucket `task-files`, its rules, `stale_task_files`) | ✅ 30 Oct 2026, privacy check 53 lines all PASS | ✅ privacy check all PASS (30 Oct 2026) |
-| 017 thanks (`thanks`, its rules) | ⬜ Release 3 | ⬜ |
+| 017 thanks (`thanks`, its rules) | ⬜ Release 3 | ✅ privacy check all PASS (30 Oct 2026) |
 
 ## 10. Configuration reference
 
