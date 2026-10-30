@@ -69,6 +69,7 @@ There is no own server: GitHub hosts the files, Supabase holds data, sign-in and
 | `supabase/migrations/NNN_*.sql` | Later database changes, in order, each safe to run more than once |
 | `supabase/tests/privacy-check.sql` | Paste into the SQL Editor: checks each person sees only what they should (PASS/FAIL), leaves nothing behind |
 | `scripts/make-setup-sql.py <ref>` | Writes `supabase/setup-<ref>.sql`: schema + all migrations + permissions + timer for one project |
+| `scripts/make-release-sql.py <first migration>` | Writes `supabase/release-<project name>.sql` for each project: a check that it's the right project (by the address in its timer job), the release's migrations, the privacy check |
 | `supabase/functions/claude/index.ts` | Claude proxy for the app's AI features |
 | `supabase/functions/notify/index.ts` | Push, reminders, briefings, briefing chat, timer |
 | `docs/backlog.md` | Plans, decisions, designs |
@@ -356,8 +357,9 @@ Secrets are never stored in this repository or sent in chats. They live only whe
 
 - Build on `dev`; it publishes to the orange app automatically. Try it there.
 - Database changes: a new numbered migration, safe to run more than once; run in development first.
-- Collect several items, then **release**: merge `dev` into `main`, run the release's migrations in production,
-  deploy changed functions to production, update §9.
+- Collect several items, then **release**: run `python3 scripts/make-release-sql.py <first migration of the release>`, try `supabase/release-our-tasks.sql` in development, merge `dev` into `main`,
+  run `supabase/release-our-tasks-prod.sql` in production (it ends with the privacy check), deploy changed functions to production, update §9.
+  The file stops with "STOP: this is the wrong Supabase project" in the other project, before changing anything.
 - Record decisions and status in `docs/backlog.md`; structure and settings here.
 - Commit messages explain why; no secrets, no personal data in the repository.
 
