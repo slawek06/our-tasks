@@ -267,6 +267,9 @@ body.shop-mode .fab { display: none; }
 .field input[type=time] { -webkit-appearance: none; appearance: none; display: block; box-sizing: border-box; border: 1px solid var(--line);
   background: var(--bg); border-radius: 9px; padding: 9px 11px; width: 100%; min-width: 0; min-height: 42px; text-align: left; }
 .two > .field { min-width: 0; }
+.remind-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.remind-pick button { border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 9px 8px; font-size: 14px; }
+.remind-pick button[aria-pressed=true] { background: var(--accent-soft); border-color: var(--accent); font-weight: 600; }
 .hint .linkish { border: 0; background: none; padding: 0; color: var(--accent); font: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
 /* Checkbox rows inside a field are normal text, not field labels. */
 .field > label.check { text-transform: none; letter-spacing: 0; font-size: 14px; font-weight: 400; color: var(--ink); }
@@ -468,6 +471,7 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
         <div class="field"><label for="f-due">Due date</label><input type="date" id="f-due"></div>
         <div class="field" id="time-field"><label for="f-time">Time</label><input type="time" id="f-time"></div>
       </div>
+      <div class="field" id="remind-field" hidden><span class="lbl" id="remind-label">Remind</span><div class="remind-pick" id="f-remind" role="group" aria-labelledby="remind-label"></div></div>
       <p class="hint" id="time-hint" hidden></p>
       <div class="field task-only"><label for="f-repeat">Repeats</label><select id="f-repeat"></select></div>
       <p class="hint" id="repeat-hint" hidden>When you close it, the next one is created with the due date moved forward.</p>
@@ -1007,7 +1011,7 @@ const store = {
     // The "Follow-up of" link needs supabase/migrations/012_follow_ups.sql; until then a next step is a plain new task.
     sb.client.from("tasks").select("follow_up_of").limit(1).then(({ error }) => { followUpsSupported = !error || isNetworkError(error); });
     // Reminders at a time of day need supabase/migrations/013_reminders.sql; until then the editor has no time field and says so.
-    sb.client.from("tasks").select("due_time").limit(1).then(({ error }) => { dueTimeSupported = !error || isNetworkError(error); });
+    sb.client.from("tasks").select("remind_before").limit(1).then(({ error }) => { dueTimeSupported = !error || isNetworkError(error); });
     // Per-list frequent items need supabase/migrations/003_catalog_per_list.sql; until then Frequent is shared.
     sb.client.from("catalog").select("list_counts").limit(1).then(({ error }) => { perListSupported = !error || isNetworkError(error); if (view === "shopping") renderChips(); });
   },
@@ -1259,6 +1263,7 @@ const FIELD_LOG = {
   assignee: (v) => v ? `assigned it to ${assigneeName(v)}` : "removed the assignee",
   due: (v) => v ? `set the due date to ${fmtDate(v)}` : "removed the due date",
   dueTime: (v) => v ? `set the time to ${v}` : "removed the time",
+  remindBefore: (v) => v ? `set a reminder ${remindText(v)}` : "removed the reminder",
   priority: (v) => `set the priority to ${PRIORITY[v]}`,
   repeat: (v) => v ? `set it to repeat ${REPEAT[v].toLowerCase()}` : "stopped it repeating",
   parentId: (v) => v ? `moved it under “${tasks.get(v)?.title || "another task"}”` : "moved it to the top level",
@@ -1328,6 +1333,11 @@ function fmtDate(s) {
 const fmtDue = (due, time) => fmtDate(due) + (time ? " · " + time : "");
 // Within a day: tasks with a time first, earliest first.
 const byTime = (x, y) => (x.dueTime || "99").localeCompare(y.dueTime || "99");
+// Reminders: minutes before the task's date and time, longest first. Stored comma separated ("1440,60"; "" = none).
+const REMIND = [["1440", "24 hours before", "24h"], ["60", "1 hour before", "1h"], ["15", "15 minutes before", "15 min"], ["0", "At the time", "at the time"]];
+const DEFAULT_REMIND = "60";
+const remindList = (v) => REMIND.filter(([m]) => (v || "").split(",").includes(m));
+const remindText = (v) => remindList(v).map(([, l]) => l.toLowerCase()).join(", ");
 const fmtStamp = (ms) => new Date(ms).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 // ---- recurring tasks: closing one creates the next, with its subtasks ----
@@ -1342,7 +1352,7 @@ async function spawnNext(t) {
     const id = await addTask({
       title: src.title, status: "todo", assignee: src.assignee || "", priority: src.priority || "normal", notes: src.notes || "", parentId,
       due: isRoot ? due : src.due && shift != null ? addDays(src.due, shift) : "",
-      ...(src.dueTime ? { dueTime: src.dueTime } : {}),
+      ...(src.dueTime ? { dueTime: src.dueTime, remindBefore: src.remindBefore || "" } : {}),
       repeat: isRoot ? src.repeat : "", order: isRoot ? (src.order || 0) + 0.5 : src.order || 0, createdAt: Date.now(),
       assignedBy: "", assignedAt: 0, private: !!src.private,
     });
@@ -1436,6 +1446,7 @@ function renderTask(t, depth) {
     const cls = archived ? "" : status !== "done" && t.due < today ? " over" : status !== "done" && t.due === today ? " today" : "";
     meta.append(h("span", { class: "date" + cls }, (cls === " over" ? "Overdue · " : cls === " today" ? "Today · " : "Due ") + fmtDue(t.due, t.dueTime)));
   }
+  if (t.dueTime && t.remindBefore && status !== "done" && !archived) meta.append(h("span", {}, "Remind " + remindList(t.remindBefore).map(([, , s]) => s).join(", ")));
   if (t.repeat) meta.append(h("span", {}, "↻ " + REPEAT[t.repeat]));
   if (counted.length) {
     const nd = counted.filter((k) => k.status === "done").length;
@@ -1646,7 +1657,7 @@ const thisWeekend = () => [0, 6].includes(new Date().getDay()) ? todayStr() : ad
 const daysUntil = (weekday) => { const n = (weekday - new Date().getDay() + 7) % 7; return n || 7; }; // next one, never today
 async function setDue(t, due) {
   try {
-    await updTask(t.id, { due, ...(!due && t.dueTime ? { dueTime: "" } : {}) }); // a new date keeps the time, so it reminds again
+    await updTask(t.id, { due, ...(!due && t.dueTime ? { dueTime: "", remindBefore: "" } : {}) }); // a new date keeps the time, so it reminds again
     if (due && due > todayStr() && isPinned(t)) await togglePin(t); // postponed: no longer for today
     log(t.id, due ? `postponed it to ${fmtDate(due)}` : "removed the due date");
     toast(due ? `Moved to ${fmtDate(due)}` : "Due date removed");
@@ -1825,7 +1836,7 @@ $("#quick-form").addEventListener("submit", async (e) => {
   const assignee = isPrivate ? "" : p.assignee || mySlot() || ""; // new tasks are yours unless you name someone
   try {
     const id = await addTask({
-      title: p.title, status: "todo", assignee, priority: p.priority, due: p.due || defaultDue(), ...(p.dueTime ? { dueTime: p.dueTime } : {}), repeat: "", parentId: p.parentId, notes: "",
+      title: p.title, status: "todo", assignee, priority: p.priority, due: p.due || defaultDue(), ...(p.dueTime ? { dueTime: p.dueTime, remindBefore: DEFAULT_REMIND } : {}), repeat: "", parentId: p.parentId, notes: "",
       order: now, createdAt: now, private: isPrivate, ...(assignee ? { assignedBy: mySlot() || "", assignedAt: now } : {}),
     });
     if (!isPrivate) log(id, "created it" + (assignee && assignee !== mySlot() ? ` and assigned it to ${assigneeName(assignee)}` : ""), p.title);
@@ -1843,6 +1854,7 @@ $("#quick-more").addEventListener("click", () => {
   $("#f-title").value = p.title;
   $("#f-due").value = p.due || defaultDue();
   $("#f-time").value = p.dueTime || "";
+  edRemind = p.dueTime ? new Set([DEFAULT_REMIND]) : null;
   $("#f-priority").value = p.priority;
   if (!tasks.get(p.parentId)?.private) $("#f-assignee").value = p.assignee || mySlot() || "";
   renderTimeHint();
@@ -2151,6 +2163,7 @@ function openEditor(id, parentId = "", opts = {}) {
   $("#f-priority").value = t.priority || "normal";
   $("#f-due").value = t.due || "";
   $("#f-time").value = t.dueTime || "";
+  edRemind = t.dueTime ? new Set((t.remindBefore || "").split(",").filter(Boolean)) : null;
   $("#f-repeat").replaceChildren(...Object.entries(REPEAT).map(([v, l]) => h("option", { value: v }, l)));
   $("#f-repeat").value = t.repeat || "";
   $("#repeat-hint").hidden = !t.repeat;
@@ -2183,18 +2196,32 @@ function openEditor(id, parentId = "", opts = {}) {
   setTimeout(() => { if (!id) $("#f-title").focus(); }, 30);
 }
 $("#f-repeat").addEventListener("change", (e) => { $("#repeat-hint").hidden = !e.target.value; });
-// Says who the reminder goes to, the same way notify decides it (private: the owner; nobody or both: both of you).
+// The reminders ticked in the editor; null until a time is set, which then starts with the default.
+let edRemind = null;
+const editorRemind = () => REMIND.filter(([m]) => edRemind?.has(m)).map(([m]) => m).join(",");
+function removeEditorTime() { $("#f-time").value = ""; edRemind = null; renderTimeHint(); }
+// The reminder choices, and who they go to, the same way notify decides it (private: the owner; nobody or both: both of you).
 function renderTimeHint() {
-  const el = $("#time-hint"), time = $("#f-time").value, a = $("#f-assignee").value;
+  const el = $("#time-hint"), time = $("#f-time").value, a = $("#f-assignee").value, off = $("#f-time").disabled;
+  $("#remind-field").hidden = editingArea || !dueTimeSupported || !time;
+  if (!$("#remind-field").hidden) $("#f-remind").replaceChildren(...REMIND.map(([m, label]) => h("button", { type: "button", "aria-pressed": String(!!edRemind?.has(m)), disabled: off,
+    onclick: () => { edRemind = edRemind || new Set(); if (!edRemind.delete(m)) edRemind.add(m); renderTimeHint(); } }, label)));
   el.hidden = editingArea || (dueTimeSupported && !time);
   if (el.hidden) return;
   if (!dueTimeSupported) return fill(el, "Reminders at a time of day need the database update: run supabase/migrations/013_reminders.sql in Supabase.");
   const who = $("#f-private").checked || (a && a === mySlot()) ? "you" : a && a !== "both" ? slotName(a) : "both of you";
-  fill(el, `A push reminds ${who} at this time (within about 5 minutes), also during quiet hours. `,
-    !$("#f-time").disabled && h("button", { type: "button", class: "linkish", onclick: () => { $("#f-time").value = ""; renderTimeHint(); } }, "Remove the time"));
+  const chosen = editorRemind(), due = $("#f-due").value;
+  const passed = due ? remindList(chosen).filter(([m]) => new Date(`${due}T${time}`).getTime() - m * 60000 < Date.now()).map(([, l]) => l.toLowerCase()) : [];
+  fill(el, !chosen ? "No reminder. " : `Reminders go to ${who}, up to 5 minutes after each moment. They ring in quiet hours too` + (edRemind.has("1440") ? ", except 24 hours before, which waits for the morning. " : ". "),
+    passed.length ? `Already passed, won't be sent: ${passed.join(", ")}. ` : "",
+    !off && h("button", { type: "button", class: "linkish", onclick: removeEditorTime }, "Remove the time"));
 }
-$("#f-time").addEventListener("input", (e) => { if (e.target.value && !$("#f-due").value) $("#f-due").value = todayStr(); renderTimeHint(); });
-$("#f-due").addEventListener("change", (e) => { if (!e.target.value) { $("#f-time").value = ""; renderTimeHint(); } });
+$("#f-time").addEventListener("input", (e) => {
+  if (e.target.value && !$("#f-due").value) $("#f-due").value = todayStr();
+  if (e.target.value && !edRemind) edRemind = new Set([DEFAULT_REMIND]);
+  renderTimeHint();
+});
+$("#f-due").addEventListener("change", (e) => { if (!e.target.value) removeEditorTime(); else renderTimeHint(); });
 $("#f-assignee").addEventListener("change", renderTimeHint);
 // "Assigned by Sławek on 30 Oct, 10:00 · Wiola saw it 10:42" (the mark only on tasks for the other person).
 function renderAssignedBy(t) {
@@ -2245,7 +2272,7 @@ $("#ed-form").addEventListener("submit", async (e) => {
     assignee: $("#f-assignee").value,
     priority: $("#f-priority").value,
     due: $("#f-due").value,
-    ...(dueTimeSupported ? { dueTime: $("#f-due").value ? $("#f-time").value : "" } : {}),
+    ...(dueTimeSupported ? { dueTime: $("#f-due").value ? $("#f-time").value : "", remindBefore: $("#f-due").value && $("#f-time").value ? editorRemind() : "" } : {}),
     repeat: $("#f-repeat").value,
     parentId: $("#f-parent").value,
     notes: $("#f-notes").value.trim(),
@@ -2310,7 +2337,7 @@ async function saveArea() {
 }
 // A top-level task that is really a theme becomes an area, keeping everything under it; and back.
 const TO_AREA = { kind: "area", status: "todo", assignee: "", assignedBy: "", assignedAt: 0, due: "", repeat: "", priority: "normal" };
-const areaPatch = (id) => ({ ...TO_AREA, ...(tasks.get(id)?.dueTime ? { dueTime: "" } : {}) });
+const areaPatch = (id) => ({ ...TO_AREA, ...(tasks.get(id)?.dueTime ? { dueTime: "", remindBefore: "" } : {}) });
 const newAreaData = (title) => ({ ...TO_AREA, title, notes: "", private: false, parentId: "", order: Date.now(), createdAt: Date.now() });
 async function makeArea(id) {
   const t = tasks.get(id); closePanels();
@@ -3594,7 +3621,7 @@ $("#signout-btn").addEventListener("click", async () => {
 });
 
 // ---- moving data between claude.ai and own hosting ----
-const TASK_FIELDS = ["title", "status", "assignee", "priority", "due", "dueTime", "repeat", "parentId", "notes", "order", "createdAt", "assignedBy", "assignedAt", "archived", "archivedAt", "followUpOf"];
+const TASK_FIELDS = ["title", "status", "assignee", "priority", "due", "dueTime", "remindBefore", "repeat", "parentId", "notes", "order", "createdAt", "assignedBy", "assignedAt", "archived", "archivedAt", "followUpOf"];
 async function exportPrivate() {
   const mine = [...tasks.values()].filter((t) => t.private)
     .map((t) => ({ id: t.id, ...Object.fromEntries(TASK_FIELDS.filter((k) => k in t).map((k) => [k, t[k]])), private: true }));

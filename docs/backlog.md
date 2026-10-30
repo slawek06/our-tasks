@@ -14,9 +14,9 @@ Status: ✅ done · 🔶 partly done · ⬜ open · ➖ dropped. Effort: S (one 
 | ✅ | Briefing language English / Polski | | |
 | 🔶 | Natural-sounding spoken briefings | S | Better, keep tuning wording; optionally premium voices |
 | ⬜ | Siri via Shortcuts: "Our briefing", "Ask Our Tasks" | M | Free, no developer account; private link per person |
-| ⬜ | Editable quiet hours (fixed 22:00-7:00 today) | S | Columns exist in `notify_prefs`. Task reminders ring through them (decided 30 Oct 2026) |
+| ⬜ | Editable quiet hours (fixed 22:00-7:00 today) | S | Columns exist in `notify_prefs`. Task reminders ring through them, except 24 hours before (decided 30 Oct 2026) |
 | ⬜ | Grouped "Wiola added 3 items to Groceries" notification | S | Not chosen yet |
-| 🔶 | Reminders at a time of day (tasks with a time, not just a date) | M | Built on dev 30 Oct 2026 (migration 013, notify updated). Decided 30 Oct 2026: timer every 5 minutes (at most about 5 minutes late); sent during quiet hours too, because someone chose that exact time; a shared task with nobody assigned reminds both; one push at the set time, no "10 minutes before". Private tasks remind only the owner. Time set in the editor or quick add ("at 9:05"); the chat and From text set dates only (could follow) |
+| 🔶 | Reminders at a time of day (tasks with a time, not just a date) | M | Built on dev 30 Oct 2026 (migration 013, notify updated). Decided 30 Oct 2026: the date and time say when the thing happens; reminders are chosen before it: 24 hours, 1 hour, 15 minutes, at the time, several allowed, starting with 1 hour before when a time is set (none ticked = no reminder). Timer every 5 minutes (at most about 5 minutes late). Quiet hours: 24 hours before waits until they end, the others ring anyway. A shared task with nobody assigned reminds both; private tasks only the owner. A moment that has passed isn't sent. Time set in the editor or quick add ("at 9:05"); the chat and From text set dates only (could follow) |
 | ⬜ | Apple Calendar feed (subscribed calendar of due tasks) | M | Read-only, refresh 15 min to hours |
 | ⬜ | Weekly summary e-mail via Gmail | M | Check Supabase mail ports first |
 | ⬜ | Weekly review by Claude ("what's stuck, what to do this weekend") | S | Can reuse the briefing |

@@ -96,7 +96,7 @@ Field names: the app uses camelCase, the database snake_case (`parentId` ↔ `pa
 `pinsSupported` (002), `perListSupported` (003), notifications (004), Ideas (006), `areasSupported` (007),
 checklists (008), `privateListsSupported` (009), seen markers (011: no marks until it runs), `followUpsSupported`
 (012: a next step is a plain new task, without the link, and the form says which file to run), `dueTimeSupported`
-(013: no time field in the editor, which says which file to run; quick add leaves "10:30" in the title). 010 only tightens
+(013, checks `remind_before`: no time field in the editor, which says which file to run; quick add leaves "10:30" in the title). 010 only tightens
 access rules; the app works the same before it.
 
 **Views.** Today · Tasks (Inbox + areas) · Upcoming · Lists (Shopping | Checklists) · Activity · Archive.
@@ -120,11 +120,14 @@ usual), each with `followUpOf` = the closed task, private if that task is privat
 they all wait in the outbox. The editor shows "Follow-up of: …" and "Follow-up: …" (`renderFollowUps`, tap to open), only for
 tasks this person can read.
 
-**Times and reminders.** A task with a date can have a time (`dueTime`, local "HH:MM"): the editor's Time field (a time with no
-date picks today; removing the date removes the time), or quick add ("Dentist tomorrow at 9:05", "o 10:30"). Rows show
-"Today · 30 Oct · 10:30"; within a day, tasks with a time come first, earliest first (`byTime`). Moving the date keeps
-the time; a repeating task's next copy keeps it too. The editor says who the push goes to (`renderTimeHint`, matching
-`remindWho` in `notify`, see §8). The next-step form, From text and the chat's suggestions set dates only.
+**Times and reminders.** A task with a date can have a time (`dueTime`, local "HH:MM"), when the thing happens: the editor's
+Time field (a time with no date picks today; removing the date removes the time), or quick add ("Dentist tomorrow at 9:05",
+"o 10:30"). Rows show "Today · 30 Oct · 10:30 · Remind 24h, 1h"; within a day, tasks with a time come first, earliest first
+(`byTime`). With a time the editor offers reminders (`remindBefore`, `REMIND`): 24 hours, 1 hour, 15 minutes before, at the
+time, any number of them; setting a time starts with 1 hour before (`DEFAULT_REMIND`, also for quick add), none ticked = no
+reminder. Moving the date keeps the time and reminders; a repeating task's next copy keeps them too. The editor says who
+gets them and which have already passed (`renderTimeHint`, matching `remindWho` in `notify`, see §8). The next-step form, From
+text and the chat's suggestions set dates only.
 
 **People.** `config` row `people` = `{a, b, aUser, bUser}`: the two names and which account is which. The first person
 is shown blue, the second green (`--p-a`, `--p-b`).
@@ -139,7 +142,7 @@ on the device).
 
 | Table | Purpose | Main columns | Added by |
 |---|---|---|---|
-| `tasks` | Areas, projects and tasks in one tree | `title`, `kind` (`task`/`area`), `status` (`todo`/`doing`/`done`), `assignee` (`''`,`a`,`b`,`both`), `priority`, `due`, `due_time` (local "HH:MM", `''` = none), `repeat`, `parent_id`, `notes`, `sort_order`, `assigned_by`, `assigned_at`, `archived`, `archived_at`, `private`, `owner`, `follow_up_of` (id of the closed task it came out of, `''` = none) | schema, 007 (`kind`), 012 (`follow_up_of`), 013 (`due_time`) |
+| `tasks` | Areas, projects and tasks in one tree | `title`, `kind` (`task`/`area`), `status` (`todo`/`doing`/`done`), `assignee` (`''`,`a`,`b`,`both`), `priority`, `due`, `due_time` (local "HH:MM", `''` = none), `remind_before` (minutes before, comma separated, from 1440, 60, 15, 0; `''` = no reminder), `repeat`, `parent_id`, `notes`, `sort_order`, `assigned_by`, `assigned_at`, `archived`, `archived_at`, `private`, `owner`, `follow_up_of` (id of the closed task it came out of, `''` = none) | schema, 007 (`kind`), 012 (`follow_up_of`), 013 (`due_time`, `remind_before`) |
 | `comments` | Comments on tasks | `task_id`, `text`, `author`, `by_user`, `at` | schema |
 | `history` | Change log (Activity, task history) | `task_id`, `text`, `title`, `author`, `at` | schema |
 | `lists` | Shopping lists (Groceries exists without a row) | `name`, `sort_order`, `private`, `owner` | schema, 009 |
@@ -152,7 +155,7 @@ on the device).
 | `notify_prefs` | Notification settings per person | `lang`, `tz`, `morning`, `evening`, `quiet_from/to`, `on_assigned/comment/closed`, `morning_sent`, `evening_sent` | 004, 005 |
 | `briefings` | Briefings and chat messages | `user_id`, `kind`, `role`, `text`, `actions` (json), `applied` | 004 |
 | `push_config` | Server only: VAPID keys, timer password | `vapid`, `cron_secret` | 004 |
-| `reminders_sent` | Server only: each reminder that went out, so it goes out once | `id` (`<user>:<task>:<date> <time>`), `user_id`, `task_id` (deleted with the task), `at` | 013 |
+| `reminders_sent` | Server only: each reminder that went out, so it goes out once | `id` (`<user>:<task>:<date> <time>:<minutes before>`), `user_id`, `task_id` (deleted with the task), `at` | 013 |
 | `ideas` | Feedback inbox | `text`, `kind` (`idea`/`problem`), `author`, `by_user`, `at`, `moved` | 006 |
 | `checklists` | Templates, lists, standing lists | `title`, `template`, `template_id`, `standing`, `closed`, `closed_at`, `private`, `owner` | 008, 009 |
 | `checklist_items` | Checklist items and headings | `checklist_id`, `text`, `heading`, `done`, `done_by`, `done_at`, `added_by`, `sort_order` | 008, 009 |
@@ -214,12 +217,14 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 - On iPhone, push works only in the home-screen app (iOS 16.4+).
 - Briefings: morning (default 07:30) and evening (20:00) per person, in English or Polish, friendly and short,
   written to sound natural when read aloud. Quiet hours 22:00–07:00 for instant notifications.
-- Reminders (decided 30 Oct 2026): one push at a task's date and time, on the person's own clock (`tz`), at most about 5
-  minutes late. Goes to the owner of a private task; on a shared task to the assignee, and to both when it's set to both or
-  nobody is assigned. Sent during quiet hours too, because someone chose that exact time; the Assigned/Comments/Closed
-  switches don't apply. Closed, archived and area rows never send. Each goes out once: writing its `reminders_sent` row
-  decides that, so overlapping timers can't double-send; a new date or time is a new id, so a new reminder. If no device
-  takes it the row is removed and the next tick tries again. More than 60 minutes late (timer down, or a time set in the past) it is skipped.
+- Reminders (decided 30 Oct 2026): pushes the chosen time before a task's date and time (24 hours, 1 hour, 15 minutes, at the
+  time; several allowed), on the person's own clock (`tz`), at most about 5 minutes late. Titled "In 1 hour · 10:30". Goes to the
+  owner of a private task; on a shared task to the assignee, and to both when it's set to both or nobody is assigned.
+  Quiet hours: 24 hours before waits until they end (the event is still far off); the others ring anyway, so a 6:15 train
+  still gets its reminder. The Assigned/Comments/Closed switches don't apply. Closed, archived and area rows never send.
+  Each goes out once: writing its `reminders_sent` row decides that, so overlapping timers can't double-send; a new date or
+  time is a new id, so it's recalculated. If no device takes it the row is removed and the next tick tries again. A moment
+  more than 10 minutes past (`REMINDER_LATE_MIN`, two timer runs: time set too late, timer down) is skipped.
 - Timer: `pg_cron` job `our-tasks-notify`, `*/5 * * * *` (changed from every 15 minutes by 013, which alters only the
   schedule, so it's safe in either project), `net.http_post` to the project's `/functions/v1/notify`. Briefings don't go out
   twice: `morning_sent` / `evening_sent` are set to today's date before each is written.
@@ -245,7 +250,7 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 | 010 private comments and history, private list items fix | ✅ 29 Oct 2026, privacy check all PASS | ✅ privacy check all PASS (26 Oct 2026) |
 | 011 seen markers | ⬜ next release | ✅ privacy check all PASS (30 Oct 2026) |
 | 012 follow-ups (Done + next step) | ⬜ next release | ✅ 30 Oct 2026 |
-| 013 reminders (due time, sent records, 5-minute timer) | ⬜ next release | ⬜ to run |
+| 013 reminders (due time, reminder choices, sent records, 5-minute timer) | ⬜ next release | ⬜ to run |
 
 ## 10. Configuration reference
 
