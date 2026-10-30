@@ -267,6 +267,7 @@ body.shop-mode .fab { display: none; }
 .field input[type=time] { -webkit-appearance: none; appearance: none; display: block; box-sizing: border-box; border: 1px solid var(--line);
   background: var(--bg); border-radius: 9px; padding: 9px 11px; width: 100%; min-width: 0; min-height: 42px; text-align: left; }
 .two > .field { min-width: 0; }
+.hint .linkish { border: 0; background: none; padding: 0; color: var(--accent); font: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
 /* Checkbox rows inside a field are normal text, not field labels. */
 .field > label.check { text-transform: none; letter-spacing: 0; font-size: 14px; font-weight: 400; color: var(--ink); }
 .brief-list { gap: 10px; flex: 1; min-height: 0; }
@@ -465,8 +466,10 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
       <p class="hint" id="assigned-by" hidden></p>
       <div class="two task-only">
         <div class="field"><label for="f-due">Due date</label><input type="date" id="f-due"></div>
-        <div class="field"><label for="f-repeat">Repeats</label><select id="f-repeat"></select></div>
+        <div class="field" id="time-field"><label for="f-time">Time</label><input type="time" id="f-time"></div>
       </div>
+      <p class="hint" id="time-hint" hidden></p>
+      <div class="field task-only"><label for="f-repeat">Repeats</label><select id="f-repeat"></select></div>
       <p class="hint" id="repeat-hint" hidden>When you close it, the next one is created with the due date moved forward.</p>
       <div class="field task-only"><label for="f-parent">Belongs under</label><select id="f-parent"></select></div>
       <div class="field"><label for="f-notes">Notes</label><textarea id="f-notes" maxlength="5000"></textarea></div>
@@ -713,7 +716,7 @@ let byParent = new Map(), byParentAll = new Map(), commentsBy = new Map();
 let editingId = null;
 let view = (() => { try { return localStorage.getItem("view") || "today"; } catch { return "today"; } })();
 let searchMode = false, searchSnippets = new Map(), flashId = null;
-let todayPins = {}, pinsSupported = true, perListSupported = true, areasSupported = true, privateListsSupported = true, followUpsSupported = true, editingArea = false;
+let todayPins = {}, pinsSupported = true, perListSupported = true, areasSupported = true, privateListsSupported = true, followUpsSupported = true, dueTimeSupported = true, editingArea = false;
 // New tasks are due tomorrow unless you pick another date (or clear it).
 const defaultDue = () => addDays(todayStr(), 1);
 const filter = { who: "all", hideDone: false, q: "" };
@@ -1003,6 +1006,8 @@ const store = {
     sb.client.from("tasks").select("kind").limit(1).then(({ error }) => { areasSupported = !error || isNetworkError(error); render(); });
     // The "Follow-up of" link needs supabase/migrations/012_follow_ups.sql; until then a next step is a plain new task.
     sb.client.from("tasks").select("follow_up_of").limit(1).then(({ error }) => { followUpsSupported = !error || isNetworkError(error); });
+    // Reminders at a time of day need supabase/migrations/013_reminders.sql; until then the editor has no time field and says so.
+    sb.client.from("tasks").select("due_time").limit(1).then(({ error }) => { dueTimeSupported = !error || isNetworkError(error); });
     // Per-list frequent items need supabase/migrations/003_catalog_per_list.sql; until then Frequent is shared.
     sb.client.from("catalog").select("list_counts").limit(1).then(({ error }) => { perListSupported = !error || isNetworkError(error); if (view === "shopping") renderChips(); });
   },
@@ -1253,6 +1258,7 @@ const FIELD_LOG = {
   status: (v) => `changed the status to ${STATUS[v]}`,
   assignee: (v) => v ? `assigned it to ${assigneeName(v)}` : "removed the assignee",
   due: (v) => v ? `set the due date to ${fmtDate(v)}` : "removed the due date",
+  dueTime: (v) => v ? `set the time to ${v}` : "removed the time",
   priority: (v) => `set the priority to ${PRIORITY[v]}`,
   repeat: (v) => v ? `set it to repeat ${REPEAT[v].toLowerCase()}` : "stopped it repeating",
   parentId: (v) => v ? `moved it under “${tasks.get(v)?.title || "another task"}”` : "moved it to the top level",
@@ -1295,7 +1301,7 @@ const inboxTasks = () => childrenOf("").filter((t) => !isArea(t));
 function pathOf(t) { const names = []; for (let p = tasks.get(t.parentId); p; p = tasks.get(p.parentId)) names.unshift(p.title || "Untitled"); return names.join(" › "); }
 function sortTasks(arr) {
   const a = [...arr], byOrder = (x, y) => (x.order || 0) - (y.order || 0);
-  if (sortMode === "due") a.sort((x, y) => (x.due || "9999").localeCompare(y.due || "9999") || byOrder(x, y));
+  if (sortMode === "due") a.sort((x, y) => (x.due || "9999").localeCompare(y.due || "9999") || byTime(x, y) || byOrder(x, y));
   else if (sortMode === "priority") a.sort((x, y) => (PRIO_RANK[x.priority] ?? 1) - (PRIO_RANK[y.priority] ?? 1) || byOrder(x, y));
   return a;
 }
@@ -1319,6 +1325,9 @@ function fmtDate(s) {
   if (dt.getFullYear() !== new Date().getFullYear()) opts.year = "numeric";
   return dt.toLocaleDateString(undefined, opts);
 }
+const fmtDue = (due, time) => fmtDate(due) + (time ? " · " + time : "");
+// Within a day: tasks with a time first, earliest first.
+const byTime = (x, y) => (x.dueTime || "99").localeCompare(y.dueTime || "99");
 const fmtStamp = (ms) => new Date(ms).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 // ---- recurring tasks: closing one creates the next, with its subtasks ----
@@ -1333,6 +1342,7 @@ async function spawnNext(t) {
     const id = await addTask({
       title: src.title, status: "todo", assignee: src.assignee || "", priority: src.priority || "normal", notes: src.notes || "", parentId,
       due: isRoot ? due : src.due && shift != null ? addDays(src.due, shift) : "",
+      ...(src.dueTime ? { dueTime: src.dueTime } : {}),
       repeat: isRoot ? src.repeat : "", order: isRoot ? (src.order || 0) + 0.5 : src.order || 0, createdAt: Date.now(),
       assignedBy: "", assignedAt: 0, private: !!src.private,
     });
@@ -1424,7 +1434,7 @@ function renderTask(t, depth) {
   if (t.assignee) meta.append(h("span", { class: "chip " + pc(t.assignee) }, assigneeName(t.assignee)));
   if (t.due) {
     const cls = archived ? "" : status !== "done" && t.due < today ? " over" : status !== "done" && t.due === today ? " today" : "";
-    meta.append(h("span", { class: "date" + cls }, (cls === " over" ? "Overdue · " : cls === " today" ? "Today · " : "Due ") + fmtDate(t.due)));
+    meta.append(h("span", { class: "date" + cls }, (cls === " over" ? "Overdue · " : cls === " today" ? "Today · " : "Due ") + fmtDue(t.due, t.dueTime)));
   }
   if (t.repeat) meta.append(h("span", {}, "↻ " + REPEAT[t.repeat]));
   if (counted.length) {
@@ -1537,7 +1547,7 @@ function render() {
   if (view === "upcoming") {
     const today = todayStr(), week = addDays(today, 7);
     const dated = [...tasks.values()].filter((t) => !t.archived && t.status !== "done" && t.due);
-    const items = dated.filter(matches).sort((x, y) => x.due.localeCompare(y.due) || (PRIO_RANK[x.priority] ?? 1) - (PRIO_RANK[y.priority] ?? 1));
+    const items = dated.filter(matches).sort((x, y) => x.due.localeCompare(y.due) || byTime(x, y) || (PRIO_RANK[x.priority] ?? 1) - (PRIO_RANK[y.priority] ?? 1));
     const groups = [["Overdue", (t) => t.due < today, true], ["Today", (t) => t.due === today], ["Next 7 days", (t) => t.due > today && t.due <= week], ["Later", (t) => t.due > week]];
     if (!dated.length) list.replaceChildren(h("div", { class: "empty" }, h("strong", {}, "Nothing due"),
       h("span", {}, "Open tasks with a due date show up here, soonest first, wherever they sit in the hierarchy.")));
@@ -1584,7 +1594,7 @@ function todayLists() {
   const me = mySlot(), today = todayStr();
   const open = [...tasks.values()].filter((t) => !t.archived && t.status !== "done");
   const forMe = (t) => !me || t.private || isMine(t, me);
-  const byDue = (x, y) => (x.due || "").localeCompare(y.due || "") || (PRIO_RANK[x.priority] ?? 1) - (PRIO_RANK[y.priority] ?? 1);
+  const byDue = (x, y) => (x.due || "").localeCompare(y.due || "") || byTime(x, y) || (PRIO_RANK[x.priority] ?? 1) - (PRIO_RANK[y.priority] ?? 1);
   const overdue = open.filter((t) => forMe(t) && t.due && t.due < today).sort(byDue);
   const dueToday = open.filter((t) => forMe(t) && t.due === today).sort(byDue);
   const taken = new Set([...overdue, ...dueToday].map((t) => t.id));
@@ -1636,7 +1646,7 @@ const thisWeekend = () => [0, 6].includes(new Date().getDay()) ? todayStr() : ad
 const daysUntil = (weekday) => { const n = (weekday - new Date().getDay() + 7) % 7; return n || 7; }; // next one, never today
 async function setDue(t, due) {
   try {
-    await updTask(t.id, { due });
+    await updTask(t.id, { due, ...(!due && t.dueTime ? { dueTime: "" } : {}) }); // a new date keeps the time, so it reminds again
     if (due && due > todayStr() && isPinned(t)) await togglePin(t); // postponed: no longer for today
     log(t.id, due ? `postponed it to ${fmtDate(due)}` : "removed the due date");
     toast(due ? `Moved to ${fmtDate(due)}` : "Due date removed");
@@ -1762,6 +1772,8 @@ function parseQuick(text) {
     }],
   ];
   for (const [re, fn] of dateRules) { const d = take(re, fn); if (d) { out.due = d; break; } }
+  // time: "10:30", "at 9:05", "o 10:30"
+  if (dueTimeSupported) out.dueTime = take(new RegExp("(^|\\s)(?:at |o |godz\\.? )?(\\d{1,2}):(\\d{2})" + end), (m) => +m[2] < 24 && +m[3] < 60 ? m[2].padStart(2, "0") + ":" + m[3] : undefined) || "";
   // title = what's left
   let title = "";
   let pos = 0;
@@ -1779,7 +1791,7 @@ function renderQuickPreview() {
   const p = parseQuick($("#quick-input").value), parent = tasks.get(p.parentId);
   const chips = [
     p.title && "“" + p.title + "”",
-    p.title && "Due " + new Date(parseDate(p.due || defaultDue())).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" }) + (p.due ? "" : " (default)"),
+    p.title && "Due " + new Date(parseDate(p.due || defaultDue())).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" }) + (p.dueTime ? " · " + p.dueTime : "") + (p.due ? "" : " (default)"),
     p.assignee && "For " + assigneeName(p.assignee),
     parent && "Under " + (pathOf(parent) ? pathOf(parent) + " › " : "") + parent.title,
     p.priority !== "normal" && PRIORITY[p.priority] + " priority",
@@ -1813,7 +1825,7 @@ $("#quick-form").addEventListener("submit", async (e) => {
   const assignee = isPrivate ? "" : p.assignee || mySlot() || ""; // new tasks are yours unless you name someone
   try {
     const id = await addTask({
-      title: p.title, status: "todo", assignee, priority: p.priority, due: p.due || defaultDue(), repeat: "", parentId: p.parentId, notes: "",
+      title: p.title, status: "todo", assignee, priority: p.priority, due: p.due || defaultDue(), ...(p.dueTime ? { dueTime: p.dueTime } : {}), repeat: "", parentId: p.parentId, notes: "",
       order: now, createdAt: now, private: isPrivate, ...(assignee ? { assignedBy: mySlot() || "", assignedAt: now } : {}),
     });
     if (!isPrivate) log(id, "created it" + (assignee && assignee !== mySlot() ? ` and assigned it to ${assigneeName(assignee)}` : ""), p.title);
@@ -1821,7 +1833,7 @@ $("#quick-form").addEventListener("submit", async (e) => {
     if (p.parentId) { collapsed.delete(p.parentId); saveCollapsed(); }
     $("#quick-input").value = "";
     renderQuickPreview();
-    toast(`Added “${p.title}”, due ${fmtDate(p.due || defaultDue())}.`, { label: "Show", run: () => { closeQuick(); showTask(id); } });
+    toast(`Added “${p.title}”, due ${fmtDue(p.due || defaultDue(), p.dueTime)}.`, { label: "Show", run: () => { closeQuick(); showTask(id); } });
   } catch (err) { writeFailed(err); }
 });
 $("#quick-more").addEventListener("click", () => {
@@ -1830,8 +1842,10 @@ $("#quick-more").addEventListener("click", () => {
   openEditor(null, p.parentId);
   $("#f-title").value = p.title;
   $("#f-due").value = p.due || defaultDue();
+  $("#f-time").value = p.dueTime || "";
   $("#f-priority").value = p.priority;
   if (!tasks.get(p.parentId)?.private) $("#f-assignee").value = p.assignee || mySlot() || "";
+  renderTimeHint();
 });
 // Press N anywhere (not while typing) to quick-add.
 document.addEventListener("keydown", (e) => {
@@ -2136,6 +2150,7 @@ function openEditor(id, parentId = "", opts = {}) {
   asg.value = t.assignee || "";
   $("#f-priority").value = t.priority || "normal";
   $("#f-due").value = t.due || "";
+  $("#f-time").value = t.dueTime || "";
   $("#f-repeat").replaceChildren(...Object.entries(REPEAT).map(([v, l]) => h("option", { value: v }, l)));
   $("#f-repeat").value = t.repeat || "";
   $("#repeat-hint").hidden = !t.repeat;
@@ -2147,6 +2162,8 @@ function openEditor(id, parentId = "", opts = {}) {
   for (const el of $("#editor .fields").querySelectorAll("input, select, textarea")) el.disabled = !canWrite() || !!t.archived;
   applyPrivateUI(!!t.private);
   for (const el of document.querySelectorAll("#editor .task-only")) el.hidden = area;
+  $("#time-field").hidden = !dueTimeSupported;
+  renderTimeHint();
   renderFollowUps(id && !area ? t : null);
   $("#private-label").textContent = area ? "Private: only you can see this area (and everything in it)" : "Private: only you can see it (and its subtasks)";
   $("#extras").hidden = !id || area;
@@ -2166,6 +2183,19 @@ function openEditor(id, parentId = "", opts = {}) {
   setTimeout(() => { if (!id) $("#f-title").focus(); }, 30);
 }
 $("#f-repeat").addEventListener("change", (e) => { $("#repeat-hint").hidden = !e.target.value; });
+// Says who the reminder goes to, the same way notify decides it (private: the owner; nobody or both: both of you).
+function renderTimeHint() {
+  const el = $("#time-hint"), time = $("#f-time").value, a = $("#f-assignee").value;
+  el.hidden = editingArea || (dueTimeSupported && !time);
+  if (el.hidden) return;
+  if (!dueTimeSupported) return fill(el, "Reminders at a time of day need the database update: run supabase/migrations/013_reminders.sql in Supabase.");
+  const who = $("#f-private").checked || (a && a === mySlot()) ? "you" : a && a !== "both" ? slotName(a) : "both of you";
+  fill(el, `A push reminds ${who} at this time (within about 5 minutes), also during quiet hours. `,
+    !$("#f-time").disabled && h("button", { type: "button", class: "linkish", onclick: () => { $("#f-time").value = ""; renderTimeHint(); } }, "Remove the time"));
+}
+$("#f-time").addEventListener("input", (e) => { if (e.target.value && !$("#f-due").value) $("#f-due").value = todayStr(); renderTimeHint(); });
+$("#f-due").addEventListener("change", (e) => { if (!e.target.value) { $("#f-time").value = ""; renderTimeHint(); } });
+$("#f-assignee").addEventListener("change", renderTimeHint);
 // "Assigned by Sławek on 30 Oct, 10:00 · Wiola saw it 10:42" (the mark only on tasks for the other person).
 function renderAssignedBy(t) {
   const ab = $("#assigned-by");
@@ -2202,6 +2232,7 @@ $("#f-private").addEventListener("change", (e) => {
   const t = editingId ? tasks.get(editingId) : { parentId: $("#f-parent").value };
   fillParents(t, editingId, e.target.checked, $("#f-parent").value);
   applyPrivateUI(e.target.checked);
+  renderTimeHint();
 });
 $("#ed-form").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -2214,6 +2245,7 @@ $("#ed-form").addEventListener("submit", async (e) => {
     assignee: $("#f-assignee").value,
     priority: $("#f-priority").value,
     due: $("#f-due").value,
+    ...(dueTimeSupported ? { dueTime: $("#f-due").value ? $("#f-time").value : "" } : {}),
     repeat: $("#f-repeat").value,
     parentId: $("#f-parent").value,
     notes: $("#f-notes").value.trim(),
@@ -2278,11 +2310,12 @@ async function saveArea() {
 }
 // A top-level task that is really a theme becomes an area, keeping everything under it; and back.
 const TO_AREA = { kind: "area", status: "todo", assignee: "", assignedBy: "", assignedAt: 0, due: "", repeat: "", priority: "normal" };
+const areaPatch = (id) => ({ ...TO_AREA, ...(tasks.get(id)?.dueTime ? { dueTime: "" } : {}) });
 const newAreaData = (title) => ({ ...TO_AREA, title, notes: "", private: false, parentId: "", order: Date.now(), createdAt: Date.now() });
 async function makeArea(id) {
   const t = tasks.get(id); closePanels();
   try {
-    await updTask(id, TO_AREA);
+    await updTask(id, areaPatch(id));
     if (!t.private) log(id, "turned it into an area");
     toast(`“${t.title}” is now an area`);
   } catch (err) { writeFailed(err); }
@@ -2751,7 +2784,7 @@ $("#sort-apply").addEventListener("click", async () => {
     const created = new Map();
     for (const [id, to] of choices) {
       const t = tasks.get(id);
-      if (to === "area") { await updTask(id, TO_AREA); if (!t.private) log(id, "turned it into an area"); made++; continue; }
+      if (to === "area") { await updTask(id, areaPatch(id)); if (!t.private) log(id, "turned it into an area"); made++; continue; }
       let areaId = to;
       if (to.startsWith("new:")) {
         const name = to.slice(4);
@@ -3561,7 +3594,7 @@ $("#signout-btn").addEventListener("click", async () => {
 });
 
 // ---- moving data between claude.ai and own hosting ----
-const TASK_FIELDS = ["title", "status", "assignee", "priority", "due", "repeat", "parentId", "notes", "order", "createdAt", "assignedBy", "assignedAt", "archived", "archivedAt", "followUpOf"];
+const TASK_FIELDS = ["title", "status", "assignee", "priority", "due", "dueTime", "repeat", "parentId", "notes", "order", "createdAt", "assignedBy", "assignedAt", "archived", "archivedAt", "followUpOf"];
 async function exportPrivate() {
   const mine = [...tasks.values()].filter((t) => t.private)
     .map((t) => ({ id: t.id, ...Object.fromEntries(TASK_FIELDS.filter((k) => k in t).map((k) => [k, t[k]])), private: true }));

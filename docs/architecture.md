@@ -24,7 +24,7 @@ and in the browser.
  Supabase project ─ Postgres (tables + row level security) ─ Realtime (live changes)
                   ─ Auth (email + password, email code/link; invited people only)
                   ─ Edge Functions:  claude  (Smart add, From text, Sort into areas)
-                                     notify  (push, briefings, chat)  ◄── pg_cron every 15 min
+                                     notify  (push, reminders, briefings, chat)  ◄── pg_cron every 5 min
                   ─ Secrets: ANTHROPIC_API_KEY (+ APP_URL in development)
         │
         ├─> Anthropic API (Claude) ── from the Edge Functions only
@@ -47,7 +47,7 @@ There is no own server: GitHub hosts the files, Supabase holds data, sign-in and
 | Server code | Supabase Edge Functions (Deno, TypeScript) | `claude`, `notify` |
 | AI | Claude API, model `claude-opus-5-5` | Effort `low`, server-side fallback beta; key only in Supabase |
 | Push | Web Push, own implementation (RFC 8291 encryption, RFC 8292 VAPID) on WebCrypto | Keys created on first use, stored in `push_config` |
-| Timer | `pg_cron` + `pg_net` | Calls `notify` with `action: tick` every 15 minutes |
+| Timer | `pg_cron` + `pg_net` | Calls `notify` with `action: tick` every 5 minutes |
 | Hosting | GitHub Pages, published by GitHub Actions | Repository `slawek06/our-tasks` (public) |
 | Mail | Gmail SMTP (app password) in Supabase Auth | Sign-in codes and invitations |
 | Voice | Browser speech synthesis and recognition | Free, on the device |
@@ -68,7 +68,7 @@ There is no own server: GitHub hosts the files, Supabase holds data, sign-in and
 | `supabase/tests/privacy-check.sql` | Paste into the SQL Editor: checks each person sees only what they should (PASS/FAIL), leaves nothing behind |
 | `scripts/make-setup-sql.py <ref>` | Writes `supabase/setup-<ref>.sql`: schema + all migrations + permissions + timer for one project |
 | `supabase/functions/claude/index.ts` | Claude proxy for the app's AI features |
-| `supabase/functions/notify/index.ts` | Push, briefings, briefing chat, timer |
+| `supabase/functions/notify/index.ts` | Push, reminders, briefings, briefing chat, timer |
 | `docs/backlog.md` | Plans, decisions, designs |
 | `docs/architecture.md` | This file |
 | `CLAUDE.md` | Working rules for Claude sessions in this folder |
@@ -95,8 +95,9 @@ Field names: the app uses camelCase, the database snake_case (`parentId` ↔ `pa
 **Feature checks.** Before a migration has run, the matching feature hides itself and says which file to run:
 `pinsSupported` (002), `perListSupported` (003), notifications (004), Ideas (006), `areasSupported` (007),
 checklists (008), `privateListsSupported` (009), seen markers (011: no marks until it runs), `followUpsSupported`
-(012: a next step is a plain new task, without the link, and the form says which file to run). 010 only tightens access
-rules; the app works the same before it.
+(012: a next step is a plain new task, without the link, and the form says which file to run), `dueTimeSupported`
+(013: no time field in the editor, which says which file to run; quick add leaves "10:30" in the title). 010 only tightens
+access rules; the app works the same before it.
 
 **Views.** Today · Tasks (Inbox + areas) · Upcoming · Lists (Shopping | Checklists) · Activity · Archive.
 Panels: task editor, People (names, password, notifications, data), Briefing, From text, Ideas, Sort into areas,
@@ -119,6 +120,12 @@ usual), each with `followUpOf` = the closed task, private if that task is privat
 they all wait in the outbox. The editor shows "Follow-up of: …" and "Follow-up: …" (`renderFollowUps`, tap to open), only for
 tasks this person can read.
 
+**Times and reminders.** A task with a date can have a time (`dueTime`, local "HH:MM"): the editor's Time field (a time with no
+date picks today; removing the date removes the time), or quick add ("Dentist tomorrow at 9:05", "o 10:30"). Rows show
+"Today · 30 Oct · 10:30"; within a day, tasks with a time come first, earliest first (`byTime`). Moving the date keeps
+the time; a repeating task's next copy keeps it too. The editor says who the push goes to (`renderTimeHint`, matching
+`remindWho` in `notify`, see §8). The next-step form, From text and the chat's suggestions set dates only.
+
 **People.** `config` row `people` = `{a, b, aUser, bUser}`: the two names and which account is which. The first person
 is shown blue, the second green (`--p-a`, `--p-b`).
 
@@ -132,7 +139,7 @@ on the device).
 
 | Table | Purpose | Main columns | Added by |
 |---|---|---|---|
-| `tasks` | Areas, projects and tasks in one tree | `title`, `kind` (`task`/`area`), `status` (`todo`/`doing`/`done`), `assignee` (`''`,`a`,`b`,`both`), `priority`, `due`, `repeat`, `parent_id`, `notes`, `sort_order`, `assigned_by`, `assigned_at`, `archived`, `archived_at`, `private`, `owner`, `follow_up_of` (id of the closed task it came out of, `''` = none) | schema, 007 (`kind`), 012 (`follow_up_of`) |
+| `tasks` | Areas, projects and tasks in one tree | `title`, `kind` (`task`/`area`), `status` (`todo`/`doing`/`done`), `assignee` (`''`,`a`,`b`,`both`), `priority`, `due`, `due_time` (local "HH:MM", `''` = none), `repeat`, `parent_id`, `notes`, `sort_order`, `assigned_by`, `assigned_at`, `archived`, `archived_at`, `private`, `owner`, `follow_up_of` (id of the closed task it came out of, `''` = none) | schema, 007 (`kind`), 012 (`follow_up_of`), 013 (`due_time`) |
 | `comments` | Comments on tasks | `task_id`, `text`, `author`, `by_user`, `at` | schema |
 | `history` | Change log (Activity, task history) | `task_id`, `text`, `title`, `author`, `at` | schema |
 | `lists` | Shopping lists (Groceries exists without a row) | `name`, `sort_order`, `private`, `owner` | schema, 009 |
@@ -145,6 +152,7 @@ on the device).
 | `notify_prefs` | Notification settings per person | `lang`, `tz`, `morning`, `evening`, `quiet_from/to`, `on_assigned/comment/closed`, `morning_sent`, `evening_sent` | 004, 005 |
 | `briefings` | Briefings and chat messages | `user_id`, `kind`, `role`, `text`, `actions` (json), `applied` | 004 |
 | `push_config` | Server only: VAPID keys, timer password | `vapid`, `cron_secret` | 004 |
+| `reminders_sent` | Server only: each reminder that went out, so it goes out once | `id` (`<user>:<task>:<date> <time>`), `user_id`, `task_id` (deleted with the task), `at` | 013 |
 | `ideas` | Feedback inbox | `text`, `kind` (`idea`/`problem`), `author`, `by_user`, `at`, `moved` | 006 |
 | `checklists` | Templates, lists, standing lists | `title`, `template`, `template_id`, `standing`, `closed`, `closed_at`, `private`, `owner` | 008, 009 |
 | `checklist_items` | Checklist items and headings | `checklist_id`, `text`, `heading`, `done`, `done_by`, `done_at`, `added_by`, `sort_order` | 008, 009 |
@@ -173,7 +181,8 @@ on the device).
 - `seen_marks` (011): everyone writes only their own rows (the id must match what they mark); both read them, except
   marks on the other person's private task.
 - `user_state`, `push_subscriptions`, `notify_prefs`, `briefings`: own rows only.
-- `push_config`: no rules at all, so only the server functions (service role) can read it.
+- `push_config`, `reminders_sent`: no rules at all, so only the server functions (service role) can read them.
+  `reminders_sent` also has its permissions revoked for `anon` and `authenticated`, and the privacy check tests it.
 - New projects created with "Automatically expose new tables" off need explicit `grant`s; `make-setup-sql.py` adds them.
 - Realtime publication `supabase_realtime` includes the shared tables.
 
@@ -195,7 +204,8 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
   shopping, standing-list topics and recent activity (never the other person's private items); proposed changes come
   back as `actions` that the app applies only after confirmation
 - Errors answer `server_error` without details; the reason goes to the function's logs.
-- `tick`: called by the timer with header `x-cron-secret` (from `push_config`); sends due morning/evening briefings
+- `tick`: called by the timer with header `x-cron-secret` (from `push_config`); sends due reminders, then due
+  morning/evening briefings
 - `APP_URL` (secret, optional): address opened from notifications; defaults to production
 
 ## 8. Notifications and briefings
@@ -204,7 +214,15 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 - On iPhone, push works only in the home-screen app (iOS 16.4+).
 - Briefings: morning (default 07:30) and evening (20:00) per person, in English or Polish, friendly and short,
   written to sound natural when read aloud. Quiet hours 22:00–07:00 for instant notifications.
-- Timer: `pg_cron` job `our-tasks-notify`, `*/15 * * * *`, `net.http_post` to the project's `/functions/v1/notify`.
+- Reminders (decided 30 Oct 2026): one push at a task's date and time, on the person's own clock (`tz`), at most about 5
+  minutes late. Goes to the owner of a private task; on a shared task to the assignee, and to both when it's set to both or
+  nobody is assigned. Sent during quiet hours too, because someone chose that exact time; the Assigned/Comments/Closed
+  switches don't apply. Closed, archived and area rows never send. Each goes out once: writing its `reminders_sent` row
+  decides that, so overlapping timers can't double-send; a new date or time is a new id, so a new reminder. If no device
+  takes it the row is removed and the next tick tries again. More than 60 minutes late (timer down, or a time set in the past) it is skipped.
+- Timer: `pg_cron` job `our-tasks-notify`, `*/5 * * * *` (changed from every 15 minutes by 013, which alters only the
+  schedule, so it's safe in either project), `net.http_post` to the project's `/functions/v1/notify`. Briefings don't go out
+  twice: `morning_sent` / `evening_sent` are set to today's date before each is written.
 
 ## 9. Environments
 
@@ -227,6 +245,7 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 | 010 private comments and history, private list items fix | ✅ 29 Oct 2026, privacy check all PASS | ✅ privacy check all PASS (26 Oct 2026) |
 | 011 seen markers | ⬜ next release | ✅ privacy check all PASS (30 Oct 2026) |
 | 012 follow-ups (Done + next step) | ⬜ next release | ✅ 30 Oct 2026 |
+| 013 reminders (due time, sent records, 5-minute timer) | ⬜ next release | ⬜ to run |
 
 ## 10. Configuration reference
 
@@ -245,7 +264,7 @@ Secrets are never stored in this repository or sent in chats. They live only whe
 | Magic Link template | Auth → Emails → Templates | `<h2>Sign in to Our Tasks</h2><p>Your code: <strong>{{ .Token }}</strong></p><p>Or open this link: <a href="{{ .ConfirmationURL }}">Sign in</a></p>` |
 | Users | Auth → Users → Invite user | The two people |
 | Function settings | Edge Functions → each function | Name `claude` / `notify` (set the name before the first deploy); Verify JWT off |
-| Timer | Created by migration 004 / setup file | Job `our-tasks-notify` |
+| Timer | Created by migration 004 / setup file; every 5 minutes since 013 | Job `our-tasks-notify` |
 | GitHub Pages | Repo → Settings → Pages | Source: **GitHub Actions** |
 | Deployment branches | Repo → Settings → Environments → github-pages | `main` and `dev` allowed |
 | Git identity | Repo-local git config | Author `slawek06`, email `89165628+slawek06@users.noreply.github.com` (no real name or email on GitHub) |

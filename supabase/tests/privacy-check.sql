@@ -1,7 +1,7 @@
 -- Privacy check: can each person see only what they should?
 -- Run any time: Supabase dashboard > SQL Editor > New query > paste this whole file > Run.
 -- It adds a few test rows, looks at them as each of the two people, then undoes everything, so nothing is left.
--- The result is a table with PASS or FAIL per line. Needs migrations 009, 010 and 011.
+-- The result is a table with PASS or FAIL per line. Needs migrations 009, 010, 011 and 013.
 --
 -- "A" is the person who owns the private test task and list (the first account), "B" is the other person.
 -- Works with a single account, so also in a development project with only one user.
@@ -50,6 +50,26 @@ begin
   return ok;
 end $$;
 
+-- Tries to read or add reminder records, which only the server may touch (as the given person).
+create or replace function pg_temp.can_touch_reminders(uid uuid, tid text) returns boolean language plpgsql as $$
+declare ok boolean := false; n int;
+begin
+  perform set_config('request.jwt.claims', json_build_object('sub', uid, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  begin
+    select count(*) into n from public.reminders_sent;
+    ok := n > 0;
+  exception when others then null;
+  end;
+  begin
+    insert into public.reminders_sent (id, user_id, task_id) values ('privacy-check-r2-' || uid, uid, tid);
+    ok := true;
+  exception when others then null;
+  end;
+  execute 'reset role';
+  return ok;
+end $$;
+
 do $$
 declare
   ua uuid; ub uuid; res jsonb := '[]';
@@ -90,6 +110,7 @@ begin
     insert into public.seen_marks (id, user_id, task_id, kind, ref) values
       ('privacy-check-m1', ua, 'privacy-check-t1', 'comment', 'privacy-check-c1'),
       ('privacy-check-m2', ua, 'privacy-check-t2', 'comment', 'privacy-check-c2');
+    insert into public.reminders_sent (id, user_id, task_id) values ('privacy-check-r1', ua, 'privacy-check-t2');
 
     for c in select * from jsonb_array_elements(checks) loop
       i := i + 1;
@@ -103,6 +124,12 @@ begin
       'expected', 'no', 'actual', case when got then 'yes' else 'no' end, 'result', case when got then 'FAIL' else 'PASS' end);
     got := pg_temp.can_mark_as(ub, ua, 'privacy-check-t1');
     res := res || jsonb_build_object('n', i + 2, 'who', 'B', 'what', 'can write a seen marker in A''s name',
+      'expected', 'no', 'actual', case when got then 'yes' else 'no' end, 'result', case when got then 'FAIL' else 'PASS' end);
+    got := pg_temp.can_touch_reminders(ua, 'privacy-check-t2');
+    res := res || jsonb_build_object('n', i + 3, 'who', 'A', 'what', 'can read or add reminder records (server only)',
+      'expected', 'no', 'actual', case when got then 'yes' else 'no' end, 'result', case when got then 'FAIL' else 'PASS' end);
+    got := pg_temp.can_touch_reminders(ub, 'privacy-check-t1');
+    res := res || jsonb_build_object('n', i + 4, 'who', 'B', 'what', 'can read or add reminder records (server only)',
       'expected', 'no', 'actual', case when got then 'yes' else 'no' end, 'result', case when got then 'FAIL' else 'PASS' end);
 
     raise exception 'privacy_check_undo'; -- undoes every test row above
