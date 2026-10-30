@@ -530,7 +530,7 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
           <div class="field"><label for="n-morning">Morning briefing</label><input type="time" id="n-morning"></div>
           <div class="field"><label for="n-evening">Evening check</label><input type="time" id="n-evening"></div>
         </div>
-        <label class="check"><input type="checkbox" id="n-assigned"> When a task is assigned to me</label>
+        <label class="check"><input type="checkbox" id="n-assigned"> When a task is assigned to me by name</label>
         <label class="check"><input type="checkbox" id="n-comment"> New comments</label>
         <label class="check"><input type="checkbox" id="n-closed"> When the other person closes a task</label>
         <label class="check" id="n-reminder-wrap"><input type="checkbox" id="n-reminder"> Task reminders</label>
@@ -1114,7 +1114,7 @@ async function setPrivacy(id, makePrivate, rootData) {
       const cur = tasks.get(i);
       if (!cur || (i !== id && !!cur.private === makePrivate)) continue;
       const base = i === id ? (({ private: _p, ...r }) => r)(rootData) : {};
-      await store.update("tasks", i, { ...base, private: makePrivate, ...(makePrivate ? { assignee: "", owner: meId } : {}) });
+      await store.update("tasks", i, { ...base, private: makePrivate, ...(makePrivate ? { assignee: "", owner: meId } : { assignee: rootData.assignee }) });
     }
     return;
   }
@@ -1122,7 +1122,7 @@ async function setPrivacy(id, makePrivate, rootData) {
     const cur = i === id ? { ...tasks.get(i), ...rootData } : tasks.get(i);
     if (!cur || (i !== id && !!cur.private === makePrivate)) continue;
     const { id: _id, private: _p, ...rest } = cur;
-    await store.put(makePrivate ? privColl() : "tasks", i, makePrivate ? { ...rest, private: true, assignee: "" } : rest);
+    await store.put(makePrivate ? privColl() : "tasks", i, makePrivate ? { ...rest, private: true, assignee: "" } : { ...rest, assignee: rootData.assignee });
     await store.remove(makePrivate ? "tasks" : privColl(), i);
   }
 }
@@ -1149,7 +1149,14 @@ const slotName = (s) => s === "a" ? people.a : s === "b" ? people.b : "";
 const pc = (s) => s === "a" || s === "b" ? "p-" + s : s === "both" ? "p-both" : "";
 const assigneeName = (a) => a === "both" ? "Both" : slotName(a);
 const cleanPeople = () => ({ a: people.a, b: people.b, aUser: people.aUser || null, bUser: people.bUser || null });
-const isMine = (t, me = mySlot()) => !!me && (t.assignee === me || t.assignee === "both");
+// Every shared task belongs to someone: a name or Both. Empty on a shared task (offline device, migration 014 not run yet) counts as Both;
+// private tasks and areas have no assignee.
+const assigneeOf = (t) => t && !t.private && !isArea(t) ? t.assignee || "both" : "";
+// A new task under another task takes that task's person; directly under an area or in the Inbox it's Both.
+const inheritedAssignee = (parentId) => assigneeOf(tasks.get(parentId)) || "both";
+const assignedNote = (a) => a && a !== "both" && a !== mySlot() ? ` and assigned it to ${assigneeName(a)}` : "";
+const personOptions = () => [["a", people.a], ["b", people.b], ["both", "Both"]].map(([v, l]) => h("option", { value: v }, l));
+const isMine = (t, me = mySlot()) => { const a = assigneeOf(t); return !!me && (a === me || a === "both"); };
 // "New for you": assigned to you by the other person, and you haven't opened it since.
 const isNew = (t) => { const me = mySlot(); return isMine(t, me) && !t.archived && t.status !== "done" && !!t.assignedBy && t.assignedBy !== me && seen[t.id] !== t.assignedAt; };
 async function markSeen(ids) {
@@ -1261,7 +1268,7 @@ function log(taskId, text, title) { if (tasks.get(taskId)?.private) return; stor
 const FIELD_LOG = {
   title: (v) => `renamed it to “${v}”`,
   status: (v) => `changed the status to ${STATUS[v]}`,
-  assignee: (v) => v ? `assigned it to ${assigneeName(v)}` : "removed the assignee",
+  assignee: (v) => `assigned it to ${assigneeName(v)}`,
   due: (v) => v ? `set the due date to ${fmtDate(v)}` : "removed the due date",
   dueTime: (v) => v ? `set the time to ${v}` : "removed the time",
   remindBefore: (v) => v ? `set a reminder ${remindText(v)}` : "removed the reminder",
@@ -1271,7 +1278,7 @@ const FIELD_LOG = {
   notes: () => "edited the notes",
 };
 function describeChanges(before, data) {
-  const b = { status: "todo", priority: "normal", ...before };
+  const b = { status: "todo", priority: "normal", ...before, assignee: assigneeOf(before) };
   return Object.keys(FIELD_LOG).filter((k) => (b[k] || "") !== (data[k] || "")).map((k) => FIELD_LOG[k](data[k])).join("; ");
 }
 
@@ -1351,7 +1358,7 @@ async function spawnNext(t) {
   const shift = t.due ? Math.round((parseDate(due) - parseDate(t.due)) / 864e5) : null;
   const copy = async (src, parentId, isRoot) => {
     const id = await addTask({
-      title: src.title, status: "todo", assignee: src.assignee || "", priority: src.priority || "normal", notes: src.notes || "", parentId,
+      title: src.title, status: "todo", assignee: assigneeOf(src), priority: src.priority || "normal", notes: src.notes || "", parentId,
       due: isRoot ? due : src.due && shift != null ? addDays(src.due, shift) : "",
       ...(src.dueTime ? { dueTime: src.dueTime, remindBefore: src.remindBefore || "", remindBy: src.remindBy || "" } : {}),
       repeat: isRoot ? src.repeat : "", order: isRoot ? (src.order || 0) + 0.5 : src.order || 0, createdAt: Date.now(),
@@ -1442,7 +1449,7 @@ function renderTask(t, depth) {
   if (status === "doing" && !archived) meta.append(h("span", { class: "chip doing" }, "In progress"));
   if (t.priority === "high") meta.append(h("span", { class: "prio-high" }, "High priority"));
   if (t.priority === "low") meta.append(h("span", { class: "prio-low" }, "Low priority"));
-  if (t.assignee) meta.append(h("span", { class: "chip " + pc(t.assignee) }, assigneeName(t.assignee)));
+  if (assigneeOf(t)) meta.append(h("span", { class: "chip " + pc(assigneeOf(t)) }, assigneeName(assigneeOf(t))));
   if (t.due) {
     const cls = archived ? "" : status !== "done" && t.due < today ? " over" : status !== "done" && t.due === today ? " today" : "";
     meta.append(h("span", { class: "date" + cls }, (cls === " over" ? "Overdue · " : cls === " today" ? "Today · " : "Due ") + fmtDue(t.due, t.dueTime)));
@@ -1612,17 +1619,16 @@ function todayLists() {
   const taken = new Set([...overdue, ...dueToday].map((t) => t.id));
   const pinned = open.filter((t) => isPinned(t) && !taken.has(t.id)).sort(byDue);
   pinned.forEach((t) => taken.add(t.id));
-  const unassigned = me ? open.filter((t) => !t.private && !t.assignee && t.due && t.due <= today && !taken.has(t.id)).sort(byDue) : [];
-  return { overdue, dueToday, pinned, unassigned };
+  return { overdue, dueToday, pinned };
 }
 function renderToday(list) {
-  const { overdue, dueToday, pinned, unassigned } = todayLists();
+  const { overdue, dueToday, pinned } = todayLists();
   const out = [];
   if (!mySlot()) out.push(h("p", { class: "hint", style: "padding: 8px 10px" }, "Showing everyone's tasks. Choose who you are in the blue banner to see just yours."));
-  for (const [label, g, over] of [["Overdue", overdue, true], ["Due today", dueToday], ["My day", pinned], ["Due, but nobody's assigned", unassigned]]) {
+  for (const [label, g, over] of [["Overdue", overdue, true], ["Due today", dueToday], ["My day", pinned]]) {
     if (g.length) out.push(h("div", { class: "group-head" + (over ? " over" : "") }, label, h("span", { class: "n" }, String(g.length))), ...g.map((t) => renderTask(t, 0)));
   }
-  if (!overdue.length && !dueToday.length && !pinned.length && !unassigned.length) out.push(h("div", { class: "empty" },
+  if (!overdue.length && !dueToday.length && !pinned.length) out.push(h("div", { class: "empty" },
     h("strong", {}, "Nothing for today"),
     h("span", {}, "Tasks due today or overdue for you show up here. Add any task to My day with its clock button, or add a new one with +.")));
   list.replaceChildren(...out);
@@ -1804,7 +1810,7 @@ function renderQuickPreview() {
   const chips = [
     p.title && "“" + p.title + "”",
     p.title && "Due " + new Date(parseDate(p.due || defaultDue())).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" }) + (p.dueTime ? " · " + p.dueTime : "") + (p.due ? "" : " (default)"),
-    p.assignee && "For " + assigneeName(p.assignee),
+    (p.assignee || (parent && !parent.private)) && "For " + assigneeName(p.assignee || inheritedAssignee(p.parentId)),
     parent && "Under " + (pathOf(parent) ? pathOf(parent) + " › " : "") + parent.title,
     p.priority !== "normal" && PRIORITY[p.priority] + " priority",
   ].filter(Boolean);
@@ -1834,13 +1840,13 @@ $("#quick-form").addEventListener("submit", async (e) => {
   const p = parseQuick($("#quick-input").value);
   if (!p.title) { $("#quick-input").focus(); return; }
   const parent = tasks.get(p.parentId), now = Date.now(), isPrivate = !!parent?.private;
-  const assignee = isPrivate ? "" : p.assignee || mySlot() || ""; // new tasks are yours unless you name someone
+  const assignee = isPrivate ? "" : p.assignee || inheritedAssignee(p.parentId); // naming someone wins
   try {
     const id = await addTask({
       title: p.title, status: "todo", assignee, priority: p.priority, due: p.due || defaultDue(), ...(p.dueTime ? { dueTime: p.dueTime, remindBefore: DEFAULT_REMIND, remindBy: mySlot() || "" } : {}), repeat: "", parentId: p.parentId, notes: "",
       order: now, createdAt: now, private: isPrivate, ...(assignee ? { assignedBy: mySlot() || "", assignedAt: now } : {}),
     });
-    if (!isPrivate) log(id, "created it" + (assignee && assignee !== mySlot() ? ` and assigned it to ${assigneeName(assignee)}` : ""), p.title);
+    if (!isPrivate) log(id, "created it" + assignedNote(assignee), p.title);
     if (assignee) notifyEvent("assigned", id);
     if (p.parentId) { collapsed.delete(p.parentId); saveCollapsed(); }
     $("#quick-input").value = "";
@@ -1857,7 +1863,7 @@ $("#quick-more").addEventListener("click", () => {
   $("#f-time").value = p.dueTime || "";
   edRemind = p.dueTime ? new Set([DEFAULT_REMIND]) : null;
   $("#f-priority").value = p.priority;
-  if (!tasks.get(p.parentId)?.private) $("#f-assignee").value = p.assignee || mySlot() || "";
+  if (p.assignee && !tasks.get(p.parentId)?.private) { $("#f-assignee").value = p.assignee; edPicked = true; }
   renderTimeHint();
 });
 // Press N anywhere (not while typing) to quick-add.
@@ -2040,8 +2046,8 @@ async function openNextStep(id) {
       const n = rows.length + 1, k = (x) => `ns-${x}-${n}`;
       const title = h("input", { type: "text", id: k("title"), maxlength: "200", enterkeyhint: "done", placeholder: n === 1 ? "e.g. Send Jan the measurements" : null });
       const due = h("input", { type: "date", id: k("due"), value: defaultDue() });
-      const person = h("select", { id: k("person") }, [["", "No one"], ["a", people.a], ["b", people.b], ["both", "Both"]].map(([v, l]) => h("option", { value: v }, l)));
-      person.value = mySlot() || "";
+      const person = h("select", { id: k("person") }, personOptions());
+      person.value = assigneeOf(t) || "both";
       title.addEventListener("input", relabel);
       title.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); save(); } });
       rows.push({ title, due, person });
@@ -2082,7 +2088,7 @@ async function openNextStep(id) {
       order: now + i, createdAt: now + i, private: isPrivate, ...(followUpsSupported ? { followUpOf: id } : {}), ...(s.assignee ? { assignedBy: mySlot() || "", assignedAt: now } : {}),
     })));
     res.steps.forEach((s, i) => {
-      if (!isPrivate) log(newIds[i], `created it as a next step after “${t.title}”` + (s.assignee && s.assignee !== mySlot() ? ` and assigned it to ${assigneeName(s.assignee)}` : ""), s.title);
+      if (!isPrivate) log(newIds[i], `created it as a next step after “${t.title}”` + assignedNote(s.assignee), s.title);
       if (s.assignee) notifyEvent("assigned", newIds[i]);
     });
     if (inParent) { collapsed.delete(inParent); saveCollapsed(); }
@@ -2150,7 +2156,7 @@ function closePanels() {
   editingId = null; editingItem = null; resetFoot(); lastFocus?.focus?.();
 }
 function openEditor(id, parentId = "", opts = {}) {
-  const t = id ? tasks.get(id) : { status: "todo", priority: "normal", assignee: opts.area ? "" : mySlot() || "", repeat: "", parentId, due: opts.area ? "" : defaultDue(), private: !!tasks.get(parentId)?.private };
+  const t = id ? tasks.get(id) : { status: "todo", priority: "normal", assignee: opts.area ? "" : inheritedAssignee(parentId), repeat: "", parentId, due: opts.area ? "" : defaultDue(), private: !!tasks.get(parentId)?.private };
   if (!t) return;
   editingId = id;
   const area = editingArea = id ? isArea(t) : !!opts.area;
@@ -2159,8 +2165,9 @@ function openEditor(id, parentId = "", opts = {}) {
   $("#f-title").value = t.title || "";
   for (const s of Object.keys(STATUS)) { $("#s-" + s).checked = (t.status || "todo") === s; $("label[for=s-" + s + "]").replaceChildren(svg(ICON[s], 16), h("span", {}, STATUS[s])); }
   const asg = $("#f-assignee");
-  asg.replaceChildren(...[["", "No one"], ["a", people.a], ["b", people.b], ["both", "Both"]].map(([v, l]) => h("option", { value: v }, l)));
-  asg.value = t.assignee || "";
+  asg.replaceChildren(...personOptions());
+  asg.value = t.assignee || "both";
+  edPicked = false;
   $("#f-priority").value = t.priority || "normal";
   $("#f-due").value = t.due || "";
   $("#f-time").value = t.dueTime || "";
@@ -2201,7 +2208,7 @@ $("#f-repeat").addEventListener("change", (e) => { $("#repeat-hint").hidden = !e
 let edRemind = null;
 const editorRemind = () => REMIND.filter(([m]) => edRemind?.has(m)).map(([m]) => m).join(",");
 function removeEditorTime() { $("#f-time").value = ""; edRemind = null; renderTimeHint(); }
-// The reminder choices, and who they go to, the same way notify decides it (private: the owner; nobody or both: both of you).
+// The reminder choices, and who they go to, the same way notify decides it (private: the owner; both: both of you).
 function renderTimeHint() {
   const el = $("#time-hint"), time = $("#f-time").value, a = $("#f-assignee").value, off = $("#f-time").disabled;
   $("#remind-field").hidden = editingArea || !dueTimeSupported || !time;
@@ -2224,7 +2231,14 @@ $("#f-time").addEventListener("input", (e) => {
   renderTimeHint();
 });
 $("#f-due").addEventListener("change", (e) => { if (!e.target.value) removeEditorTime(); else renderTimeHint(); });
-$("#f-assignee").addEventListener("change", renderTimeHint);
+// On a new task the person follows "Belongs under" until you pick someone yourself.
+let edPicked = false;
+$("#f-assignee").addEventListener("change", () => { edPicked = true; renderTimeHint(); });
+$("#f-parent").addEventListener("change", (e) => {
+  if (editingId || editingArea || edPicked) return;
+  $("#f-assignee").value = inheritedAssignee(e.target.value);
+  renderTimeHint();
+});
 // "Assigned by Sławek on 30 Oct, 10:00 · Wiola saw it 10:42" (the mark only on tasks for the other person).
 function renderAssignedBy(t) {
   const ab = $("#assigned-by");
@@ -2287,7 +2301,7 @@ $("#ed-form").addEventListener("submit", async (e) => {
   else { let p = data.parentId; while (p && tasks.get(p)?.private) p = tasks.get(p).parentId || ""; data.parentId = p; }
   // Who set the reminders decides who they can wake at night (see notify).
   if (data.dueTime && (data.due !== before?.due || data.dueTime !== before?.dueTime || data.remindBefore !== (before?.remindBefore || ""))) data.remindBy = mySlot() || "";
-  if ((before?.assignee || "") !== data.assignee) Object.assign(data, data.assignee ? { assignedBy: mySlot() || "", assignedAt: Date.now() } : { assignedBy: "", assignedAt: 0 });
+  if (assigneeOf(before) !== data.assignee) Object.assign(data, data.assignee ? { assignedBy: mySlot() || "", assignedAt: Date.now() } : { assignedBy: "", assignedAt: 0 });
   const open = id && data.status === "done" ? openDescendants(id) : [];
   const choice = open.length ? await confirmCascade(data.title, open) : "close";
   if (!choice) { if (wantNext) $("#s-" + (before.status || "todo")).checked = true; return; }
@@ -2304,13 +2318,13 @@ $("#ed-form").addEventListener("submit", async (e) => {
         const { private: _p, ...patch } = data;
         await updTask(id, patch);
       }
-      if ((before.assignee || "") !== data.assignee && data.assignee) notifyEvent("assigned", id);
+      if (assigneeOf(before) !== data.assignee && data.assignee) notifyEvent("assigned", id);
       if (data.status === "done" && before.status !== "done") notifyEvent("closed", id);
       if (changes && !data.private) log(id, changes + (open.length ? ` (and closed ${open.length} subtask${open.length > 1 ? "s" : ""})` : ""), data.title);
     } else {
       const newId = await addTask({ ...data, order: Date.now(), createdAt: Date.now() });
       if (data.assignee) notifyEvent("assigned", newId);
-      if (!data.private) log(newId, "created it" + (data.assignee && data.assignee !== mySlot() ? ` and assigned it to ${assigneeName(data.assignee)}` : ""), data.title);
+      if (!data.private) log(newId, "created it" + assignedNote(data.assignee), data.title);
       toast("Task added");
     }
     if (data.status !== "done") await reopenAncestors(data.parentId);
@@ -2354,7 +2368,7 @@ async function makeArea(id) {
 async function makeTask(id) {
   const t = tasks.get(id); closePanels();
   try {
-    await updTask(id, { kind: "task" });
+    await updTask(id, { kind: "task", ...(t.private ? {} : { assignee: "both" }) });
     if (!t.private) log(id, "turned the area back into a task");
     toast(`“${t.title}” is a task again, in the Inbox`);
   } catch (err) { writeFailed(err); }
@@ -2573,7 +2587,7 @@ function clItemMenu(i, c) {
         !i.heading && act("Make it a task (goes to the Inbox)", async () => {
           try {
             const now = Date.now();
-            const id = await addTask({ title: i.text, status: "todo", assignee: c.private ? "" : mySlot() || "", priority: "normal", due: defaultDue(), repeat: "", parentId: "", notes: `From the checklist “${c.title}”`, order: now, createdAt: now, private: !!c.private });
+            const id = await addTask({ title: i.text, status: "todo", assignee: c.private ? "" : "both", priority: "normal", due: defaultDue(), repeat: "", parentId: "", notes: `From the checklist “${c.title}”`, order: now, createdAt: now, private: !!c.private, ...(c.private ? {} : { assignedBy: mySlot() || "", assignedAt: now }) });
             if (!c.private) log(id, "created it from a checklist", i.text);
             toast(`Added the task “${i.text}”`, { label: "Show", run: () => showTask(id) });
           } catch (err) { writeFailed(err); }
@@ -3254,6 +3268,8 @@ async function suggestTasks() {
         notes: String(t?.notes || "").trim().slice(0, 2000),
       };
     });
+    // Not named in the text: from the task above, the new group counting as sitting where it will go.
+    for (const t of parsedTasks) if (!t.assignee) t.assignee = t.parent === "group" ? inheritedAssignee(group.parent) : parsedTasks[+t.parent.slice(4)].assignee;
     for (const x of Array.isArray(r?.items) ? r.items.slice(0, 60) : []) {
       const text = String(x?.text || "").trim().slice(0, 200);
       if (text) items.push({ on: true, text, list: listIds.includes(x?.list) ? x.list : "groceries", task: "" });
@@ -3294,7 +3310,7 @@ function renderImportPreview() {
         h("input", { type: "text", value: t.title, maxlength: "200", "aria-label": "Task title", oninput: (e) => { t.title = e.target.value; renderImportFoot(); } })),
       h("div", { class: "imp-meta" },
         h("div", { class: "wide" }, select(parentOpts, t.parent, (e) => { t.parent = e.target.value; }, "Belongs under")),
-        select([["", "No one"], ["a", people.a], ["b", people.b], ["both", "Both"]].map(([v, l]) => h("option", { value: v }, l)), t.assignee, (e) => { t.assignee = e.target.value; }, "Assigned to"),
+        select(personOptions(), t.assignee, (e) => { t.assignee = e.target.value; }, "Assigned to"),
         h("input", { type: "date", value: t.due, "aria-label": "Due date", onchange: (e) => { t.due = e.target.value; } })),
       t.notes && h("p", { class: "imp-notes" }, t.notes)));
   });
@@ -3331,16 +3347,16 @@ async function importAdd() {
   let nt = 0, ni = 0;
   try {
     const create = async (fields, key, order) => {
-      const parentId = resolveParent(fields.parent), now = Date.now();
+      const parentId = resolveParent(fields.parent), now = Date.now(), assignee = fields.assignee || inheritedAssignee(parentId);
       const id = await addTask({
-        title: fields.title.trim(), status: "todo", assignee: fields.assignee || "", priority: fields.priority || "normal", due: fields.due || "", repeat: "",
-        parentId, notes: fields.notes || "", order, createdAt: now, ...(fields.assignee ? { assignedBy: mySlot() || "", assignedAt: now } : {}),
+        title: fields.title.trim(), status: "todo", assignee, priority: fields.priority || "normal", due: fields.due || "", repeat: "",
+        parentId, notes: fields.notes || "", order, createdAt: now, assignedBy: mySlot() || "", assignedAt: now,
       });
       ids[key] = id; nt++;
       if (parentId) collapsed.delete(parentId);
       collapsed.delete(id);
-      if (fields.assignee) notifyEvent("assigned", id);
-      log(id, "created it from text" + (fields.assignee ? ` and assigned it to ${assigneeName(fields.assignee)}` : ""), fields.title.trim());
+      notifyEvent("assigned", id);
+      log(id, "created it from text" + assignedNote(assignee), fields.title.trim());
     };
     const base = Date.now();
     if (g?.on && g.title.trim() && data.tasks.some((t) => t.on && t.title.trim())) await create(g, "group", base);
@@ -3873,12 +3889,13 @@ async function executeActions(actions) {
     else if (a.type === "pin_today" && t && !isPinned(t)) await togglePin(t);
     else if (a.type === "assign" && t && !t.private) {
       const now = Date.now();
-      await updTask(t.id, a.assignee ? { assignee: a.assignee, assignedBy: mySlot() || "", assignedAt: now } : { assignee: "", assignedBy: "", assignedAt: 0 });
-      log(t.id, a.assignee ? `assigned it to ${assigneeName(a.assignee)}` : "removed the assignee");
-      if (a.assignee) notifyEvent("assigned", t.id);
+      const assignee = a.assignee || "both";
+      await updTask(t.id, { assignee, assignedBy: mySlot() || "", assignedAt: now });
+      log(t.id, `assigned it to ${assigneeName(assignee)}`);
+      notifyEvent("assigned", t.id);
     } else if (a.type === "add_task" && a.title) {
       const parent = tasks.get(a.parentId), now = Date.now(), isPrivate = !!parent?.private;
-      const assignee = isPrivate || !["a", "b", "both"].includes(a.assignee) ? "" : a.assignee;
+      const assignee = isPrivate ? "" : ["a", "b", "both"].includes(a.assignee) ? a.assignee : inheritedAssignee(a.parentId);
       const id = await addTask({ title: a.title, status: "todo", assignee, priority: "normal", due: /^\d{4}-\d{2}-\d{2}$/.test(a.due) ? a.due : defaultDue(),
         repeat: "", parentId: parent ? parent.id : "", notes: "", order: now, createdAt: now, private: isPrivate, ...(assignee ? { assignedBy: mySlot() || "", assignedAt: now } : {}) });
       if (!isPrivate) log(id, "created it from the briefing chat", a.title);

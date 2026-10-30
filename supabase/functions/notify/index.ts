@@ -159,7 +159,7 @@ async function snapshot(uid: string) {
   const lines = open.slice(0, 250).map((t) => [
     `id=${t.id}`, `"${t.title}"`, t.status === "doing" ? "in progress" : "not started",
     t.due ? `due ${t.due}${t.due_time ? ` at ${t.due_time}` : ""}${t.due < now.date ? " (OVERDUE)" : t.due === now.date ? " (TODAY)" : ""}` : "no due date",
-    t.private ? "private" : t.assignee ? `for ${nameOf(ppl, t.assignee)}` : "unassigned",
+    t.private ? "private" : `for ${nameOf(ppl, t.assignee || "both")}`,
     t.priority !== "normal" ? `${t.priority} priority` : "", path(t) ? `under ${path(t)}` : "", pins[t.id] === now.date ? "in MY DAY" : "",
   ].filter(Boolean).join(" | "));
   // Never another person's private shopping lists or checklists.
@@ -332,8 +332,8 @@ async function chat(uid: string, message: string) {
   const system = `You are the friendly assistant inside "Our Tasks", a shared task and shopping app for ${s.ppl.a} and ${s.ppl.b}. ` +
     `You are chatting with ${s.myName}. Reply conversationally and briefly (usually 1-4 sentences), in the language of ${s.myName}'s last message (${LANGUAGE[s.prefs.lang] || "English"} if unclear). Use task titles as written; never invent tasks. ${SPOKEN_STYLE}\n` +
     `You can PROPOSE changes in "actions"; the app shows them to ${s.myName}, who confirms. Never say a change is done; say you've suggested it.\n` +
-    `Action types (fill unused fields with ""): complete {taskId}; set_due {taskId, due "YYYY-MM-DD" or "" to remove}; assign {taskId, assignee "a"|"b"|"both"|""}; ` +
-    `add_task {title, due, assignee, parentId}; add_item {text like "2 milk", listId}; pin_today {taskId} (adds to MY DAY). ` +
+    `Action types (fill unused fields with ""): complete {taskId}; set_due {taskId, due "YYYY-MM-DD" or "" to remove}; assign {taskId, assignee "a"|"b"|"both"}; ` +
+    `add_task {title, due, assignee ("" unless someone is named; it then follows the task above, or both), parentId}; add_item {text like "2 milk", listId}; pin_today {taskId} (adds to MY DAY). ` +
     `"label" is a short human description, e.g. "Move \\"Dentist\\" to Fri 31 Oct". Only use ids from the data. Propose nothing when ${s.myName} only asks a question.\n` +
     `You can't delete tasks or change private tasks of the other person; say so if asked.\n\nCurrent data:\n${s.text}`;
   const out = await askClaude(system, history, CHAT_SCHEMA);
@@ -342,7 +342,7 @@ async function chat(uid: string, message: string) {
     if (!ACTION_TYPES.includes(a.type) || !a.label) return false;
     if (["complete", "set_due", "assign", "pin_today"].includes(a.type)) {
       if (!s.byId.has(a.taskId)) return false;
-      if (a.type === "assign") return !s.byId.get(a.taskId)?.private && ["a", "b", "both", ""].includes(a.assignee);
+      if (a.type === "assign") return !s.byId.get(a.taskId)?.private && ["a", "b", "both"].includes(a.assignee);
       if (a.type === "set_due") return !a.due || /^\d{4}-\d{2}-\d{2}$/.test(a.due);
       return true;
     }
@@ -411,7 +411,8 @@ Deno.serve(async (req) => {
       const who = nameOf(ppl, sender) || "Someone", url = APP_URL + "?task=" + encodeURIComponent(task.id);
       let message: { title: string; body: string } | null = null;
       const mentioned = body.type === "comment" && mentions(String(body.text ?? ""), nameOf(ppl, otherSlot));
-      if (body.type === "assigned" && p.on_assigned && [otherSlot, "both"].includes(task.assignee))
+      // Only when they're picked by name: a task for both is the default, and shows as new in the app without a push.
+      if (body.type === "assigned" && p.on_assigned && task.assignee === otherSlot)
         message = { title: `${who} assigned you a task`, body: task.title + (task.due ? ` (due ${task.due}${task.due_time ? ` at ${task.due_time}` : ""})` : "") };
       else if (body.type === "comment" && (p.on_comment || mentioned))
         // An @mention reaches them even with the Comments switch off, under its own title (one push, never two).

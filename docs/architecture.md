@@ -129,6 +129,14 @@ reminder. Moving the date keeps the time and reminders; a repeating task's next 
 gets them and which have already passed (`renderTimeHint`, matching `remindWho` in `notify`, see §8). The next-step form, From
 text and the chat's suggestions set dates only.
 
+**Every task has an owner.** A shared task belongs to one person or Both; there is no "No one" any more. A new task is Both, a
+task under another task takes that task's person (`inheritedAssignee`; in the editor it follows "Belongs under" until you pick
+someone), a next step takes the closed task's person, directly under an area or in the Inbox it's Both. Naming or picking someone
+wins. The same goes for quick add, From text (the group inherits from where it goes), the chat's suggestions, checklist "make it a
+task", repeats and an area turned back into a task. Empty on a shared task (an offline device, 014 not run yet) counts as Both
+everywhere (`assigneeOf`) and is filled in on the next save without marking the task as newly assigned. Both shows as new for the
+other person (`isNew`, because `assignedBy` is set) but sends no push (see §7).
+
 **People.** `config` row `people` = `{a, b, aUser, bUser}`: the two names and which account is which. The first person
 is shown blue, the second green (`--p-a`, `--p-b`).
 
@@ -142,7 +150,7 @@ on the device).
 
 | Table | Purpose | Main columns | Added by |
 |---|---|---|---|
-| `tasks` | Areas, projects and tasks in one tree | `title`, `kind` (`task`/`area`), `status` (`todo`/`doing`/`done`), `assignee` (`''`,`a`,`b`,`both`), `priority`, `due`, `due_time` (local "HH:MM", `''` = none), `remind_before` (minutes before, comma separated, from 1440, 60, 15, 0; `''` = no reminder), `remind_by` (who last set them, `a`/`b`), `repeat`, `parent_id`, `notes`, `sort_order`, `assigned_by`, `assigned_at`, `archived`, `archived_at`, `private`, `owner`, `follow_up_of` (id of the closed task it came out of, `''` = none) | schema, 007 (`kind`), 012 (`follow_up_of`), 013 (`due_time`, `remind_before`, `remind_by`) |
+| `tasks` | Areas, projects and tasks in one tree | `title`, `kind` (`task`/`area`), `status` (`todo`/`doing`/`done`), `assignee` (`a`,`b`,`both` on shared tasks; `''` on private tasks and areas), `priority`, `due`, `due_time` (local "HH:MM", `''` = none), `remind_before` (minutes before, comma separated, from 1440, 60, 15, 0; `''` = no reminder), `remind_by` (who last set them, `a`/`b`), `repeat`, `parent_id`, `notes`, `sort_order`, `assigned_by`, `assigned_at`, `archived`, `archived_at`, `private`, `owner`, `follow_up_of` (id of the closed task it came out of, `''` = none) | schema, 007 (`kind`), 012 (`follow_up_of`), 013 (`due_time`, `remind_before`, `remind_by`) |
 | `comments` | Comments on tasks | `task_id`, `text`, `author`, `by_user`, `at` | schema |
 | `history` | Change log (Activity, task history) | `task_id`, `text`, `title`, `author`, `at` | schema |
 | `lists` | Shopping lists (Groceries exists without a row) | `name`, `sort_order`, `private`, `owner` | schema, 009 |
@@ -201,6 +209,8 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 - `vapid`: public push key (keys are created and stored in `push_config` on first use)
 - `test`: push to the caller's devices
 - `event` (`assigned`, `comment`, `closed`): instant push to the other person, respecting their switches and quiet hours.
+  `assigned` pushes only when the task is theirs by name, never for Both. This is the one place that rule lives: the app calls
+  `notifyEvent("assigned", …)` on every assignment and `notify` decides
   A comment with `@<their name>` is a mention: it pushes even with their Comments switch off, titled
   "Sławek mentioned you in …" (one push, never two); quiet hours still apply
 - `brief_now`, `chat`: briefing and conversation, written by Claude from a snapshot of the caller's open tasks,
@@ -219,7 +229,7 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
   written to sound natural when read aloud. Quiet hours 22:00–07:00 for instant notifications.
 - Reminders (decided 30 Oct 2026): pushes the chosen time before a task's date and time (24 hours, 1 hour, 15 minutes, at the
   time; several allowed), on the person's own clock (`tz`), at most about 5 minutes late. Titled "In 1 hour · 10:30". Goes to the
-  owner of a private task; on a shared task to the assignee, and to both when it's set to both or nobody is assigned.
+  owner of a private task; on a shared task to the assignee, and to both when it's set to Both (or still empty).
   Quiet hours: only your own reminder can wake you. A moment in quiet hours waits until they end if it's 24 hours before (the
   event is still far off) or the other person set it (`remind_by`), and is dropped if the event is over by then; a shorter one you
   set yourself, or on your private task, rings anyway, so your 6:15 train still gets its reminder. Each person's Task reminders
@@ -253,6 +263,7 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 | 011 seen markers | ⬜ next release | ✅ privacy check all PASS (30 Oct 2026) |
 | 012 follow-ups (Done + next step) | ⬜ next release | ✅ 30 Oct 2026 |
 | 013 reminders (due time, reminder choices, sent records, 5-minute timer) | ⬜ next release | ⬜ to run |
+| 014 every task has an owner (open shared tasks with nobody assigned become Both) | ⬜ next release | ⬜ to run |
 
 ## 10. Configuration reference
 
