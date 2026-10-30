@@ -113,6 +113,8 @@ comments. You never see your own marks.
 **Mentions.** Typing `@` in a comment offers the other person's name (`#mention-pick`); `@Name` is shown in that
 person's colour (`withMentions`). The push is decided by `notify` (see §7).
 
+**Quick archive.** A closed task's row has an archive button where an open task has its My day button (`askArchive`): one tap with an Undo, and it asks first only if a subtask is still open.
+
 **Done + next step.** Closing a task keeps its one tap; the toast offers "Next step" (`toast` takes a list of actions).
 The editor has "Done + next step" on open tasks and "Add a next step" on closed ones (`askNextStep`: saves the editor as
 usual, closing the task if open, then opens the form). The form (`openNextStep`, in the `#cascade` modal) saves the

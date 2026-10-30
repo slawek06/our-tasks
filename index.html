@@ -260,6 +260,7 @@ body.shop-mode .item .box svg { width: 26px; height: 26px; }
 .signin-card input { border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 11px 12px; font-size: 16px; }
 .signin-card .btn { padding: 11px 14px; font-size: 15px; }
 .day { width: 32px; height: 32px; color: var(--muted); opacity: 0; }
+@media (hover: none) { .quick-archive { opacity: .7; } }
 .row.flash { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); transition: background 1s; }
 .chip.myday { background: var(--accent-soft); border-color: transparent; color: var(--accent); font-weight: 600; }
 .fab { position: fixed; z-index: 15; right: calc(20px + env(safe-area-inset-right, 0px)); bottom: calc(20px + env(safe-area-inset-bottom, 0px));
@@ -782,6 +783,7 @@ const ICON = {
   chevron: '<path d="M7 4.5L11.5 9 7 13.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
   clock: '<circle cx="9" cy="9" r="7" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9 5.3V9l2.6 1.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
   area: '<rect x="2.5" y="4" width="13" height="10.5" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M2.5 7.5h13" stroke="currentColor" stroke-width="1.8"/>',
+  archive: '<rect x="2.5" y="3.5" width="13" height="3.5" rx="1" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.8 7v6a1.5 1.5 0 0 0 1.5 1.5h7.4a1.5 1.5 0 0 0 1.5-1.5V7M7.2 10h3.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
   grip: '<g fill="currentColor"><circle cx="6.5" cy="4.5" r="1.4"/><circle cx="11.5" cy="4.5" r="1.4"/><circle cx="6.5" cy="9" r="1.4"/><circle cx="11.5" cy="9" r="1.4"/><circle cx="6.5" cy="13.5" r="1.4"/><circle cx="11.5" cy="13.5" r="1.4"/></g>',
 };
 
@@ -1523,6 +1525,8 @@ function renderTask(t, depth) {
     h("button", { type: "button", class: "main", onclick: () => openEditor(t.id) }, h("span", { class: "title" }, t.title || "Untitled"), meta),
     canWrite() && !archived && status !== "done"
       ? h("button", { type: "button", class: "day", title: "My day or postpone", "aria-label": "Add to My day or postpone: " + t.title, onclick: () => openDayMenu(t) }, svg(ICON.clock, 17))
+      : canWrite() && !archived
+      ? h("button", { type: "button", class: "day quick-archive", title: "Move to archive", "aria-label": "Move to archive: " + t.title, onclick: () => askArchive(t.id) }, svg(ICON.archive, 17))
       : h("span"),
     canWrite() && !archived && !flat && status !== "done"
       ? h("button", { type: "button", class: "add", title: "Add subtask", "aria-label": "Add subtask under " + t.title, onclick: () => openEditor(null, t.id) }, "+")
