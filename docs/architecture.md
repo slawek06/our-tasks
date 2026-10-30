@@ -96,7 +96,7 @@ Field names: the app uses camelCase, the database snake_case (`parentId` ↔ `pa
 `pinsSupported` (002), `perListSupported` (003), notifications (004), Ideas (006), `areasSupported` (007),
 checklists (008), `privateListsSupported` (009), seen markers (011: no marks until it runs), `followUpsSupported`
 (012: a next step is a plain new task, without the link, and the form says which file to run), `dueTimeSupported`
-(013, checks `remind_before`: no time field in the editor, which says which file to run; quick add leaves "10:30" in the title). 010 only tightens
+(013, checks `remind_by`: no time field in the editor, which says which file to run; quick add leaves "10:30" in the title). 010 only tightens
 access rules; the app works the same before it.
 
 **Views.** Today · Tasks (Inbox + areas) · Upcoming · Lists (Shopping | Checklists) · Activity · Archive.
@@ -124,7 +124,7 @@ tasks this person can read.
 Time field (a time with no date picks today; removing the date removes the time), or quick add ("Dentist tomorrow at 9:05",
 "o 10:30"). Rows show "Today · 30 Oct · 10:30 · Remind 24h, 1h"; within a day, tasks with a time come first, earliest first
 (`byTime`). With a time the editor offers reminders (`remindBefore`, `REMIND`): 24 hours, 1 hour, 15 minutes before, at the
-time, any number of them; setting a time starts with 1 hour before (`DEFAULT_REMIND`, also for quick add), none ticked = no
+time, any number of them; `remindBy` records who last set them (the date, time or reminders changed), and setting a time starts with 1 hour before (`DEFAULT_REMIND`, also for quick add), none ticked = no
 reminder. Moving the date keeps the time and reminders; a repeating task's next copy keeps them too. The editor says who
 gets them and which have already passed (`renderTimeHint`, matching `remindWho` in `notify`, see §8). The next-step form, From
 text and the chat's suggestions set dates only.
@@ -142,7 +142,7 @@ on the device).
 
 | Table | Purpose | Main columns | Added by |
 |---|---|---|---|
-| `tasks` | Areas, projects and tasks in one tree | `title`, `kind` (`task`/`area`), `status` (`todo`/`doing`/`done`), `assignee` (`''`,`a`,`b`,`both`), `priority`, `due`, `due_time` (local "HH:MM", `''` = none), `remind_before` (minutes before, comma separated, from 1440, 60, 15, 0; `''` = no reminder), `repeat`, `parent_id`, `notes`, `sort_order`, `assigned_by`, `assigned_at`, `archived`, `archived_at`, `private`, `owner`, `follow_up_of` (id of the closed task it came out of, `''` = none) | schema, 007 (`kind`), 012 (`follow_up_of`), 013 (`due_time`, `remind_before`) |
+| `tasks` | Areas, projects and tasks in one tree | `title`, `kind` (`task`/`area`), `status` (`todo`/`doing`/`done`), `assignee` (`''`,`a`,`b`,`both`), `priority`, `due`, `due_time` (local "HH:MM", `''` = none), `remind_before` (minutes before, comma separated, from 1440, 60, 15, 0; `''` = no reminder), `remind_by` (who last set them, `a`/`b`), `repeat`, `parent_id`, `notes`, `sort_order`, `assigned_by`, `assigned_at`, `archived`, `archived_at`, `private`, `owner`, `follow_up_of` (id of the closed task it came out of, `''` = none) | schema, 007 (`kind`), 012 (`follow_up_of`), 013 (`due_time`, `remind_before`, `remind_by`) |
 | `comments` | Comments on tasks | `task_id`, `text`, `author`, `by_user`, `at` | schema |
 | `history` | Change log (Activity, task history) | `task_id`, `text`, `title`, `author`, `at` | schema |
 | `lists` | Shopping lists (Groceries exists without a row) | `name`, `sort_order`, `private`, `owner` | schema, 009 |
@@ -152,7 +152,7 @@ on the device).
 | `seen_marks` | "Wiola saw it 10:42": first time a person saw an assignment or comment | `id` (`<user>:<task>:<kind>:<ref>`), `user_id`, `task_id` (deleted with the task), `kind` (`assigned`/`comment`), `ref` (assigned_at or comment id), `at` | 011 |
 | `user_state` | Per person: "new for you" and Activity/Shopping read markers, My day pins | `user_id`, `seen`, `activity_at`, `shopping_at`, `today` | schema, 002 |
 | `push_subscriptions` | Devices that get push | `user_id`, `endpoint`, `p256dh`, `auth`, `device` | 004 |
-| `notify_prefs` | Notification settings per person | `lang`, `tz`, `morning`, `evening`, `quiet_from/to`, `on_assigned/comment/closed`, `morning_sent`, `evening_sent` | 004, 005 |
+| `notify_prefs` | Notification settings per person | `lang`, `tz`, `morning`, `evening`, `quiet_from/to`, `on_assigned/comment/closed`, `on_reminder`, `morning_sent`, `evening_sent` | 004, 005, 013 |
 | `briefings` | Briefings and chat messages | `user_id`, `kind`, `role`, `text`, `actions` (json), `applied` | 004 |
 | `push_config` | Server only: VAPID keys, timer password | `vapid`, `cron_secret` | 004 |
 | `reminders_sent` | Server only: each reminder that went out, so it goes out once | `id` (`<user>:<task>:<date> <time>:<minutes before>`), `user_id`, `task_id` (deleted with the task), `at` | 013 |
@@ -220,8 +220,10 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 - Reminders (decided 30 Oct 2026): pushes the chosen time before a task's date and time (24 hours, 1 hour, 15 minutes, at the
   time; several allowed), on the person's own clock (`tz`), at most about 5 minutes late. Titled "In 1 hour · 10:30". Goes to the
   owner of a private task; on a shared task to the assignee, and to both when it's set to both or nobody is assigned.
-  Quiet hours: 24 hours before waits until they end (the event is still far off); the others ring anyway, so a 6:15 train
-  still gets its reminder. The Assigned/Comments/Closed switches don't apply. Closed, archived and area rows never send.
+  Quiet hours: only your own reminder can wake you. A moment in quiet hours waits until they end if it's 24 hours before (the
+  event is still far off) or the other person set it (`remind_by`), and is dropped if the event is over by then; a shorter one you
+  set yourself, or on your private task, rings anyway, so your 6:15 train still gets its reminder. Each person's Task reminders
+  switch (`on_reminder`, under People) turns theirs off altogether. Closed, archived and area rows never send.
   Each goes out once: writing its `reminders_sent` row decides that, so overlapping timers can't double-send; a new date or
   time is a new id, so it's recalculated. If no device takes it the row is removed and the next tick tries again. A moment
   more than 10 minutes past (`REMINDER_LATE_MIN`, two timer runs: time set too late, timer down) is skipped.

@@ -121,7 +121,7 @@ const mentions = (text: string, name: string) => {
   const n = name.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return !!n && new RegExp(`@${n}(?![\\p{L}\\p{N}])`, "iu").test(text);
 };
-const PREF_DEFAULTS = { lang: "en", tz: "Europe/Warsaw", morning: "07:30", evening: "20:00", quiet_from: "22:00", quiet_to: "07:00", on_assigned: true, on_comment: true, on_closed: true, morning_sent: "", evening_sent: "" };
+const PREF_DEFAULTS = { lang: "en", tz: "Europe/Warsaw", morning: "07:30", evening: "20:00", quiet_from: "22:00", quiet_to: "07:00", on_assigned: true, on_comment: true, on_closed: true, on_reminder: true, morning_sent: "", evening_sent: "" };
 async function prefsOf(uid: string) {
   const { data } = await db.from("notify_prefs").select("*").eq("user_id", uid).maybeSingle();
   return { ...PREF_DEFAULTS, ...(data ?? {}), user_id: uid };
@@ -245,6 +245,11 @@ async function writeBriefing(uid: string, kind: "morning" | "evening") {
 // ---- reminders: pushes a chosen time before a task's date and time ----
 const REMINDER_LATE_MIN = 10; // two timer runs; later than this the moment has passed (time set too late, timer down): skip it
 const REMINDER_OFFSETS = [1440, 60, 15, 0]; // minutes before
+// The clock time that many minutes before a time.
+const clockBefore = (time: string, minutes: number) => {
+  const [h, m] = time.split(":").map(Number), t = (h * 60 + m - minutes + 1440) % 1440;
+  return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+};
 // How many minutes ago the date and time were, on that person's clock (negative = still to come).
 const minutesSince = (due: string, time: string, now: { date: string; time: string }) =>
   (Date.parse(`${now.date}T${now.time}:00Z`) - Date.parse(`${due}T${time}:00Z`)) / 60000;
@@ -254,26 +259,29 @@ const remindWho = (t: { private: boolean; owner: string | null; assignee: string
 async function sendReminders(ppl: Awaited<ReturnType<typeof people>>) {
   const day = (offset: number) => new Date(Date.now() + offset * 864e5).toISOString().slice(0, 10);
   // Fails harmlessly before migration 013 (no column): then there's simply nothing to remind.
-  const { data: due } = await db.from("tasks").select("id, title, due, due_time, remind_before, assignee, private, owner")
+  const { data: due } = await db.from("tasks").select("id, title, due, due_time, remind_before, remind_by, assignee, private, owner")
     .neq("due_time", "").neq("remind_before", "").neq("status", "done").eq("archived", false).neq("kind", "area").gte("due", day(-2)).lte("due", day(2));
   const done: string[] = [], prefs = new Map<string, typeof PREF_DEFAULTS>();
   for (const t of due ?? []) {
     for (const uid of remindWho(t, ppl)) {
       if (!prefs.has(uid)) prefs.set(uid, await prefsOf(uid));
       const p = prefs.get(uid)!, now = localNow(p.tz), toEvent = minutesSince(t.due, t.due_time, now);
+      if (!p.on_reminder) continue;
+      const own = t.private || t.remind_by === slotOf(ppl, uid);
       for (const before of String(t.remind_before).split(",").filter(Boolean).map(Number)) {
         if (!REMINDER_OFFSETS.includes(before)) continue;
         const late = toEvent + before;
-        // 24 hours before can wait for the morning: if its moment is in quiet hours it goes out when they end. The others ring anyway.
-        const held = before === 1440 && inQuiet(p, t.due_time);
+        // A moment in quiet hours waits for them to end if it's 24 hours before (time to spare) or someone else set it,
+        // so only your own reminder can wake you. It's dropped if the event is over by then.
+        const held = inQuiet(p, clockBefore(t.due_time, before)) && (before === 1440 || !own);
         const fromEnd = held ? minutesSince(now.date, p.quiet_to, now) : late;
-        if (!(late >= 0 && fromEnd >= 0 && fromEnd <= REMINDER_LATE_MIN)) continue;
+        if (!(late >= 0 && fromEnd >= 0 && fromEnd <= REMINDER_LATE_MIN) || (held && toEvent > 0)) continue;
         // Only the row that gets written may send, so overlapping timers can't send it twice.
         const id = `${uid}:${t.id}:${t.due} ${t.due_time}:${before}`;
         const { data: claimed } = await db.from("reminders_sent").upsert({ id, user_id: uid, task_id: t.id, at: Date.now() }, { onConflict: "id", ignoreDuplicates: true }).select("id");
         if (!claimed?.length) continue;
         const pl = p.lang === "pl";
-        const when = before === 1440 ? (t.due === now.date ? (pl ? "Dziś" : "Today") : (pl ? "Jutro" : "Tomorrow"))
+        const when = before === 1440 || held ? (t.due === now.date ? (pl ? "Dziś" : "Today") : (pl ? "Jutro" : "Tomorrow"))
           : before === 60 ? (pl ? "Za godzinę" : "In 1 hour") : before === 15 ? (pl ? "Za 15 minut" : "In 15 minutes") : (pl ? "Teraz" : "Now");
         const sent = await pushTo(uid, { title: `${when} · ${t.due_time}`, body: t.title, url: APP_URL + "?task=" + encodeURIComponent(t.id), tag: `reminder-${t.id}-${before}` }, "high");
         if (sent) done.push(`reminder:${uid}`);

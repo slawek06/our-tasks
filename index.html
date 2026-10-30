@@ -533,6 +533,7 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
         <label class="check"><input type="checkbox" id="n-assigned"> When a task is assigned to me</label>
         <label class="check"><input type="checkbox" id="n-comment"> New comments</label>
         <label class="check"><input type="checkbox" id="n-closed"> When the other person closes a task</label>
+        <label class="check" id="n-reminder-wrap"><input type="checkbox" id="n-reminder"> Task reminders</label>
         <p class="hint">Settings are per person and apply to all your devices. Quiet hours 22:00-7:00: no instant notifications then. Clear a time to skip that briefing.</p>
       </div>
       <div class="field" id="data-tools" hidden>
@@ -1011,7 +1012,7 @@ const store = {
     // The "Follow-up of" link needs supabase/migrations/012_follow_ups.sql; until then a next step is a plain new task.
     sb.client.from("tasks").select("follow_up_of").limit(1).then(({ error }) => { followUpsSupported = !error || isNetworkError(error); });
     // Reminders at a time of day need supabase/migrations/013_reminders.sql; until then the editor has no time field and says so.
-    sb.client.from("tasks").select("remind_before").limit(1).then(({ error }) => { dueTimeSupported = !error || isNetworkError(error); });
+    sb.client.from("tasks").select("remind_by").limit(1).then(({ error }) => { dueTimeSupported = !error || isNetworkError(error); });
     // Per-list frequent items need supabase/migrations/003_catalog_per_list.sql; until then Frequent is shared.
     sb.client.from("catalog").select("list_counts").limit(1).then(({ error }) => { perListSupported = !error || isNetworkError(error); if (view === "shopping") renderChips(); });
   },
@@ -1352,7 +1353,7 @@ async function spawnNext(t) {
     const id = await addTask({
       title: src.title, status: "todo", assignee: src.assignee || "", priority: src.priority || "normal", notes: src.notes || "", parentId,
       due: isRoot ? due : src.due && shift != null ? addDays(src.due, shift) : "",
-      ...(src.dueTime ? { dueTime: src.dueTime, remindBefore: src.remindBefore || "" } : {}),
+      ...(src.dueTime ? { dueTime: src.dueTime, remindBefore: src.remindBefore || "", remindBy: src.remindBy || "" } : {}),
       repeat: isRoot ? src.repeat : "", order: isRoot ? (src.order || 0) + 0.5 : src.order || 0, createdAt: Date.now(),
       assignedBy: "", assignedAt: 0, private: !!src.private,
     });
@@ -1657,7 +1658,7 @@ const thisWeekend = () => [0, 6].includes(new Date().getDay()) ? todayStr() : ad
 const daysUntil = (weekday) => { const n = (weekday - new Date().getDay() + 7) % 7; return n || 7; }; // next one, never today
 async function setDue(t, due) {
   try {
-    await updTask(t.id, { due, ...(!due && t.dueTime ? { dueTime: "", remindBefore: "" } : {}) }); // a new date keeps the time, so it reminds again
+    await updTask(t.id, { due, ...(t.dueTime ? (due ? { remindBy: mySlot() || "" } : { dueTime: "", remindBefore: "" }) : {}) }); // a new date keeps the time, so it reminds again
     if (due && due > todayStr() && isPinned(t)) await togglePin(t); // postponed: no longer for today
     log(t.id, due ? `postponed it to ${fmtDate(due)}` : "removed the due date");
     toast(due ? `Moved to ${fmtDate(due)}` : "Due date removed");
@@ -1836,7 +1837,7 @@ $("#quick-form").addEventListener("submit", async (e) => {
   const assignee = isPrivate ? "" : p.assignee || mySlot() || ""; // new tasks are yours unless you name someone
   try {
     const id = await addTask({
-      title: p.title, status: "todo", assignee, priority: p.priority, due: p.due || defaultDue(), ...(p.dueTime ? { dueTime: p.dueTime, remindBefore: DEFAULT_REMIND } : {}), repeat: "", parentId: p.parentId, notes: "",
+      title: p.title, status: "todo", assignee, priority: p.priority, due: p.due || defaultDue(), ...(p.dueTime ? { dueTime: p.dueTime, remindBefore: DEFAULT_REMIND, remindBy: mySlot() || "" } : {}), repeat: "", parentId: p.parentId, notes: "",
       order: now, createdAt: now, private: isPrivate, ...(assignee ? { assignedBy: mySlot() || "", assignedAt: now } : {}),
     });
     if (!isPrivate) log(id, "created it" + (assignee && assignee !== mySlot() ? ` and assigned it to ${assigneeName(assignee)}` : ""), p.title);
@@ -2209,10 +2210,11 @@ function renderTimeHint() {
   el.hidden = editingArea || (dueTimeSupported && !time);
   if (el.hidden) return;
   if (!dueTimeSupported) return fill(el, "Reminders at a time of day need the database update: run supabase/migrations/013_reminders.sql in Supabase.");
-  const who = $("#f-private").checked || (a && a === mySlot()) ? "you" : a && a !== "both" ? slotName(a) : "both of you";
+  const mine = $("#f-private").checked || (a && a === mySlot());
+  const who = mine ? "you" : a && a !== "both" ? slotName(a) : "both of you";
   const chosen = editorRemind(), due = $("#f-due").value;
   const passed = due ? remindList(chosen).filter(([m]) => new Date(`${due}T${time}`).getTime() - m * 60000 < Date.now()).map(([, l]) => l.toLowerCase()) : [];
-  fill(el, !chosen ? "No reminder. " : `Reminders go to ${who}, up to 5 minutes after each moment. They ring in quiet hours too` + (edRemind.has("1440") ? ", except 24 hours before, which waits for the morning. " : ". "),
+  fill(el, !chosen ? "No reminder. " : `Reminders go to ${who}, up to 5 minutes after each moment. ` + (mine ? "They ring in quiet hours too. " : "In quiet hours they ring only for you, and wait for the morning for anyone else. ") + (edRemind.has("1440") ? "24 hours before always waits for the morning. " : ""),
     passed.length ? `Already passed, won't be sent: ${passed.join(", ")}. ` : "",
     !off && h("button", { type: "button", class: "linkish", onclick: removeEditorTime }, "Remove the time"));
 }
@@ -2283,6 +2285,8 @@ $("#ed-form").addEventListener("submit", async (e) => {
   if (before?.archived) return;
   if (data.private) data.assignee = "";
   else { let p = data.parentId; while (p && tasks.get(p)?.private) p = tasks.get(p).parentId || ""; data.parentId = p; }
+  // Who set the reminders decides who they can wake at night (see notify).
+  if (data.dueTime && (data.due !== before?.due || data.dueTime !== before?.dueTime || data.remindBefore !== (before?.remindBefore || ""))) data.remindBy = mySlot() || "";
   if ((before?.assignee || "") !== data.assignee) Object.assign(data, data.assignee ? { assignedBy: mySlot() || "", assignedAt: Date.now() } : { assignedBy: "", assignedAt: 0 });
   const open = id && data.status === "done" ? openDescendants(id) : [];
   const choice = open.length ? await confirmCascade(data.title, open) : "close";
@@ -2337,7 +2341,7 @@ async function saveArea() {
 }
 // A top-level task that is really a theme becomes an area, keeping everything under it; and back.
 const TO_AREA = { kind: "area", status: "todo", assignee: "", assignedBy: "", assignedAt: 0, due: "", repeat: "", priority: "normal" };
-const areaPatch = (id) => ({ ...TO_AREA, ...(tasks.get(id)?.dueTime ? { dueTime: "", remindBefore: "" } : {}) });
+const areaPatch = (id) => ({ ...TO_AREA, ...(tasks.get(id)?.dueTime ? { dueTime: "", remindBefore: "", remindBy: "" } : {}) });
 const newAreaData = (title) => ({ ...TO_AREA, title, notes: "", private: false, parentId: "", order: Date.now(), createdAt: Date.now() });
 async function makeArea(id) {
   const t = tasks.get(id); closePanels();
@@ -3621,7 +3625,7 @@ $("#signout-btn").addEventListener("click", async () => {
 });
 
 // ---- moving data between claude.ai and own hosting ----
-const TASK_FIELDS = ["title", "status", "assignee", "priority", "due", "dueTime", "remindBefore", "repeat", "parentId", "notes", "order", "createdAt", "assignedBy", "assignedAt", "archived", "archivedAt", "followUpOf"];
+const TASK_FIELDS = ["title", "status", "assignee", "priority", "due", "dueTime", "remindBefore", "remindBy", "repeat", "parentId", "notes", "order", "createdAt", "assignedBy", "assignedAt", "archived", "archivedAt", "followUpOf"];
 async function exportPrivate() {
   const mine = [...tasks.values()].filter((t) => t.private)
     .map((t) => ({ id: t.id, ...Object.fromEntries(TASK_FIELDS.filter((k) => k in t).map((k) => [k, t[k]])), private: true }));
@@ -3744,18 +3748,20 @@ async function fnErrorText(error) {
 async function loadNotifyPrefs() {
   const { data, error } = await sb.client.from("notify_prefs").select("*").eq("user_id", meId).maybeSingle();
   if (error) { $("#notify-status").textContent = /notify_prefs|42P01|schema cache/i.test(error.message + error.code) ? NEEDS_UPDATE : "Couldn't load the notification settings: " + error.message; return; }
-  const p = data || { morning: "07:30", evening: "20:00", on_assigned: true, on_comment: true, on_closed: true };
+  const p = data || { morning: "07:30", evening: "20:00", on_assigned: true, on_comment: true, on_closed: true, on_reminder: true };
   $("#n-lang").value = p.lang === "pl" ? "pl" : "en";
   $("#n-morning").value = p.morning || "";
   $("#n-evening").value = p.evening || "";
   try { if (!localStorage.getItem("voiceLang")) { voiceLang = p.lang === "pl" ? "pl-PL" : "en-GB"; $("#voice-lang").value = voiceLang; } } catch {}
   $("#n-assigned").checked = p.on_assigned; $("#n-comment").checked = p.on_comment; $("#n-closed").checked = p.on_closed;
+  $("#n-reminder").checked = p.on_reminder !== false; $("#n-reminder-wrap").hidden = !dueTimeSupported;
 }
 async function saveNotifyPrefs(quiet) {
   const row = {
     user_id: meId, tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Warsaw",
     lang: $("#n-lang").value, morning: $("#n-morning").value, evening: $("#n-evening").value,
     on_assigned: $("#n-assigned").checked, on_comment: $("#n-comment").checked, on_closed: $("#n-closed").checked,
+    ...(dueTimeSupported ? { on_reminder: $("#n-reminder").checked } : {}),
   };
   const { error } = await sb.client.from("notify_prefs").upsert(row);
   if (error) toast(/notify_prefs|42P01|schema cache/i.test(error.message + error.code) ? NEEDS_UPDATE : "Couldn't save the notification settings: " + error.message);
@@ -3803,7 +3809,7 @@ $("#notify-test").addEventListener("click", async () => {
   const { data, error } = await sb.client.functions.invoke("notify", { body: { action: "test" } });
   toast(error ? await fnErrorText(error) : data?.sent ? "Test sent: it should appear in a few seconds." : "No device received it. Turn notifications on again on this device.");
 });
-for (const id of ["#n-lang", "#n-morning", "#n-evening", "#n-assigned", "#n-comment", "#n-closed"]) $(id).addEventListener("change", () => saveNotifyPrefs());
+for (const id of ["#n-lang", "#n-morning", "#n-evening", "#n-assigned", "#n-comment", "#n-closed", "#n-reminder"]) $(id).addEventListener("change", () => saveNotifyPrefs());
 
 // ---- briefing and the conversation about it ----
 let briefRows = [];
