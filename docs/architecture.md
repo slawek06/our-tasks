@@ -286,7 +286,7 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 | 010 private comments and history, private list items fix | ✅ 29 Oct 2026, privacy check all PASS | ✅ privacy check all PASS (26 Oct 2026) |
 | 011 seen markers | ⬜ next release | ✅ privacy check all PASS (30 Oct 2026) |
 | 012 follow-ups (Done + next step) | ⬜ next release | ✅ 30 Oct 2026 |
-| 013 reminders (due time, reminder choices, sent records, 5-minute timer) | ⬜ next release | ⬜ to run |
+| 013 reminders (due time, reminder choices, sent records, 5-minute timer) | ✅ run early by mistake 30 Oct 2026, harmless (rerun at the release) | ⬜ to run |
 | 014 every task has an owner (open shared tasks with nobody assigned become Both) | ⬜ next release | ⬜ to run |
 | 015 photos of shopping items (`items.photo`, bucket `item-photos`, its rules, `stale_item_photos`) | ⬜ next release | ⬜ to run |
 
