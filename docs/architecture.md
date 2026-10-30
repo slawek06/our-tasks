@@ -116,6 +116,8 @@ comments. You never see your own marks.
 **Mentions.** Typing `@` in a comment offers the other person's name (`#mention-pick`); `@Name` is shown in that
 person's colour (`withMentions`). The push is decided by `notify` (see §7).
 
+**Wrap up all areas.** A link above the areas (`wrapAreas`) adds every area shown to `collapsed`, or takes them out if all are already in it; `collapsed` is kept on the device (`localStorage`). An area stays closed under Hide done and a person's filter, and only a search opens it.
+
 **Quick archive.** A closed task's row has an archive button where an open task has its My day button (`askArchive`): one tap with an Undo, and it asks first only if a subtask is still open.
 
 **Done + next step.** Closing a task keeps its one tap; the toast offers "Next step" (`toast` takes a list of actions).
