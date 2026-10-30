@@ -41,7 +41,6 @@ Notes from daily use go here, then we pick what to improve.
 | ✅ | Ideas button in the app to collect feedback | | Migration 006; Copy open ideas → paste to Claude |
 | ⬜ | Collect what's annoying or missing (Sławek and Wiola) | | Use the Ideas button |
 | ⬜ | Check briefing times and tone for both | S | Times are per person under People |
-| ⬜ | Show "I'm Wiola / I'm Sławek" link button in People when not linked | S | Today only the main screen offers it |
 
 ## From Ideas (25 Oct 2026)
 
