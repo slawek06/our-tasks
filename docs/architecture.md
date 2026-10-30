@@ -213,7 +213,7 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 | 008 checklists | ✅ (run again 29 Oct 2026) | ✅ |
 | 009 private lists, standing lists | ✅ 29 Oct 2026 | ✅ |
 | 010 private comments and history, private list items fix | ✅ 29 Oct 2026, privacy check all PASS | ✅ privacy check all PASS (26 Oct 2026) |
-| 011 seen markers | ⬜ next release | ⬜ to run (then the privacy check) |
+| 011 seen markers | ⬜ next release | ✅ privacy check all PASS (30 Oct 2026) |
 
 ## 10. Configuration reference
 
