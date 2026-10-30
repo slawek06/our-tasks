@@ -257,7 +257,7 @@ body.shop-mode .fab { display: none; }
 .menu-opt .sub, .result .sub { font-weight: 400; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
 .menu-date { display: flex; justify-content: space-between; align-items: center; gap: 12px; border: 1px solid var(--line); border-radius: 10px; padding: 7px 12px; font-weight: 600; }
 .menu-date input { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 6px 8px; }
-.modal.quick { top: max(12%, calc(env(safe-area-inset-top, 0px) + 16px)); transform: translateX(-50%); }
+.modal.quick { top: max(12%, calc(env(safe-area-inset-top, 0px) + 16px)); transform: translateX(-50%); max-height: calc(100% - max(12%, calc(env(safe-area-inset-top, 0px) + 16px)) - 16px); }
 .quick-input { border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 12px; font-size: 16px; width: 100%; }
 .chip.preview { background: var(--accent-soft); border-color: transparent; }
 .result { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; width: 100%; text-align: left; border: 0; background: none; padding: 10px; border-radius: 9px; }
@@ -310,6 +310,9 @@ body.shop-mode .fab { display: none; }
 .field textarea { min-height: 96px; resize: vertical; }
 .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .status-pick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.next-steps { display: flex; flex-direction: column; gap: 12px; }
+.next-step { display: flex; flex-direction: column; gap: 10px; }
+.next-step + .next-step { border-top: 1px solid var(--line); padding-top: 12px; }
 .follow-links { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .follow-link { border: 0; background: none; padding: 2px 0; font-size: 14px; text-align: left; color: var(--accent); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
 .status-pick label { border: 1px solid var(--line); border-radius: 9px; padding: 8px 6px; text-align: center; font-size: 13.5px; font-weight: 500; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 6px; }
@@ -1995,32 +1998,43 @@ async function openNextStep(id) {
   const res = await showModal((m, finish) => {
     m.classList.add("quick");
     const outcome = h("textarea", { id: "ns-outcome", maxlength: "2000", style: "min-height: 64px", placeholder: isPrivate ? "Saved in the task's notes" : "Saved as a comment on the task" });
-    const title = h("input", { type: "text", id: "ns-title", maxlength: "200", enterkeyhint: "done", placeholder: "e.g. Send Jan the measurements" });
-    const due = h("input", { type: "date", id: "ns-due", value: defaultDue() });
-    const person = h("select", { id: "ns-person" }, [["", "No one"], ["a", people.a], ["b", people.b], ["both", "Both"]].map(([v, l]) => h("option", { value: v }, l)));
-    person.value = mySlot() || "";
+    // One row per next step; a row without a title is ignored.
+    const rows = [], rowsBox = h("div", { class: "next-steps" });
+    const filled = () => rows.filter((r) => r.title.value.trim());
     const save = () => {
-      const r = { outcome: outcome.value.trim(), title: title.value.trim(), due: due.value, assignee: isPrivate ? "" : person.value };
-      if (r.outcome || r.title) finish(r); else title.focus();
+      const steps = filled().map((r) => ({ title: r.title.value.trim(), due: r.due.value, assignee: isPrivate ? "" : r.person.value }));
+      if (outcome.value.trim() || steps.length) finish({ outcome: outcome.value.trim(), steps }); else rows[0].title.focus();
     };
     // With an outcome but no next step, the button saves just the outcome.
     const yes = h("button", { class: "btn primary", type: "button", id: "modal-yes", onclick: save }, "Add next step");
-    const relabel = () => { yes.textContent = !title.value.trim() && outcome.value.trim() ? "Save without next step" : "Add next step"; };
+    const relabel = () => { const n = filled().length; yes.textContent = n > 1 ? `Add ${n} next steps` : !n && outcome.value.trim() ? "Save without next step" : "Add next step"; };
     outcome.addEventListener("input", relabel);
-    title.addEventListener("input", relabel);
-    title.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); save(); } });
+    const addRow = () => {
+      const n = rows.length + 1, k = (x) => `ns-${x}-${n}`;
+      const title = h("input", { type: "text", id: k("title"), maxlength: "200", enterkeyhint: "done", placeholder: n === 1 ? "e.g. Send Jan the measurements" : null });
+      const due = h("input", { type: "date", id: k("due"), value: defaultDue() });
+      const person = h("select", { id: k("person") }, [["", "No one"], ["a", people.a], ["b", people.b], ["both", "Both"]].map(([v, l]) => h("option", { value: v }, l)));
+      person.value = mySlot() || "";
+      title.addEventListener("input", relabel);
+      title.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); save(); } });
+      rows.push({ title, due, person });
+      rowsBox.append(h("div", { class: "next-step" },
+        h("div", { class: "field" }, h("label", { for: k("title") }, n === 1 ? "Next step" : `Next step ${n}`), title),
+        h("div", { class: isPrivate ? "field" : "two" },
+          isPrivate ? [h("label", { for: k("due") }, "Date"), due] : [
+            h("div", { class: "field" }, h("label", { for: k("due") }, "Date"), due),
+            h("div", { class: "field" }, h("label", { for: k("person") }, "Person"), person)])));
+      title.focus();
+    };
     fill(m,
       h("h2", { id: "modal-title" }, `Next step after “${t.title || "Untitled"}”`),
       h("div", { class: "field" }, h("label", { for: "ns-outcome" }, "What came out of it? (optional)"), outcome),
-      h("div", { class: "field" }, h("label", { for: "ns-title" }, "Next step"), title),
-      h("div", { class: isPrivate ? "field" : "two" },
-        isPrivate ? [h("label", { for: "ns-due" }, "Date"), due] : [
-          h("div", { class: "field" }, h("label", { for: "ns-due" }, "Date"), due),
-          h("div", { class: "field" }, h("label", { for: "ns-person" }, "Person"), person)]),
-      h("p", { class: "hint" }, `It goes in ${inParent ? pathOf(t) : "the Inbox"}.`, isPrivate && " Private, like this task: only you can see it."),
+      rowsBox,
+      h("div", {}, h("button", { class: "btn small", type: "button", id: "ns-another", onclick: addRow }, "+ Another step")),
+      h("p", { class: "hint" }, `Next steps go in ${inParent ? pathOf(t) : "the Inbox"}.`, isPrivate && " Private, like this task: only you can see them."),
       !followUpsSupported && h("p", { class: "hint" }, "The “Follow-up of” link needs the database update: run supabase/migrations/012_follow_ups.sql in Supabase."),
       h("div", { class: "actions" }, h("button", { class: "btn", type: "button", onclick: () => finish(false) }, "Skip"), yes));
-    title.focus();
+    addRow();
   });
   $("#cascade").classList.remove("quick");
   if (!res) return;
@@ -2033,17 +2047,21 @@ async function openNextStep(id) {
         notifyEvent("comment", id, res.outcome);
       }
     }
-    if (!res.title) { toast("Saved what came out of it"); return; }
+    if (!res.steps.length) { toast("Saved what came out of it"); return; }
     const now = Date.now();
-    const newId = await addTask({
-      title: res.title, status: "todo", assignee: res.assignee, priority: "normal", due: res.due, repeat: "", parentId: inParent, notes: "",
-      order: now, createdAt: now, private: isPrivate, ...(followUpsSupported ? { followUpOf: id } : {}), ...(res.assignee ? { assignedBy: mySlot() || "", assignedAt: now } : {}),
+    // Started together, so they all land on the device at once and wait in the outbox together when offline.
+    const newIds = await Promise.all(res.steps.map((s, i) => addTask({
+      title: s.title, status: "todo", assignee: s.assignee, priority: "normal", due: s.due, repeat: "", parentId: inParent, notes: "",
+      order: now + i, createdAt: now + i, private: isPrivate, ...(followUpsSupported ? { followUpOf: id } : {}), ...(s.assignee ? { assignedBy: mySlot() || "", assignedAt: now } : {}),
+    })));
+    res.steps.forEach((s, i) => {
+      if (!isPrivate) log(newIds[i], `created it as a next step after “${t.title}”` + (s.assignee && s.assignee !== mySlot() ? ` and assigned it to ${assigneeName(s.assignee)}` : ""), s.title);
+      if (s.assignee) notifyEvent("assigned", newIds[i]);
     });
-    if (!isPrivate) log(newId, `created it as the next step after “${t.title}”` + (res.assignee && res.assignee !== mySlot() ? ` and assigned it to ${assigneeName(res.assignee)}` : ""), res.title);
-    if (res.assignee) notifyEvent("assigned", newId);
     if (inParent) { collapsed.delete(inParent); saveCollapsed(); }
     await reopenAncestors(inParent);
-    toast(`Next step added: “${res.title}”` + (res.due ? `, due ${fmtDate(res.due)}` : ""), { label: "Show", run: () => showTask(newId) });
+    const first = res.steps[0];
+    toast(res.steps.length > 1 ? `Added ${res.steps.length} next steps` : `Next step added: “${first.title}”` + (first.due ? `, due ${fmtDate(first.due)}` : ""), { label: "Show", run: () => showTask(newIds[0]) });
   } catch (err) { writeFailed(err); }
 }
 // In the editor: "Follow-up of: …" and "Follow-up: …" (tap to open), and the button that closes the task and asks for the next step.

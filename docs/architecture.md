@@ -113,9 +113,10 @@ person's colour (`withMentions`). The push is decided by `notify` (see §7).
 **Done + next step.** Closing a task keeps its one tap; the toast offers "Next step" (`toast` takes a list of actions).
 The editor has "Done + next step" on open tasks and "Add a next step" on closed ones (`askNextStep`: saves the editor as
 usual, closing the task if open, then opens the form). The form (`openNextStep`, in the `#cascade` modal) saves the
-outcome as a comment (in the notes on a private task, which has no comments) and adds the new task under the same
-parent (the Inbox if that parent is archived; a closed parent reopens as usual), with `followUpOf` = the closed task, private if
-that task is private. The editor shows "Follow-up of: …" and "Follow-up: …" (`renderFollowUps`, tap to open), only for
+outcome once as a comment (in the notes on a private task, which has no comments) and adds one new task per titled
+row ("+ Another step" adds a row) under the same parent (the Inbox if that parent is archived; a closed parent reopens as
+usual), each with `followUpOf` = the closed task, private if that task is private. The writes start together, so offline
+they all wait in the outbox. The editor shows "Follow-up of: …" and "Follow-up: …" (`renderFollowUps`, tap to open), only for
 tasks this person can read.
 
 **People.** `config` row `people` = `{a, b, aUser, bUser}`: the two names and which account is which. The first person
@@ -225,7 +226,7 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 | 009 private lists, standing lists | ✅ 29 Oct 2026 | ✅ |
 | 010 private comments and history, private list items fix | ✅ 29 Oct 2026, privacy check all PASS | ✅ privacy check all PASS (26 Oct 2026) |
 | 011 seen markers | ⬜ next release | ✅ privacy check all PASS (30 Oct 2026) |
-| 012 follow-ups (Done + next step) | ⬜ next release | ⬜ to run |
+| 012 follow-ups (Done + next step) | ⬜ next release | ✅ 30 Oct 2026 |
 
 ## 10. Configuration reference
 
