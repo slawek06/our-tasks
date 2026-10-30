@@ -94,7 +94,8 @@ Field names: the app uses camelCase, the database snake_case (`parentId` ↔ `pa
 
 **Feature checks.** Before a migration has run, the matching feature hides itself and says which file to run:
 `pinsSupported` (002), `perListSupported` (003), notifications (004), Ideas (006), `areasSupported` (007),
-checklists (008), `privateListsSupported` (009), seen markers (011: no marks until it runs). 010 only tightens access
+checklists (008), `privateListsSupported` (009), seen markers (011: no marks until it runs), `followUpsSupported`
+(012: a next step is a plain new task, without the link, and the form says which file to run). 010 only tightens access
 rules; the app works the same before it.
 
 **Views.** Today · Tasks (Inbox + areas) · Upcoming · Lists (Shopping | Checklists) · Activity · Archive.
@@ -109,6 +110,14 @@ comments. You never see your own marks.
 **Mentions.** Typing `@` in a comment offers the other person's name (`#mention-pick`); `@Name` is shown in that
 person's colour (`withMentions`). The push is decided by `notify` (see §7).
 
+**Done + next step.** Closing a task keeps its one tap; the toast offers "Next step" (`toast` takes a list of actions).
+The editor has "Done + next step" on open tasks and "Add a next step" on closed ones (`askNextStep`: saves the editor as
+usual, closing the task if open, then opens the form). The form (`openNextStep`, in the `#cascade` modal) saves the
+outcome as a comment (in the notes on a private task, which has no comments) and adds the new task under the same
+parent (the Inbox if that parent is archived; a closed parent reopens as usual), with `followUpOf` = the closed task, private if
+that task is private. The editor shows "Follow-up of: …" and "Follow-up: …" (`renderFollowUps`, tap to open), only for
+tasks this person can read.
+
 **People.** `config` row `people` = `{a, b, aUser, bUser}`: the two names and which account is which. The first person
 is shown blue, the second green (`--p-a`, `--p-b`).
 
@@ -122,7 +131,7 @@ on the device).
 
 | Table | Purpose | Main columns | Added by |
 |---|---|---|---|
-| `tasks` | Areas, projects and tasks in one tree | `title`, `kind` (`task`/`area`), `status` (`todo`/`doing`/`done`), `assignee` (`''`,`a`,`b`,`both`), `priority`, `due`, `repeat`, `parent_id`, `notes`, `sort_order`, `assigned_by`, `assigned_at`, `archived`, `archived_at`, `private`, `owner` | schema, 007 (`kind`) |
+| `tasks` | Areas, projects and tasks in one tree | `title`, `kind` (`task`/`area`), `status` (`todo`/`doing`/`done`), `assignee` (`''`,`a`,`b`,`both`), `priority`, `due`, `repeat`, `parent_id`, `notes`, `sort_order`, `assigned_by`, `assigned_at`, `archived`, `archived_at`, `private`, `owner`, `follow_up_of` (id of the closed task it came out of, `''` = none) | schema, 007 (`kind`), 012 (`follow_up_of`) |
 | `comments` | Comments on tasks | `task_id`, `text`, `author`, `by_user`, `at` | schema |
 | `history` | Change log (Activity, task history) | `task_id`, `text`, `title`, `author`, `at` | schema |
 | `lists` | Shopping lists (Groceries exists without a row) | `name`, `sort_order`, `private`, `owner` | schema, 009 |
@@ -158,6 +167,8 @@ on the device).
   itself be filtered by the access rules, never see the private row, and let everything through (009's mistake).
   The `private` schema isn't exposed by the API.
 - Check the rules any time with `supabase/tests/privacy-check.sql`.
+- `follow_up_of` (012) is a plain column on `tasks` and adds no rule: a task's link to the other person's private task
+  shows them nothing, because they can't read that row.
 - `seen_marks` (011): everyone writes only their own rows (the id must match what they mark); both read them, except
   marks on the other person's private task.
 - `user_state`, `push_subscriptions`, `notify_prefs`, `briefings`: own rows only.
@@ -214,6 +225,7 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 | 009 private lists, standing lists | ✅ 29 Oct 2026 | ✅ |
 | 010 private comments and history, private list items fix | ✅ 29 Oct 2026, privacy check all PASS | ✅ privacy check all PASS (26 Oct 2026) |
 | 011 seen markers | ⬜ next release | ✅ privacy check all PASS (30 Oct 2026) |
+| 012 follow-ups (Done + next step) | ⬜ next release | ⬜ to run |
 
 ## 10. Configuration reference
 

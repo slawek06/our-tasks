@@ -310,6 +310,8 @@ body.shop-mode .fab { display: none; }
 .field textarea { min-height: 96px; resize: vertical; }
 .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .status-pick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.follow-links { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.follow-link { border: 0; background: none; padding: 2px 0; font-size: 14px; text-align: left; color: var(--accent); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
 .status-pick label { border: 1px solid var(--line); border-radius: 9px; padding: 8px 6px; text-align: center; font-size: 13.5px; font-weight: 500; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 6px; }
 .status-pick input { position: absolute; opacity: 0; pointer-events: none; }
 .status-pick input:checked + label { border-color: currentColor; background: var(--hover); font-weight: 600; }
@@ -364,7 +366,8 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
 .modal .actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 
 .toast { display: flex; gap: 14px; align-items: center; position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); z-index: 30;
-  background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px; max-width: calc(100% - 32px); }
+  background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px; width: max-content; max-width: calc(100% - 32px); flex-wrap: wrap; }
+.toast > span { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .toast button { border: 0; background: none; padding: 2px 0; font-weight: 600; text-decoration: underline; white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
@@ -450,6 +453,7 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
           <input type="radio" name="status" id="s-done" value="done"><label for="s-done" class="s-done"></label>
         </div>
       </div>
+      <div class="follow-links" id="follow-links" hidden></div>
       <div class="two task-only">
         <div class="field" id="assignee-field"><label for="f-assignee">Assigned to</label><select id="f-assignee"></select></div>
         <div class="field"><label for="f-priority">Priority</label>
@@ -706,7 +710,7 @@ let byParent = new Map(), byParentAll = new Map(), commentsBy = new Map();
 let editingId = null;
 let view = (() => { try { return localStorage.getItem("view") || "today"; } catch { return "today"; } })();
 let searchMode = false, searchSnippets = new Map(), flashId = null;
-let todayPins = {}, pinsSupported = true, perListSupported = true, areasSupported = true, privateListsSupported = true, editingArea = false;
+let todayPins = {}, pinsSupported = true, perListSupported = true, areasSupported = true, privateListsSupported = true, followUpsSupported = true, editingArea = false;
 // New tasks are due tomorrow unless you pick another date (or clear it).
 const defaultDue = () => addDays(todayStr(), 1);
 const filter = { who: "all", hideDone: false, q: "" };
@@ -994,6 +998,8 @@ const store = {
     sb.client.from("lists").select("private").limit(1).then(({ error }) => { privateListsSupported = !error || isNetworkError(error); render(); });
     // Areas need the kind column from supabase/migrations/007_areas.sql; until then the Tasks view says so.
     sb.client.from("tasks").select("kind").limit(1).then(({ error }) => { areasSupported = !error || isNetworkError(error); render(); });
+    // The "Follow-up of" link needs supabase/migrations/012_follow_ups.sql; until then a next step is a plain new task.
+    sb.client.from("tasks").select("follow_up_of").limit(1).then(({ error }) => { followUpsSupported = !error || isNetworkError(error); });
     // Per-list frequent items need supabase/migrations/003_catalog_per_list.sql; until then Frequent is shared.
     sb.client.from("catalog").select("list_counts").limit(1).then(({ error }) => { perListSupported = !error || isNetworkError(error); if (view === "shopping") renderChips(); });
   },
@@ -1972,10 +1978,93 @@ async function changeStatus(t, next) {
     }
   } catch (err) { writeFailed(err); }
 }
-async function afterClose(t, choice) {
+async function afterClose(t, choice, offerNext = true) {
   const next = t.repeat ? await spawnNext(t) : null;
   if (choice === "archive") return archiveTask(t.id);
-  toast(next ? `Closed. The next one is due ${fmtDate(next)}` : `Closed “${t.title || "task"}”`, { label: "Move to archive", run: () => archiveTask(t.id) });
+  // Already on the way to the next step form: only say what it wouldn't show.
+  if (!offerNext) { if (next) toast(`Closed. The next one is due ${fmtDate(next)}`); return; }
+  toast(next ? `Closed. The next one is due ${fmtDate(next)}` : `Closed “${t.title || "task"}”`, [
+    canWrite() && { label: "Next step", run: () => openNextStep(t.id) },
+    { label: "Move to archive", run: () => archiveTask(t.id) }]);
+}
+
+// ---- done + next step: what came out of a closed task, and the follow-up task it leads to ----
+async function openNextStep(id) {
+  const t = tasks.get(id); if (!t) return;
+  const isPrivate = !!t.private, inParent = parentKey(t);
+  const res = await showModal((m, finish) => {
+    m.classList.add("quick");
+    const outcome = h("textarea", { id: "ns-outcome", maxlength: "2000", style: "min-height: 64px", placeholder: isPrivate ? "Saved in the task's notes" : "Saved as a comment on the task" });
+    const title = h("input", { type: "text", id: "ns-title", maxlength: "200", enterkeyhint: "done", placeholder: "e.g. Send Jan the measurements" });
+    const due = h("input", { type: "date", id: "ns-due", value: defaultDue() });
+    const person = h("select", { id: "ns-person" }, [["", "No one"], ["a", people.a], ["b", people.b], ["both", "Both"]].map(([v, l]) => h("option", { value: v }, l)));
+    person.value = mySlot() || "";
+    const save = () => {
+      const r = { outcome: outcome.value.trim(), title: title.value.trim(), due: due.value, assignee: isPrivate ? "" : person.value };
+      if (r.outcome || r.title) finish(r); else title.focus();
+    };
+    // With an outcome but no next step, the button saves just the outcome.
+    const yes = h("button", { class: "btn primary", type: "button", id: "modal-yes", onclick: save }, "Add next step");
+    const relabel = () => { yes.textContent = !title.value.trim() && outcome.value.trim() ? "Save without next step" : "Add next step"; };
+    outcome.addEventListener("input", relabel);
+    title.addEventListener("input", relabel);
+    title.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); save(); } });
+    fill(m,
+      h("h2", { id: "modal-title" }, `Next step after “${t.title || "Untitled"}”`),
+      h("div", { class: "field" }, h("label", { for: "ns-outcome" }, "What came out of it? (optional)"), outcome),
+      h("div", { class: "field" }, h("label", { for: "ns-title" }, "Next step"), title),
+      h("div", { class: isPrivate ? "field" : "two" },
+        isPrivate ? [h("label", { for: "ns-due" }, "Date"), due] : [
+          h("div", { class: "field" }, h("label", { for: "ns-due" }, "Date"), due),
+          h("div", { class: "field" }, h("label", { for: "ns-person" }, "Person"), person)]),
+      h("p", { class: "hint" }, `It goes in ${inParent ? pathOf(t) : "the Inbox"}.`, isPrivate && " Private, like this task: only you can see it."),
+      !followUpsSupported && h("p", { class: "hint" }, "The “Follow-up of” link needs the database update: run supabase/migrations/012_follow_ups.sql in Supabase."),
+      h("div", { class: "actions" }, h("button", { class: "btn", type: "button", onclick: () => finish(false) }, "Skip"), yes));
+    title.focus();
+  });
+  $("#cascade").classList.remove("quick");
+  if (!res) return;
+  try {
+    if (res.outcome) {
+      // Private tasks have no comments, so there the outcome goes into the notes.
+      if (isPrivate) await updTask(id, { notes: [t.notes, "Outcome: " + res.outcome].filter(Boolean).join("\n") });
+      else {
+        await store.add("comments", { taskId: id, text: res.outcome, by: mySlot() || "", byUser: meId || "", at: Date.now() });
+        notifyEvent("comment", id, res.outcome);
+      }
+    }
+    if (!res.title) { toast("Saved what came out of it"); return; }
+    const now = Date.now();
+    const newId = await addTask({
+      title: res.title, status: "todo", assignee: res.assignee, priority: "normal", due: res.due, repeat: "", parentId: inParent, notes: "",
+      order: now, createdAt: now, private: isPrivate, ...(followUpsSupported ? { followUpOf: id } : {}), ...(res.assignee ? { assignedBy: mySlot() || "", assignedAt: now } : {}),
+    });
+    if (!isPrivate) log(newId, `created it as the next step after “${t.title}”` + (res.assignee && res.assignee !== mySlot() ? ` and assigned it to ${assigneeName(res.assignee)}` : ""), res.title);
+    if (res.assignee) notifyEvent("assigned", newId);
+    if (inParent) { collapsed.delete(inParent); saveCollapsed(); }
+    await reopenAncestors(inParent);
+    toast(`Next step added: “${res.title}”` + (res.due ? `, due ${fmtDate(res.due)}` : ""), { label: "Show", run: () => showTask(newId) });
+  } catch (err) { writeFailed(err); }
+}
+// In the editor: "Follow-up of: …" and "Follow-up: …" (tap to open), and the button that closes the task and asks for the next step.
+function renderFollowUps(t) {
+  const box = $("#follow-links"), linked = followUpsSupported && !!t;
+  const link = (label, x) => h("button", { type: "button", class: "follow-link", onclick: () => { openEditor(x.id); $("#editor .fields").scrollTop = 0; } },
+    `${label}: ${x.title || "Untitled"}` + (x.status === "done" ? " (done)" : ""));
+  const of = linked && t.followUpOf && tasks.get(t.followUpOf);
+  const after = linked ? [...tasks.values()].filter((x) => x.followUpOf === t.id).sort((x, y) => (x.createdAt || 0) - (y.createdAt || 0)) : [];
+  const w = canWrite() && t && !t.archived;
+  fill(box, of && link("Follow-up of", of), after.map((x) => link("Follow-up", x)),
+    w && h("button", { type: "button", class: "btn small", id: "next-step-btn", onclick: askNextStep }, t.status === "done" ? "Add a next step" : "Done + next step"));
+  box.hidden = !box.childElementCount;
+}
+// Saves the editor as usual (closing the task if it's open), then opens the next step form.
+let nextStepAsked = false;
+function askNextStep() {
+  if (!$("#f-title").value.trim()) { $("#f-title").focus(); return; }
+  if (tasks.get(editingId)?.status !== "done") $("#s-done").checked = true;
+  nextStepAsked = true;
+  $("#ed-form").requestSubmit();
 }
 
 // ---- archive: a task moves there together with everything below it ----
@@ -2040,6 +2129,7 @@ function openEditor(id, parentId = "", opts = {}) {
   for (const el of $("#editor .fields").querySelectorAll("input, select, textarea")) el.disabled = !canWrite() || !!t.archived;
   applyPrivateUI(!!t.private);
   for (const el of document.querySelectorAll("#editor .task-only")) el.hidden = area;
+  renderFollowUps(id && !area ? t : null);
   $("#private-label").textContent = area ? "Private: only you can see this area (and everything in it)" : "Private: only you can see it (and its subtasks)";
   $("#extras").hidden = !id || area;
   if (id) {
@@ -2097,6 +2187,7 @@ $("#f-private").addEventListener("change", (e) => {
 });
 $("#ed-form").addEventListener("submit", async (e) => {
   e.preventDefault();
+  const wantNext = nextStepAsked; nextStepAsked = false;
   if (!canWrite()) return;
   if (editingArea) return saveArea();
   const data = {
@@ -2118,7 +2209,7 @@ $("#ed-form").addEventListener("submit", async (e) => {
   if ((before?.assignee || "") !== data.assignee) Object.assign(data, data.assignee ? { assignedBy: mySlot() || "", assignedAt: Date.now() } : { assignedBy: "", assignedAt: 0 });
   const open = id && data.status === "done" ? openDescendants(id) : [];
   const choice = open.length ? await confirmCascade(data.title, open) : "close";
-  if (!choice) return;
+  if (!choice) { if (wantNext) $("#s-" + (before.status || "todo")).checked = true; return; }
   closePanels();
   if (data.parentId) { collapsed.delete(data.parentId); saveCollapsed(); }
   try {
@@ -2142,7 +2233,8 @@ $("#ed-form").addEventListener("submit", async (e) => {
       toast("Task added");
     }
     if (data.status !== "done") await reopenAncestors(data.parentId);
-    else if (id && (before.status !== "done" || choice === "archive")) await afterClose({ ...before, ...data, id }, choice);
+    else if (id && (before.status !== "done" || choice === "archive")) await afterClose({ ...before, ...data, id }, choice, !wantNext);
+    if (wantNext) openNextStep(id);
   } catch (err) { writeFailed(err); }
 });
 async function saveArea() {
@@ -3451,7 +3543,7 @@ $("#signout-btn").addEventListener("click", async () => {
 });
 
 // ---- moving data between claude.ai and own hosting ----
-const TASK_FIELDS = ["title", "status", "assignee", "priority", "due", "repeat", "parentId", "notes", "order", "createdAt", "assignedBy", "assignedAt", "archived", "archivedAt"];
+const TASK_FIELDS = ["title", "status", "assignee", "priority", "due", "repeat", "parentId", "notes", "order", "createdAt", "assignedBy", "assignedAt", "archived", "archivedAt", "followUpOf"];
 async function exportPrivate() {
   const mine = [...tasks.values()].filter((t) => t.private)
     .map((t) => ({ id: t.id, ...Object.fromEntries(TASK_FIELDS.filter((k) => k in t).map((k) => [k, t[k]])), private: true }));
@@ -3886,7 +3978,8 @@ function showBanner(msg) { const b = $("#banner"); b.textContent = msg; b.hidden
 let toastTimer;
 function toast(msg, action) {
   const t = $("#toast");
-  t.replaceChildren(...[h("span", {}, msg), action && h("button", { type: "button", onclick: () => { t.hidden = true; action.run(); } }, action.label)].filter(Boolean));
+  // One action, or a list of them.
+  t.replaceChildren(h("span", {}, msg), ...[action].flat().filter(Boolean).map((a) => h("button", { type: "button", onclick: () => { t.hidden = true; a.run(); } }, a.label)));
   t.hidden = false; clearTimeout(toastTimer);
   toastTimer = setTimeout(() => (t.hidden = true), action ? 7000 : 2600);
 }
