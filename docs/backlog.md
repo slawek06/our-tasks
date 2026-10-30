@@ -50,7 +50,8 @@ Notes from daily use go here, then we pick what to improve.
 | ✅ | **Areas → Projects → Tasks** | | Live 26 Oct 2026 (migration 007, notify function updated) |
 | ✅ | **Checklists** (Sławek): see the design below | | Released 29 Oct 2026 (migration 008) |
 | ✅ | **A colour per person**: Sławek blue, Wiola green, at the top and wherever a name appears | | Released 29 Oct 2026 |
-| ✅ | **New tasks belong to whoever creates them** (unless you pick or name someone else) | | Released 29 Oct 2026 |
+| ✅ | **New tasks belong to whoever creates them** (unless you pick or name someone else) | | Released 29 Oct 2026; replaced by the rule below in the next release |
+| ⬜ | **Every task has an owner**: new tasks default to Both; a task under another task and a next step inherit from the task above; directly under an area = Both; "No one" removed; existing unassigned tasks become Both once; "Due, but nobody's assigned" removed from Today. Naming someone still wins; private tasks and areas unchanged | S | Next release (decided 30 Oct 2026). **No push for Both**: an assignment push only when the other person is picked by name; Both still shows as new in the app. Build after reminders |
 
 ### Design: Checklists (agreed 26 Oct 2026)
 
