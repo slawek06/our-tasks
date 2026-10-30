@@ -24,6 +24,8 @@ instructions with exact menu paths and links for anything to do in Supabase or G
 - Database changes: a new numbered file in `supabase/migrations/`, safe to run more than once; the app hides the
   feature until it has run. Run in development first; list it for the release. Regenerate the production setup file
   with `python3 scripts/make-setup-sql.py jwhuaaxrymdqwanwthvg`.
+- Release: `python3 scripts/make-release-sql.py <first migration>` writes one file per project (`supabase/release-<project name>.sql`) with the
+  release's migrations and the privacy check, which refuses to run in the wrong project; the owner pastes that instead of each migration.
 - Edge Functions (`supabase/functions/*`) are deployed by the owner by pasting the code in the dashboard: say which
   function and which project.
 - Test changes in the local preview (`.claude/launch.json`, preview mode keeps data in the browser) at phone size

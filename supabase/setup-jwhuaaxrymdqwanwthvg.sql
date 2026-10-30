@@ -390,6 +390,197 @@ create policy "items: like their list" on public.items for all to authenticated
 update public.history set text = 'added an item to a private list'
   where text like 'added “%” to a private list';
 
+-- ======== 011_seen_marks.sql ========
+-- Seen markers: "Wiola saw it 10:42" on tasks assigned to the other person and on comments.
+-- One row per thing a person has seen, written the first time they open it: an assignment (ref = the task's
+-- assigned_at) or a comment (ref = the comment's id). Each person writes only their own rows; both can read them,
+-- except on the other person's private tasks.
+-- Run once: Supabase dashboard > SQL Editor > New query > paste > Run. Safe to run more than once. Needs 010.
+-- Check afterwards with supabase/tests/privacy-check.sql.
+create table if not exists public.seen_marks (
+  id       text primary key,                     -- '<user id>:<task id>:<kind>:<ref>'
+  user_id  uuid not null default auth.uid() references auth.users on delete cascade,
+  task_id  text not null references public.tasks on delete cascade,
+  kind     text not null check (kind in ('assigned', 'comment')),
+  ref      text not null,
+  at       bigint not null default 0              -- when it was first seen
+);
+create index if not exists seen_marks_task_id_idx on public.seen_marks (task_id);
+alter table public.seen_marks enable row level security;
+
+drop policy if exists "seen_marks: read unless the other's private task" on public.seen_marks;
+create policy "seen_marks: read unless the other's private task" on public.seen_marks for select to authenticated
+  using (user_id = auth.uid() or not private.others_private_task(task_id));
+-- Writing: only your own marks, with an id that matches what they mark.
+drop policy if exists "seen_marks: write own" on public.seen_marks;
+create policy "seen_marks: write own" on public.seen_marks for all to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid() and id = user_id::text || ':' || task_id || ':' || kind || ':' || ref
+              and not private.others_private_task(task_id));
+
+grant select, insert, update, delete on public.seen_marks to authenticated;
+grant all on public.seen_marks to service_role;
+do $$ begin
+  alter publication supabase_realtime add table public.seen_marks;
+exception when duplicate_object then null; end $$;
+
+-- ======== 012_follow_ups.sql ========
+-- Done + next step: a task can be the follow-up of another one, the closed task it came out of.
+-- follow_up_of holds that task's id ('' = none). It follows the row's own access rules, and the app shows the link only
+-- when it can read the other task, so a follow-up never reveals the other person's private task.
+-- Run once: Supabase dashboard > SQL Editor > New query > paste > Run. Safe to run more than once.
+alter table public.tasks add column if not exists follow_up_of text not null default '';
+
+-- ======== 013_reminders.sql ========
+-- Reminders ahead of an event: a task can have a time as well as a date (when the thing happens), and pushes arrive
+-- a chosen time before it. due_time is local "HH:MM" ('' = no time). remind_before lists the minutes before it, comma
+-- separated, from 1440 (24 hours), 60, 15 and 0 (at the time); '' = no reminder.
+-- remind_by is who last set them ('a'/'b'): at night only that person's reminder rings; the other's waits for the morning.
+-- on_reminder is each person's switch for task reminders.
+-- reminders_sent records each reminder that went out, one row per person, date + time and minutes before, so it goes out
+-- once only, and a new date or time counts as new. Server only: no access rules and no permissions for the app, like push_config.
+-- The timer checks every 5 minutes instead of 15 (it stays pointed at this project; briefings are marked as sent per day,
+-- so they don't go out twice).
+-- Run once: Supabase dashboard > SQL Editor > New query > paste > Run. Safe to run more than once.
+-- Check afterwards with supabase/tests/privacy-check.sql.
+alter table public.tasks add column if not exists due_time text not null default '';
+alter table public.tasks add column if not exists remind_before text not null default '';
+alter table public.tasks add column if not exists remind_by text not null default '';
+alter table public.notify_prefs add column if not exists on_reminder boolean not null default true;
+
+create table if not exists public.reminders_sent (
+  id       text primary key,                     -- '<user id>:<task id>:<YYYY-MM-DD HH:MM>:<minutes before>'
+  user_id  uuid not null references auth.users on delete cascade,
+  task_id  text not null references public.tasks on delete cascade,
+  at       bigint not null default 0             -- when it was sent
+);
+create index if not exists reminders_sent_task_id_idx on public.reminders_sent (task_id);
+alter table public.reminders_sent enable row level security;
+revoke all on public.reminders_sent from anon, authenticated;
+grant all on public.reminders_sent to service_role;
+
+select cron.alter_job(job_id := jobid, schedule := '*/5 * * * *') from cron.job where jobname = 'our-tasks-notify';
+
+-- ======== 014_every_task_has_an_owner.sql ========
+-- Every task has an owner: existing open shared tasks with nobody assigned become Both, once.
+-- Private tasks and areas have no assignee and stay as they are. Closed and archived rows stay as they are too: they
+-- are history, and if one comes back the app treats its empty assignee as Both and fills it in on the next save.
+-- assigned_by and assigned_at stay empty, so nothing shows as new for anyone. No push: pushes are sent only by the app
+-- calling notify, never by a database change. Who gets a reminder doesn't change either (empty and both both mean both of you).
+-- Run once: Supabase dashboard > SQL Editor > New query > paste > Run. Safe to run more than once.
+update public.tasks set assignee = 'both'
+  where assignee = '' and kind = 'task' and not private and not archived and status <> 'done';
+
+-- ======== 015_item_photos.sql ========
+-- Photo of a shopping item ("this exact brand"): one photo per item, kept in a private Storage bucket.
+-- A file's path is "<item id>/<random>.jpg" and the item's photo column holds that path. Each file is added once and
+-- never changed, so a new photo is a new file. The app can only read and add: removing files is the server's job
+-- (notify, once a day), so an Undo can bring back an item with its photo.
+-- Run once: Supabase dashboard > SQL Editor > New query > paste > Run. Safe to run more than once. Needs 010.
+-- Check afterwards with supabase/tests/privacy-check.sql.
+alter table public.items add column if not exists photo text not null default '';
+
+-- Private: files are reachable only through the rules below, never by a plain web address.
+-- The limit is a backstop; the app shrinks photos well below it before sending them.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  values ('item-photos', 'item-photos', false, 1048576, array['image/jpeg'])
+  on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
+
+-- True when this person may see the item the file belongs to: the item exists and isn't on the other person's private
+-- list. It goes by the item, not the file, so a photo follows when an item moves or its list turns private. A file
+-- whose item is gone is readable by nobody. Looks past the access rules like the 010 checks (security definer).
+create or replace function private.item_photo_allowed(path text) returns boolean
+  language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.items i where i.id = split_part(path, '/', 1)
+    and not exists (select 1 from public.lists l where l.id = i.list_id and l.private and l.owner is distinct from auth.uid()));
+$$;
+revoke all on function private.item_photo_allowed(text) from public, anon;
+grant execute on function private.item_photo_allowed(text) to authenticated;
+
+drop policy if exists "item photos: read like their item" on storage.objects;
+create policy "item photos: read like their item" on storage.objects for select to authenticated
+  using (bucket_id = 'item-photos' and private.item_photo_allowed(name));
+drop policy if exists "item photos: add like their item" on storage.objects;
+create policy "item photos: add like their item" on storage.objects for insert to authenticated
+  with check (bucket_id = 'item-photos' and name ~ '^[^/]+/[^/]+\.jpg$' and private.item_photo_allowed(name));
+-- No update or delete rules on purpose: signed-in people can't change or remove files.
+
+-- Files no item points at any more (item or list deleted, photo replaced or removed), for notify to remove.
+-- An hour's grace, so a file just added is safe while its item is being saved. Only the server may call this.
+create or replace function public.stale_item_photos() returns table (name text)
+  language sql stable security definer set search_path = '' as $$
+  select o.name from storage.objects o
+    where o.bucket_id = 'item-photos' and o.created_at < now() - interval '1 hour'
+      and not exists (select 1 from public.items i where i.id = split_part(o.name, '/', 1) and i.photo = o.name);
+$$;
+revoke all on function public.stale_item_photos() from public, anon, authenticated;
+grant execute on function public.stale_item_photos() to service_role;
+
+-- ======== 016_task_attachments.sql ========
+-- Attachments on tasks (quotes, invoices): photos and PDFs, up to 10 per task, kept in a private Storage bucket.
+-- A file's path is "<task id>/<random>.jpg" or ".pdf", so Storage never holds its real name. The name is on the row in
+-- attachments, which follows its task like comments do. Each file is added once and never changed. The app can only read
+-- and add: removing files is the server's job (notify, once a day), so an Undo can bring a file back.
+-- Run once: Supabase dashboard > SQL Editor > New query > paste > Run. Safe to run more than once. Needs 010.
+-- Check afterwards with supabase/tests/privacy-check.sql.
+create table if not exists public.attachments (
+  id      text primary key,
+  task_id text not null references public.tasks on delete cascade,
+  name    text not null default '',  -- the name shown, e.g. "Quote kitchen.pdf"
+  path    text not null,             -- where the file is in the task-files bucket
+  size    bigint not null default 0, -- bytes
+  author  text not null default '',  -- who added it: a or b
+  at      bigint not null default 0
+);
+create index if not exists attachments_task_id_idx on public.attachments (task_id);
+alter table public.attachments enable row level security;
+
+drop policy if exists "attachments: not the other's private tasks" on public.attachments;
+create policy "attachments: not the other's private tasks" on public.attachments for all to authenticated
+  using (not private.others_private_task(task_id)) with check (not private.others_private_task(task_id));
+
+grant select, insert, update, delete on public.attachments to authenticated;
+grant all on public.attachments to service_role;
+do $$ begin
+  alter publication supabase_realtime add table public.attachments;
+exception when duplicate_object then null; end $$;
+
+-- Private: files are reachable only through the rules below, never by a plain web address.
+-- 10 MB is the limit for a PDF; the app shrinks photos well below it before sending them.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  values ('task-files', 'task-files', false, 10485760, array['image/jpeg', 'application/pdf'])
+  on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
+
+-- True when this person may see the task the file belongs to: the task exists and isn't the other person's private task.
+-- It goes by the task, not the file, so a file follows when its task turns private. A file whose task is gone is
+-- readable by nobody. Looks past the access rules like the 010 checks (security definer).
+create or replace function private.task_file_allowed(path text) returns boolean
+  language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.tasks t where t.id = split_part(path, '/', 1)
+    and (not t.private or t.owner = auth.uid()));
+$$;
+revoke all on function private.task_file_allowed(text) from public, anon;
+grant execute on function private.task_file_allowed(text) to authenticated;
+
+drop policy if exists "task files: read like their task" on storage.objects;
+create policy "task files: read like their task" on storage.objects for select to authenticated
+  using (bucket_id = 'task-files' and private.task_file_allowed(name));
+drop policy if exists "task files: add like their task" on storage.objects;
+create policy "task files: add like their task" on storage.objects for insert to authenticated
+  with check (bucket_id = 'task-files' and name ~ '^[^/]+/[^/]+\.(jpg|pdf)$' and private.task_file_allowed(name));
+-- No update or delete rules on purpose: signed-in people can't change or remove files.
+
+-- Files no attachment points at any more (task deleted, attachment removed), for notify to remove.
+-- An hour's grace, so a file just added is safe while its row is being saved. Only the server may call this.
+create or replace function public.stale_task_files() returns table (name text)
+  language sql stable security definer set search_path = '' as $$
+  select o.name from storage.objects o
+    where o.bucket_id = 'task-files' and o.created_at < now() - interval '1 hour'
+      and not exists (select 1 from public.attachments a where a.task_id = split_part(o.name, '/', 1) and a.path = o.name);
+$$;
+revoke all on function public.stale_task_files() from public, anon, authenticated;
+grant execute on function public.stale_task_files() to service_role;
+
 -- ======== permissions ========
 -- Only signed-in users (subject to the access rules above) and the server functions may use these tables.
 -- Anonymous visitors get nothing. push_config stays server-only.
@@ -397,6 +588,6 @@ grant usage on schema public to authenticated, service_role;
 grant select, insert, update, delete on
   public.tasks, public.comments, public.history, public.lists, public.items, public.catalog,
   public.config, public.user_state, public.push_subscriptions, public.notify_prefs, public.briefings, public.ideas,
-  public.checklists, public.checklist_items
+  public.checklists, public.checklist_items, public.seen_marks, public.attachments
   to authenticated;
 grant all on all tables in schema public to service_role;

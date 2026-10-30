@@ -148,7 +148,7 @@ h1 { font: 700 34px/1.05 var(--f-display); letter-spacing: -.02em; margin: 0; te
 .sort-row .hint { font-size: 12.5px; }
 .sort-row select { border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 8px 10px; width: 100%; }
 .add { width: 32px; height: 32px; font-size: 20px; color: var(--muted); opacity: 0; }
-@media (hover: none) { .add, .day { opacity: .7; } .handle { opacity: .8; } }
+@media (hover: none) { .add { opacity: .7; } .handle { opacity: .8; } }
 .group-head { display: flex; gap: 8px; align-items: baseline; padding: 14px 10px 4px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .group-head:first-child { padding-top: 6px; }
 .group-head.over { color: var(--danger); }
@@ -184,6 +184,23 @@ h1 { font: 700 34px/1.05 var(--f-display); letter-spacing: -.02em; margin: 0; te
 .item-meta:empty { display: none; }
 .item-more { border: 0; background: none; width: 40px; height: 40px; border-radius: 8px; color: var(--muted); font-size: 18px; }
 .item-more:hover { background: var(--line); }
+.item.has-photo { grid-template-columns: minmax(0, 1fr) 44px 40px; }
+.item-photo, .photo-thumb { border: 1px solid var(--line); background: var(--hover); padding: 0; border-radius: 8px; overflow: hidden; display: grid; place-items: center; color: var(--muted); font-size: 16px; }
+.item-photo { width: 40px; height: 40px; }
+.item.checked .item-photo { opacity: .55; }
+.item-photo img, .photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.photo-thumb { width: 88px; height: 88px; font-size: 22px; }
+.photo-big { display: block; width: 100%; max-height: calc(100vh - 220px); object-fit: contain; border-radius: 9px; background: var(--hover); }
+.task-shop-row .item-photo { width: 32px; height: 32px; flex: none; align-self: center; }
+.modal a.btn { color: var(--ink); text-decoration: none; }
+.file-big { display: block; width: 100%; height: calc(100vh - 260px); border: 0; border-radius: 9px; background: var(--hover); }
+.file-row { display: flex; gap: 10px; align-items: center; padding: 6px 0; }
+.file-row .item-photo { flex: none; }
+.file-open { flex: 1; min-width: 0; border: 0; background: none; padding: 0; text-align: left; color: var(--ink); font-size: 14px; }
+.file-open b { display: block; font-weight: 500; overflow-wrap: anywhere; }
+.file-open span { display: block; font-size: 12px; color: var(--muted); }
+.file-remove { flex: none; border: 0; background: none; padding: 8px 0 8px 4px; font-size: 12px; color: var(--muted); text-decoration: underline; }
 .basket-head .btn { margin-left: auto; text-transform: none; letter-spacing: 0; }
 .lists-mode { align-self: flex-start; }
 body.shop-mode #lists-mode { display: none; }
@@ -216,8 +233,8 @@ body.shop-mode .item .box svg { width: 26px; height: 26px; }
 .list-row .check { font-size: 13px; white-space: nowrap; }
 .list-row input[type=text] { flex: 1; min-width: 0; border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 9px 11px; }
 .task-shop-row { display: flex; gap: 8px; font-size: 14px; align-items: baseline; padding: 3px 0; }
-.task-shop-row > span:first-child { overflow-wrap: anywhere; min-width: 0; }
-.task-shop-row.bought > span:first-child { color: var(--muted); text-decoration: line-through; }
+.task-shop-row > span:not(.st-text) { overflow-wrap: anywhere; min-width: 0; }
+.task-shop-row.bought > span:not(.st-text) { color: var(--muted); text-decoration: line-through; }
 .task-shop-row .st-text { color: var(--muted); font-size: 12.5px; margin-left: auto; text-align: right; }
 .task-shop-add { display: flex; gap: 6px; flex-wrap: wrap; }
 .field .task-shop-add input { flex: 1 1 150px; width: auto; }
@@ -243,6 +260,7 @@ body.shop-mode .item .box svg { width: 26px; height: 26px; }
 .signin-card input { border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 11px 12px; font-size: 16px; }
 .signin-card .btn { padding: 11px 14px; font-size: 15px; }
 .day { width: 32px; height: 32px; color: var(--muted); opacity: 0; }
+@media (hover: none) { .day { opacity: .7; } }
 .row.flash { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); transition: background 1s; }
 .chip.myday { background: var(--accent-soft); border-color: transparent; color: var(--accent); font-weight: 600; }
 .fab { position: fixed; z-index: 15; right: calc(20px + env(safe-area-inset-right, 0px)); bottom: calc(20px + env(safe-area-inset-bottom, 0px));
@@ -257,7 +275,7 @@ body.shop-mode .fab { display: none; }
 .menu-opt .sub, .result .sub { font-weight: 400; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
 .menu-date { display: flex; justify-content: space-between; align-items: center; gap: 12px; border: 1px solid var(--line); border-radius: 10px; padding: 7px 12px; font-weight: 600; }
 .menu-date input { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 6px 8px; }
-.modal.quick { top: max(12%, calc(env(safe-area-inset-top, 0px) + 16px)); transform: translateX(-50%); }
+.modal.quick { top: max(12%, calc(env(safe-area-inset-top, 0px) + 16px)); transform: translateX(-50%); max-height: calc(100% - max(12%, calc(env(safe-area-inset-top, 0px) + 16px)) - 16px); }
 .quick-input { border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 12px; font-size: 16px; width: 100%; }
 .chip.preview { background: var(--accent-soft); border-color: transparent; }
 .result { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; width: 100%; text-align: left; border: 0; background: none; padding: 10px; border-radius: 9px; }
@@ -267,6 +285,10 @@ body.shop-mode .fab { display: none; }
 .field input[type=time] { -webkit-appearance: none; appearance: none; display: block; box-sizing: border-box; border: 1px solid var(--line);
   background: var(--bg); border-radius: 9px; padding: 9px 11px; width: 100%; min-width: 0; min-height: 42px; text-align: left; }
 .two > .field { min-width: 0; }
+.remind-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.remind-pick button { border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 9px 8px; font-size: 14px; }
+.remind-pick button[aria-pressed=true] { background: var(--accent-soft); border-color: var(--accent); font-weight: 600; }
+.hint .linkish { border: 0; background: none; padding: 0; color: var(--accent); font: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
 /* Checkbox rows inside a field are normal text, not field labels. */
 .field > label.check { text-transform: none; letter-spacing: 0; font-size: 14px; font-weight: 400; color: var(--ink); }
 .brief-list { gap: 10px; flex: 1; min-height: 0; }
@@ -310,6 +332,11 @@ body.shop-mode .fab { display: none; }
 .field textarea { min-height: 96px; resize: vertical; }
 .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .status-pick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.next-steps { display: flex; flex-direction: column; gap: 12px; }
+.next-step { display: flex; flex-direction: column; gap: 10px; }
+.next-step + .next-step { border-top: 1px solid var(--line); padding-top: 12px; }
+.follow-links { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.follow-link { border: 0; background: none; padding: 2px 0; font-size: 14px; text-align: left; color: var(--accent); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
 .status-pick label { border: 1px solid var(--line); border-radius: 9px; padding: 8px 6px; text-align: center; font-size: 13.5px; font-weight: 500; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 6px; }
 .status-pick input { position: absolute; opacity: 0; pointer-events: none; }
 .status-pick input:checked + label { border-color: currentColor; background: var(--hover); font-weight: 600; }
@@ -324,6 +351,10 @@ body.shop-mode .fab { display: none; }
 .comment .who { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; font-size: 12px; color: var(--muted); }
 .comment .who b { color: var(--ink); font-weight: 600; }
 .comment .who button { margin-left: auto; border: 0; background: none; padding: 0; font-size: 12px; color: var(--muted); text-decoration: underline; }
+.seen-mark b { font-weight: 600; }
+.mention { font-weight: 600; }
+.mention-pick { align-self: flex-start; }
+.mention-pick button { font: inherit; font-size: 14px; padding: 3px 10px; cursor: pointer; }
 .comment p { margin: 3px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .idea-kind { font: 600 11px var(--f-mono); letter-spacing: .04em; text-transform: uppercase; color: var(--accent); }
 .idea-kind.problem { color: var(--danger); }
@@ -360,7 +391,8 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
 .modal .actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 
 .toast { display: flex; gap: 14px; align-items: center; position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); z-index: 30;
-  background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px; max-width: calc(100% - 32px); }
+  background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px; width: max-content; max-width: calc(100% - 32px); flex-wrap: wrap; }
+.toast > span { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .toast button { border: 0; background: none; padding: 2px 0; font-weight: 600; text-decoration: underline; white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
@@ -446,6 +478,7 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
           <input type="radio" name="status" id="s-done" value="done"><label for="s-done" class="s-done"></label>
         </div>
       </div>
+      <div class="follow-links" id="follow-links" hidden></div>
       <div class="two task-only">
         <div class="field" id="assignee-field"><label for="f-assignee">Assigned to</label><select id="f-assignee"></select></div>
         <div class="field"><label for="f-priority">Priority</label>
@@ -454,8 +487,11 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
       <p class="hint" id="assigned-by" hidden></p>
       <div class="two task-only">
         <div class="field"><label for="f-due">Due date</label><input type="date" id="f-due"></div>
-        <div class="field"><label for="f-repeat">Repeats</label><select id="f-repeat"></select></div>
+        <div class="field" id="time-field"><label for="f-time">Time</label><input type="time" id="f-time"></div>
       </div>
+      <div class="field" id="remind-field" hidden><span class="lbl" id="remind-label">Remind</span><div class="remind-pick" id="f-remind" role="group" aria-labelledby="remind-label"></div></div>
+      <p class="hint" id="time-hint" hidden></p>
+      <div class="field task-only"><label for="f-repeat">Repeats</label><select id="f-repeat"></select></div>
       <p class="hint" id="repeat-hint" hidden>When you close it, the next one is created with the due date moved forward.</p>
       <div class="field task-only"><label for="f-parent">Belongs under</label><select id="f-parent"></select></div>
       <div class="field"><label for="f-notes">Notes</label><textarea id="f-notes" maxlength="5000"></textarea></div>
@@ -468,11 +504,16 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
             <button class="btn small" type="button" id="ts-add">Add</button>
           </div>
         </div>
+        <div class="field" id="files-field"><span class="lbl">Files</span>
+          <div id="file-list"></div>
+          <input type="file" id="file-pick" accept="image/*,.heic,.heif,application/pdf,.pdf" multiple hidden aria-label="Choose photos or PDFs">
+        </div>
         <p class="hint" id="private-note" hidden>Private tasks have no comments and don't appear in Activity. Items you add to buy still go on the shared shopping list.</p>
         <div class="field" id="comments-field"><span class="lbl">Comments</span>
           <div class="comments" id="comment-list"></div>
           <div class="comment-new" id="comment-new">
             <textarea id="f-comment" maxlength="2000" placeholder="Write a comment" aria-label="New comment"></textarea>
+            <div class="mention-pick" id="mention-pick" hidden></div>
             <button class="btn small" type="button" id="comment-add">Add comment</button>
           </div>
         </div>
@@ -511,10 +552,16 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
           <div class="field"><label for="n-morning">Morning briefing</label><input type="time" id="n-morning"></div>
           <div class="field"><label for="n-evening">Evening check</label><input type="time" id="n-evening"></div>
         </div>
-        <label class="check"><input type="checkbox" id="n-assigned"> When a task is assigned to me</label>
-        <label class="check"><input type="checkbox" id="n-comment"> New comments</label>
+        <label class="check"><input type="checkbox" id="n-assigned"> When a task is assigned to me by name</label>
+        <label class="check"><input type="checkbox" id="n-comment"> New comments and files</label>
         <label class="check"><input type="checkbox" id="n-closed"> When the other person closes a task</label>
-        <p class="hint">Settings are per person and apply to all your devices. Quiet hours 22:00-7:00: no instant notifications then. Clear a time to skip that briefing.</p>
+        <label class="check" id="n-reminder-wrap"><input type="checkbox" id="n-reminder"> Task reminders</label>
+        <div class="two">
+          <div class="field"><label for="n-quiet-from">Quiet hours from</label><input type="time" id="n-quiet-from" value="22:00"></div>
+          <div class="field"><label for="n-quiet-to">Quiet hours until</label><input type="time" id="n-quiet-to" value="07:00"></div>
+        </div>
+        <p class="hint" id="n-quiet-hint"></p>
+        <p class="hint">Settings are per person and apply to all your devices. Clear a briefing's time to skip that briefing.</p>
       </div>
       <div class="field" id="data-tools" hidden>
         <span class="lbl">Your data</span>
@@ -548,6 +595,8 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
       </div>
       <div class="field"><label for="it-list">List</label><select id="it-list"></select></div>
       <div class="field"><label for="it-task">For task</label><select id="it-task"></select></div>
+      <div class="field" id="it-photo-field"><span class="lbl">Photo</span><div class="photo-row" id="it-photo"></div>
+        <input type="file" id="it-photo-file" accept="image/*" hidden aria-label="Choose a photo"></div>
       <p class="hint" id="it-added"></p>
       <p class="hint">Changing the section is remembered for next time you add this item.</p>
     </div>
@@ -697,11 +746,11 @@ let items = new Map(), lists = new Map(), catalog = new Map(), toBuyBy = new Map
 let shoppingSeenAt = 0, shoppingHighlightSince = 0;
 let meId = null;
 let loaded = false;
-let byParent = new Map(), byParentAll = new Map(), commentsBy = new Map();
+let byParent = new Map(), byParentAll = new Map(), commentsBy = new Map(), attachments = new Map(), attachmentsBy = new Map(), attachmentsSupported = true;
 let editingId = null;
 let view = (() => { try { return localStorage.getItem("view") || "today"; } catch { return "today"; } })();
 let searchMode = false, searchSnippets = new Map(), flashId = null;
-let todayPins = {}, pinsSupported = true, perListSupported = true, areasSupported = true, privateListsSupported = true, editingArea = false;
+let todayPins = {}, pinsSupported = true, perListSupported = true, areasSupported = true, privateListsSupported = true, followUpsSupported = true, dueTimeSupported = true, photosSupported = true, editingArea = false;
 // New tasks are due tomorrow unless you pick another date (or clear it).
 const defaultDue = () => addDays(todayStr(), 1);
 const filter = { who: "all", hideDone: false, q: "" };
@@ -734,6 +783,7 @@ const ICON = {
   chevron: '<path d="M7 4.5L11.5 9 7 13.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
   clock: '<circle cx="9" cy="9" r="7" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9 5.3V9l2.6 1.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
   area: '<rect x="2.5" y="4" width="13" height="10.5" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M2.5 7.5h13" stroke="currentColor" stroke-width="1.8"/>',
+  archive: '<rect x="2.5" y="3.5" width="13" height="3.5" rx="1" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.8 7v6a1.5 1.5 0 0 0 1.5 1.5h7.4a1.5 1.5 0 0 0 1.5-1.5V7M7.2 10h3.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
   grip: '<g fill="currentColor"><circle cx="6.5" cy="4.5" r="1.4"/><circle cx="11.5" cy="4.5" r="1.4"/><circle cx="6.5" cy="9" r="1.4"/><circle cx="11.5" cy="9" r="1.4"/><circle cx="6.5" cy="13.5" r="1.4"/><circle cx="11.5" cy="13.5" r="1.4"/></g>',
 };
 
@@ -970,13 +1020,14 @@ const store = {
     const { data } = await sb.client.auth.getSession();
     if (linkError || back.has("access_token")) history.replaceState(null, "", location.pathname);
     if (!data.session) {
+      photos.forgetAll(); taskFiles.forgetAll(); // in case signing out was cut short
       showSignIn();
       if (linkError) $("#signin-msg").textContent = `That link didn't work (${linkError.replace(/\+/g, " ")}). Each link works once and expires after about an hour. Send yourself a new one below.`;
       return;
     }
     meId = data.session.user.id;
     // Also when signed out from another device ("Sign out" there ends every session).
-    sb.client.auth.onAuthStateChange((event) => { if (event === "SIGNED_OUT") { sb.forget(); location.reload(); } });
+    sb.client.auth.onAuthStateChange((event) => { if (event === "SIGNED_OUT") { sb.forget(); Promise.all([photos.forget(), taskFiles.forget()]).finally(() => location.reload()); } });
     sb.restore();
     await sb.flush();  // changes left from an earlier offline session go first
     sb.subscribe();
@@ -989,6 +1040,12 @@ const store = {
     sb.client.from("lists").select("private").limit(1).then(({ error }) => { privateListsSupported = !error || isNetworkError(error); render(); });
     // Areas need the kind column from supabase/migrations/007_areas.sql; until then the Tasks view says so.
     sb.client.from("tasks").select("kind").limit(1).then(({ error }) => { areasSupported = !error || isNetworkError(error); render(); });
+    // The "Follow-up of" link needs supabase/migrations/012_follow_ups.sql; until then a next step is a plain new task.
+    sb.client.from("tasks").select("follow_up_of").limit(1).then(({ error }) => { followUpsSupported = !error || isNetworkError(error); });
+    // Reminders at a time of day need supabase/migrations/013_reminders.sql; until then the editor has no time field and says so.
+    sb.client.from("tasks").select("remind_by").limit(1).then(({ error }) => { dueTimeSupported = !error || isNetworkError(error); });
+    // Photos of shopping items need supabase/migrations/015_item_photos.sql; until then the item editor says so.
+    sb.client.from("items").select("photo").limit(1).then(({ error }) => { photosSupported = !error || isNetworkError(error); if (editingItem) renderItemPhoto(); });
     // Per-list frequent items need supabase/migrations/003_catalog_per_list.sql; until then Frequent is shared.
     sb.client.from("catalog").select("list_counts").limit(1).then(({ error }) => { perListSupported = !error || isNetworkError(error); if (view === "shopping") renderChips(); });
   },
@@ -1090,7 +1147,7 @@ async function setPrivacy(id, makePrivate, rootData) {
       const cur = tasks.get(i);
       if (!cur || (i !== id && !!cur.private === makePrivate)) continue;
       const base = i === id ? (({ private: _p, ...r }) => r)(rootData) : {};
-      await store.update("tasks", i, { ...base, private: makePrivate, ...(makePrivate ? { assignee: "", owner: meId } : {}) });
+      await store.update("tasks", i, { ...base, private: makePrivate, ...(makePrivate ? { assignee: "", owner: meId } : { assignee: rootData.assignee }) });
     }
     return;
   }
@@ -1098,23 +1155,32 @@ async function setPrivacy(id, makePrivate, rootData) {
     const cur = i === id ? { ...tasks.get(i), ...rootData } : tasks.get(i);
     if (!cur || (i !== id && !!cur.private === makePrivate)) continue;
     const { id: _id, private: _p, ...rest } = cur;
-    await store.put(makePrivate ? privColl() : "tasks", i, makePrivate ? { ...rest, private: true, assignee: "" } : rest);
+    await store.put(makePrivate ? privColl() : "tasks", i, makePrivate ? { ...rest, private: true, assignee: "" } : { ...rest, assignee: rootData.assignee });
     await store.remove(makePrivate ? "tasks" : privColl(), i);
   }
 }
 
 function startListening() {
-  store.listen("tasks", (m) => { sharedTasks = m; mergeTasks(); loaded = true; render(); });
+  store.listen("tasks", (m) => { sharedTasks = m; mergeTasks(); loaded = true; render(); if (taskFiles.ready) taskFiles.sync(); });
   if (privColl()) store.listen(privColl(), (m) => { privateTasks = m; mergeTasks(); render(); });
   store.listen("comments", (m) => { comments = m; render(); if (editingId) renderComments(); });
   store.listenDoc("config/people", (d) => { people = { ...DEFAULT_PEOPLE, ...(d || {}) }; render(); });
   store.listenRecent("history", "at", 150, (arr) => { activity = arr; render(); });
-  store.listen("items", (m) => { items = m; render(); if (editingId) renderTaskShop(); });
+  store.listen("items", (m) => { items = m; render(); if (editingId) renderTaskShop(); if (editingItem) renderItemPhoto(); photos.sync(); });
   store.listen("lists", (m) => { lists = m; render(); if (!$("#lists-panel").hidden && !$("#lists-panel").contains(document.activeElement)) renderListsPanel(); });
   store.listen("catalog", (m) => { catalog = m; if (view === "shopping") renderChips(); });
   listenIdeas();
   listenChecklists();
+  listenSeenMarks();
+  listenAttachments();
   if (meId) store.listenDoc("data/users/" + meId + "/seen", (d) => { seen = d?.map || {}; activitySeenAt = d?.activityAt || 0; shoppingSeenAt = d?.shoppingAt || 0; todayPins = d?.today || {}; render(); });
+}
+
+// Files on tasks need supabase/migrations/016_task_attachments.sql; until then the task editor says so.
+function listenAttachments() {
+  const cb = (m) => { attachments = m; attachmentsSupported = true; taskFiles.ready = true; render(); if (editingId) renderAttachments(); taskFiles.sync(); };
+  if (store.mode === "supabase") sb.listen("attachments", cb).catch(() => { attachmentsSupported = false; delete sb.queries.attachments; if (editingId) renderAttachments(); });
+  else store.listen("attachments", cb);
 }
 
 // ---- people and identity ----
@@ -1124,7 +1190,14 @@ const slotName = (s) => s === "a" ? people.a : s === "b" ? people.b : "";
 const pc = (s) => s === "a" || s === "b" ? "p-" + s : s === "both" ? "p-both" : "";
 const assigneeName = (a) => a === "both" ? "Both" : slotName(a);
 const cleanPeople = () => ({ a: people.a, b: people.b, aUser: people.aUser || null, bUser: people.bUser || null });
-const isMine = (t, me = mySlot()) => !!me && (t.assignee === me || t.assignee === "both");
+// Every shared task belongs to someone: a name or Both. Empty on a shared task (offline device, migration 014 not run yet) counts as Both;
+// private tasks and areas have no assignee.
+const assigneeOf = (t) => t && !t.private && !isArea(t) ? t.assignee || "both" : "";
+// A new task under another task takes that task's person; directly under an area or in the Inbox it's Both.
+const inheritedAssignee = (parentId) => assigneeOf(tasks.get(parentId)) || "both";
+const assignedNote = (a) => a && a !== "both" && a !== mySlot() ? ` and assigned it to ${assigneeName(a)}` : "";
+const personOptions = () => [["a", people.a], ["b", people.b], ["both", "Both"]].map(([v, l]) => h("option", { value: v }, l));
+const isMine = (t, me = mySlot()) => { const a = assigneeOf(t); return !!me && (a === me || a === "both"); };
 // "New for you": assigned to you by the other person, and you haven't opened it since.
 const isNew = (t) => { const me = mySlot(); return isMine(t, me) && !t.archived && t.status !== "done" && !!t.assignedBy && t.assignedBy !== me && seen[t.id] !== t.assignedAt; };
 async function markSeen(ids) {
@@ -1138,6 +1211,42 @@ async function markSeen(ids) {
 function saveSeen() {
   if (meId) store.setDoc("data/users/" + meId + "/seen", { map: seen, activityAt: activitySeenAt, shoppingAt: shoppingSeenAt, today: todayPins }).catch(() => {});
 }
+
+// ---- seen markers: "Wiola saw it 10:42" ----
+// A mark is written the first time you open a task the other person assigned to you, or see their comment
+// (supabase/migrations/011_seen_marks.sql; until it runs there are no marks). You see only the other person's marks.
+let seenMarks = new Map(), marksSupported = false, marking = false;
+function listenSeenMarks() {
+  const cb = (m) => { seenMarks = m; marksSupported = true; if (editingId) { renderAssignedBy(tasks.get(editingId)); renderComments(); } };
+  if (store.mode === "supabase") sb.listen("seen_marks", cb).catch(() => { marksSupported = false; });
+  else store.listen("seen_marks", cb);
+}
+const markId = (uid, taskId, kind, ref) => [uid, taskId, kind, ref].join(":");
+const otherSlot = () => ({ a: "b", b: "a" })[mySlot()] || null;
+function theirMark(taskId, kind, ref) {
+  const o = otherSlot(), uid = o && people[o + "User"];
+  return uid ? seenMarks.get(markId(uid, taskId, kind, ref)) || null : null;
+}
+function markOpened(t) {
+  const me = mySlot();
+  if (!marksSupported || marking || !me || !t || t.private || !canWrite() || document.visibilityState !== "visible") return;
+  const want = [];
+  if (isMine(t, me) && t.assignedBy && t.assignedBy !== me && t.assignedAt) want.push(["assigned", String(t.assignedAt)]);
+  for (const c of commentsBy.get(t.id) || []) if (c.by && c.by !== me) want.push(["comment", c.id]);
+  marking = true; // writing fires the listener, which renders the comments again
+  try {
+    for (const [kind, ref] of want) {
+      const id = markId(meId, t.id, kind, ref);
+      if (!seenMarks.has(id)) store.put("seen_marks", id, { userId: meId, taskId: t.id, kind, ref, at: Date.now() }).catch(() => {});
+    }
+  } finally { marking = false; }
+}
+function seenWhen(ms) {
+  const d = new Date(ms), y = new Date(), time = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  y.setDate(y.getDate() - 1);
+  return d.toDateString() === new Date().toDateString() ? time : d.toDateString() === y.toDateString() ? "yesterday " + time : fmtStamp(ms);
+}
+const seenLabel = (m) => h("span", { class: "seen-mark" }, h("b", { class: pc(otherSlot()) || null }, slotName(otherSlot())), " saw it " + seenWhen(m.at));
 // Activity and Shopping highlight what the other person did since you last looked at them.
 function switchView(k) {
   if (k === view) return;
@@ -1200,22 +1309,24 @@ function log(taskId, text, title) { if (tasks.get(taskId)?.private) return; stor
 const FIELD_LOG = {
   title: (v) => `renamed it to “${v}”`,
   status: (v) => `changed the status to ${STATUS[v]}`,
-  assignee: (v) => v ? `assigned it to ${assigneeName(v)}` : "removed the assignee",
+  assignee: (v) => `assigned it to ${assigneeName(v)}`,
   due: (v) => v ? `set the due date to ${fmtDate(v)}` : "removed the due date",
+  dueTime: (v) => v ? `set the time to ${v}` : "removed the time",
+  remindBefore: (v) => v ? `set a reminder ${remindText(v)}` : "removed the reminder",
   priority: (v) => `set the priority to ${PRIORITY[v]}`,
   repeat: (v) => v ? `set it to repeat ${REPEAT[v].toLowerCase()}` : "stopped it repeating",
   parentId: (v) => v ? `moved it under “${tasks.get(v)?.title || "another task"}”` : "moved it to the top level",
   notes: () => "edited the notes",
 };
 function describeChanges(before, data) {
-  const b = { status: "todo", priority: "normal", ...before };
+  const b = { status: "todo", priority: "normal", ...before, assignee: assigneeOf(before) };
   return Object.keys(FIELD_LOG).filter((k) => (b[k] || "") !== (data[k] || "")).map((k) => FIELD_LOG[k](data[k])).join("; ");
 }
 
 // ---- tree helpers ----
 // byParent holds the active tree; byParentAll also includes archived tasks.
 function buildIndex() {
-  byParent = new Map(); byParentAll = new Map(); commentsBy = new Map();
+  byParent = new Map(); byParentAll = new Map(); commentsBy = new Map(); attachmentsBy = new Map();
   const push = (map, p, t) => { if (!map.has(p)) map.set(p, []); map.get(p).push(t); };
   for (const t of tasks.values()) {
     const parent = tasks.get(t.parentId);
@@ -1224,6 +1335,8 @@ function buildIndex() {
   }
   for (const map of [byParent, byParentAll]) for (const arr of map.values()) arr.sort((a, b) => (a.order || 0) - (b.order || 0));
   for (const c of comments.values()) push(commentsBy, c.taskId, c);
+  for (const a of attachments.values()) push(attachmentsBy, a.taskId, a);
+  for (const arr of attachmentsBy.values()) arr.sort((a, b) => (a.at || 0) - (b.at || 0));
   toBuyBy = new Map();
   for (const i of items.values()) if (i.taskId && !i.bought) toBuyBy.set(i.taskId, (toBuyBy.get(i.taskId) || 0) + 1);
   for (const arr of commentsBy.values()) arr.sort((a, b) => (a.at || 0) - (b.at || 0));
@@ -1244,7 +1357,7 @@ const inboxTasks = () => childrenOf("").filter((t) => !isArea(t));
 function pathOf(t) { const names = []; for (let p = tasks.get(t.parentId); p; p = tasks.get(p.parentId)) names.unshift(p.title || "Untitled"); return names.join(" › "); }
 function sortTasks(arr) {
   const a = [...arr], byOrder = (x, y) => (x.order || 0) - (y.order || 0);
-  if (sortMode === "due") a.sort((x, y) => (x.due || "9999").localeCompare(y.due || "9999") || byOrder(x, y));
+  if (sortMode === "due") a.sort((x, y) => (x.due || "9999").localeCompare(y.due || "9999") || byTime(x, y) || byOrder(x, y));
   else if (sortMode === "priority") a.sort((x, y) => (PRIO_RANK[x.priority] ?? 1) - (PRIO_RANK[y.priority] ?? 1) || byOrder(x, y));
   return a;
 }
@@ -1268,6 +1381,14 @@ function fmtDate(s) {
   if (dt.getFullYear() !== new Date().getFullYear()) opts.year = "numeric";
   return dt.toLocaleDateString(undefined, opts);
 }
+const fmtDue = (due, time) => fmtDate(due) + (time ? " · " + time : "");
+// Within a day: tasks with a time first, earliest first.
+const byTime = (x, y) => (x.dueTime || "99").localeCompare(y.dueTime || "99");
+// Reminders: minutes before the task's date and time, longest first. Stored comma separated ("1440,60"; "" = none).
+const REMIND = [["1440", "24 hours before", "24h"], ["60", "1 hour before", "1h"], ["15", "15 minutes before", "15 min"], ["0", "At the time", "at the time"]];
+const DEFAULT_REMIND = "60";
+const remindList = (v) => REMIND.filter(([m]) => (v || "").split(",").includes(m));
+const remindText = (v) => remindList(v).map(([, l]) => l.toLowerCase()).join(", ");
 const fmtStamp = (ms) => new Date(ms).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 // ---- recurring tasks: closing one creates the next, with its subtasks ----
@@ -1280,8 +1401,9 @@ async function spawnNext(t) {
   const shift = t.due ? Math.round((parseDate(due) - parseDate(t.due)) / 864e5) : null;
   const copy = async (src, parentId, isRoot) => {
     const id = await addTask({
-      title: src.title, status: "todo", assignee: src.assignee || "", priority: src.priority || "normal", notes: src.notes || "", parentId,
+      title: src.title, status: "todo", assignee: assigneeOf(src), priority: src.priority || "normal", notes: src.notes || "", parentId,
       due: isRoot ? due : src.due && shift != null ? addDays(src.due, shift) : "",
+      ...(src.dueTime ? { dueTime: src.dueTime, remindBefore: src.remindBefore || "", remindBy: src.remindBy || "" } : {}),
       repeat: isRoot ? src.repeat : "", order: isRoot ? (src.order || 0) + 0.5 : src.order || 0, createdAt: Date.now(),
       assignedBy: "", assignedAt: 0, private: !!src.private,
     });
@@ -1370,11 +1492,12 @@ function renderTask(t, depth) {
   if (status === "doing" && !archived) meta.append(h("span", { class: "chip doing" }, "In progress"));
   if (t.priority === "high") meta.append(h("span", { class: "prio-high" }, "High priority"));
   if (t.priority === "low") meta.append(h("span", { class: "prio-low" }, "Low priority"));
-  if (t.assignee) meta.append(h("span", { class: "chip " + pc(t.assignee) }, assigneeName(t.assignee)));
+  if (assigneeOf(t)) meta.append(h("span", { class: "chip " + pc(assigneeOf(t)) }, assigneeName(assigneeOf(t))));
   if (t.due) {
     const cls = archived ? "" : status !== "done" && t.due < today ? " over" : status !== "done" && t.due === today ? " today" : "";
-    meta.append(h("span", { class: "date" + cls }, (cls === " over" ? "Overdue · " : cls === " today" ? "Today · " : "Due ") + fmtDate(t.due)));
+    meta.append(h("span", { class: "date" + cls }, (cls === " over" ? "Overdue · " : cls === " today" ? "Today · " : "Due ") + fmtDue(t.due, t.dueTime)));
   }
+  if (t.dueTime && t.remindBefore && status !== "done" && !archived) meta.append(h("span", {}, "Remind " + remindList(t.remindBefore).map(([, , s]) => s).join(", ")));
   if (t.repeat) meta.append(h("span", {}, "↻ " + REPEAT[t.repeat]));
   if (counted.length) {
     const nd = counted.filter((k) => k.status === "done").length;
@@ -1384,6 +1507,8 @@ function renderTask(t, depth) {
   if (nb) meta.append(h("span", {}, nb + " to buy"));
   const nc = (commentsBy.get(t.id) || []).length;
   if (nc) meta.append(h("span", {}, nc + (nc === 1 ? " comment" : " comments")));
+  const nf = (attachmentsBy.get(t.id) || []).length;
+  if (nf) meta.append(h("span", {}, nf + (nf === 1 ? " file" : " files")));
   if (t.notes) meta.append(h("span", { title: "Has notes" }, "Notes"));
 
   const row = h("div", { class: "row" + (matches(t) ? "" : " ctx") + (status === "done" ? " is-done" : ""), style: "--d:" + depth, "data-depth": depth },
@@ -1400,6 +1525,8 @@ function renderTask(t, depth) {
     h("button", { type: "button", class: "main", onclick: () => openEditor(t.id) }, h("span", { class: "title" }, t.title || "Untitled"), meta),
     canWrite() && !archived && status !== "done"
       ? h("button", { type: "button", class: "day", title: "My day or postpone", "aria-label": "Add to My day or postpone: " + t.title, onclick: () => openDayMenu(t) }, svg(ICON.clock, 17))
+      : canWrite() && !archived
+      ? h("button", { type: "button", class: "day", title: "Move to archive", "aria-label": "Move to archive: " + t.title, onclick: () => askArchive(t.id) }, svg(ICON.archive, 17))
       : h("span"),
     canWrite() && !archived && !flat && status !== "done"
       ? h("button", { type: "button", class: "add", title: "Add subtask", "aria-label": "Add subtask under " + t.title, onclick: () => openEditor(null, t.id) }, "+")
@@ -1486,7 +1613,7 @@ function render() {
   if (view === "upcoming") {
     const today = todayStr(), week = addDays(today, 7);
     const dated = [...tasks.values()].filter((t) => !t.archived && t.status !== "done" && t.due);
-    const items = dated.filter(matches).sort((x, y) => x.due.localeCompare(y.due) || (PRIO_RANK[x.priority] ?? 1) - (PRIO_RANK[y.priority] ?? 1));
+    const items = dated.filter(matches).sort((x, y) => x.due.localeCompare(y.due) || byTime(x, y) || (PRIO_RANK[x.priority] ?? 1) - (PRIO_RANK[y.priority] ?? 1));
     const groups = [["Overdue", (t) => t.due < today, true], ["Today", (t) => t.due === today], ["Next 7 days", (t) => t.due > today && t.due <= week], ["Later", (t) => t.due > week]];
     if (!dated.length) list.replaceChildren(h("div", { class: "empty" }, h("strong", {}, "Nothing due"),
       h("span", {}, "Open tasks with a due date show up here, soonest first, wherever they sit in the hierarchy.")));
@@ -1533,23 +1660,22 @@ function todayLists() {
   const me = mySlot(), today = todayStr();
   const open = [...tasks.values()].filter((t) => !t.archived && t.status !== "done");
   const forMe = (t) => !me || t.private || isMine(t, me);
-  const byDue = (x, y) => (x.due || "").localeCompare(y.due || "") || (PRIO_RANK[x.priority] ?? 1) - (PRIO_RANK[y.priority] ?? 1);
+  const byDue = (x, y) => (x.due || "").localeCompare(y.due || "") || byTime(x, y) || (PRIO_RANK[x.priority] ?? 1) - (PRIO_RANK[y.priority] ?? 1);
   const overdue = open.filter((t) => forMe(t) && t.due && t.due < today).sort(byDue);
   const dueToday = open.filter((t) => forMe(t) && t.due === today).sort(byDue);
   const taken = new Set([...overdue, ...dueToday].map((t) => t.id));
   const pinned = open.filter((t) => isPinned(t) && !taken.has(t.id)).sort(byDue);
   pinned.forEach((t) => taken.add(t.id));
-  const unassigned = me ? open.filter((t) => !t.private && !t.assignee && t.due && t.due <= today && !taken.has(t.id)).sort(byDue) : [];
-  return { overdue, dueToday, pinned, unassigned };
+  return { overdue, dueToday, pinned };
 }
 function renderToday(list) {
-  const { overdue, dueToday, pinned, unassigned } = todayLists();
+  const { overdue, dueToday, pinned } = todayLists();
   const out = [];
   if (!mySlot()) out.push(h("p", { class: "hint", style: "padding: 8px 10px" }, "Showing everyone's tasks. Choose who you are in the blue banner to see just yours."));
-  for (const [label, g, over] of [["Overdue", overdue, true], ["Due today", dueToday], ["My day", pinned], ["Due, but nobody's assigned", unassigned]]) {
+  for (const [label, g, over] of [["Overdue", overdue, true], ["Due today", dueToday], ["My day", pinned]]) {
     if (g.length) out.push(h("div", { class: "group-head" + (over ? " over" : "") }, label, h("span", { class: "n" }, String(g.length))), ...g.map((t) => renderTask(t, 0)));
   }
-  if (!overdue.length && !dueToday.length && !pinned.length && !unassigned.length) out.push(h("div", { class: "empty" },
+  if (!overdue.length && !dueToday.length && !pinned.length) out.push(h("div", { class: "empty" },
     h("strong", {}, "Nothing for today"),
     h("span", {}, "Tasks due today or overdue for you show up here. Add any task to My day with its clock button, or add a new one with +.")));
   list.replaceChildren(...out);
@@ -1585,7 +1711,7 @@ const thisWeekend = () => [0, 6].includes(new Date().getDay()) ? todayStr() : ad
 const daysUntil = (weekday) => { const n = (weekday - new Date().getDay() + 7) % 7; return n || 7; }; // next one, never today
 async function setDue(t, due) {
   try {
-    await updTask(t.id, { due });
+    await updTask(t.id, { due, ...(t.dueTime ? (due ? { remindBy: mySlot() || "" } : { dueTime: "", remindBefore: "" }) : {}) }); // a new date keeps the time, so it reminds again
     if (due && due > todayStr() && isPinned(t)) await togglePin(t); // postponed: no longer for today
     log(t.id, due ? `postponed it to ${fmtDate(due)}` : "removed the due date");
     toast(due ? `Moved to ${fmtDate(due)}` : "Due date removed");
@@ -1619,8 +1745,9 @@ function renderSearch(list) {
   const hits = [];
   for (const t of tasks.values()) {
     const c = (commentsBy.get(t.id) || []).find((x) => has(x.text));
-    if (!has(t.title) && !has(t.notes) && !c) continue;
-    if (!has(t.title)) searchSnippets.set(t.id, c ? `Comment: “${c.text.slice(0, 80)}${c.text.length > 80 ? "…" : ""}”` : "Match in the notes");
+    const file = (attachmentsBy.get(t.id) || []).find((x) => has(x.name));
+    if (!has(t.title) && !has(t.notes) && !c && !file) continue;
+    if (!has(t.title)) searchSnippets.set(t.id, c ? `Comment: “${c.text.slice(0, 80)}${c.text.length > 80 ? "…" : ""}”` : file && !has(t.notes) ? `File: ${file.name}` : "Match in the notes");
     hits.push(t);
   }
   const rank = (t) => (t.archived ? 2 : t.status === "done" ? 1 : 0);
@@ -1711,6 +1838,8 @@ function parseQuick(text) {
     }],
   ];
   for (const [re, fn] of dateRules) { const d = take(re, fn); if (d) { out.due = d; break; } }
+  // time: "10:30", "at 9:05", "o 10:30"
+  if (dueTimeSupported) out.dueTime = take(new RegExp("(^|\\s)(?:at |o |godz\\.? )?(\\d{1,2}):(\\d{2})" + end), (m) => +m[2] < 24 && +m[3] < 60 ? m[2].padStart(2, "0") + ":" + m[3] : undefined) || "";
   // title = what's left
   let title = "";
   let pos = 0;
@@ -1728,8 +1857,8 @@ function renderQuickPreview() {
   const p = parseQuick($("#quick-input").value), parent = tasks.get(p.parentId);
   const chips = [
     p.title && "“" + p.title + "”",
-    p.title && "Due " + new Date(parseDate(p.due || defaultDue())).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" }) + (p.due ? "" : " (default)"),
-    p.assignee && "For " + assigneeName(p.assignee),
+    p.title && "Due " + new Date(parseDate(p.due || defaultDue())).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" }) + (p.dueTime ? " · " + p.dueTime : "") + (p.due ? "" : " (default)"),
+    (p.assignee || (parent && !parent.private)) && "For " + assigneeName(p.assignee || inheritedAssignee(p.parentId)),
     parent && "Under " + (pathOf(parent) ? pathOf(parent) + " › " : "") + parent.title,
     p.priority !== "normal" && PRIORITY[p.priority] + " priority",
   ].filter(Boolean);
@@ -1759,18 +1888,18 @@ $("#quick-form").addEventListener("submit", async (e) => {
   const p = parseQuick($("#quick-input").value);
   if (!p.title) { $("#quick-input").focus(); return; }
   const parent = tasks.get(p.parentId), now = Date.now(), isPrivate = !!parent?.private;
-  const assignee = isPrivate ? "" : p.assignee || mySlot() || ""; // new tasks are yours unless you name someone
+  const assignee = isPrivate ? "" : p.assignee || inheritedAssignee(p.parentId); // naming someone wins
   try {
     const id = await addTask({
-      title: p.title, status: "todo", assignee, priority: p.priority, due: p.due || defaultDue(), repeat: "", parentId: p.parentId, notes: "",
+      title: p.title, status: "todo", assignee, priority: p.priority, due: p.due || defaultDue(), ...(p.dueTime ? { dueTime: p.dueTime, remindBefore: DEFAULT_REMIND, remindBy: mySlot() || "" } : {}), repeat: "", parentId: p.parentId, notes: "",
       order: now, createdAt: now, private: isPrivate, ...(assignee ? { assignedBy: mySlot() || "", assignedAt: now } : {}),
     });
-    if (!isPrivate) log(id, "created it" + (assignee && assignee !== mySlot() ? ` and assigned it to ${assigneeName(assignee)}` : ""), p.title);
+    if (!isPrivate) log(id, "created it" + assignedNote(assignee), p.title);
     if (assignee) notifyEvent("assigned", id);
     if (p.parentId) { collapsed.delete(p.parentId); saveCollapsed(); }
     $("#quick-input").value = "";
     renderQuickPreview();
-    toast(`Added “${p.title}”, due ${fmtDate(p.due || defaultDue())}.`, { label: "Show", run: () => { closeQuick(); showTask(id); } });
+    toast(`Added “${p.title}”, due ${fmtDue(p.due || defaultDue(), p.dueTime)}.`, { label: "Show", run: () => { closeQuick(); showTask(id); } });
   } catch (err) { writeFailed(err); }
 });
 $("#quick-more").addEventListener("click", () => {
@@ -1779,8 +1908,11 @@ $("#quick-more").addEventListener("click", () => {
   openEditor(null, p.parentId);
   $("#f-title").value = p.title;
   $("#f-due").value = p.due || defaultDue();
+  $("#f-time").value = p.dueTime || "";
+  edRemind = p.dueTime ? new Set([DEFAULT_REMIND]) : null;
   $("#f-priority").value = p.priority;
-  if (!tasks.get(p.parentId)?.private) $("#f-assignee").value = p.assignee || mySlot() || "";
+  if (p.assignee && !tasks.get(p.parentId)?.private) { $("#f-assignee").value = p.assignee; edPicked = true; }
+  renderTimeHint();
 });
 // Press N anywhere (not while typing) to quick-add.
 document.addEventListener("keydown", (e) => {
@@ -1930,10 +2062,108 @@ async function changeStatus(t, next) {
     }
   } catch (err) { writeFailed(err); }
 }
-async function afterClose(t, choice) {
+async function afterClose(t, choice, offerNext = true) {
   const next = t.repeat ? await spawnNext(t) : null;
   if (choice === "archive") return archiveTask(t.id);
-  toast(next ? `Closed. The next one is due ${fmtDate(next)}` : `Closed “${t.title || "task"}”`, { label: "Move to archive", run: () => archiveTask(t.id) });
+  // Already on the way to the next step form: only say what it wouldn't show.
+  if (!offerNext) { if (next) toast(`Closed. The next one is due ${fmtDate(next)}`); return; }
+  toast(next ? `Closed. The next one is due ${fmtDate(next)}` : `Closed “${t.title || "task"}”`, [
+    canWrite() && { label: "Next step", run: () => openNextStep(t.id) },
+    { label: "Move to archive", run: () => archiveTask(t.id) }]);
+}
+
+// ---- done + next step: what came out of a closed task, and the follow-up task it leads to ----
+async function openNextStep(id) {
+  const t = tasks.get(id); if (!t) return;
+  const isPrivate = !!t.private, inParent = parentKey(t);
+  const res = await showModal((m, finish) => {
+    m.classList.add("quick");
+    const outcome = h("textarea", { id: "ns-outcome", maxlength: "2000", style: "min-height: 64px", placeholder: isPrivate ? "Saved in the task's notes" : "Saved as a comment on the task" });
+    // One row per next step; a row without a title is ignored.
+    const rows = [], rowsBox = h("div", { class: "next-steps" });
+    const filled = () => rows.filter((r) => r.title.value.trim());
+    const save = () => {
+      const steps = filled().map((r) => ({ title: r.title.value.trim(), due: r.due.value, assignee: isPrivate ? "" : r.person.value }));
+      if (outcome.value.trim() || steps.length) finish({ outcome: outcome.value.trim(), steps }); else rows[0].title.focus();
+    };
+    // With an outcome but no next step, the button saves just the outcome.
+    const yes = h("button", { class: "btn primary", type: "button", id: "modal-yes", onclick: save }, "Add next step");
+    const relabel = () => { const n = filled().length; yes.textContent = n > 1 ? `Add ${n} next steps` : !n && outcome.value.trim() ? "Save without next step" : "Add next step"; };
+    outcome.addEventListener("input", relabel);
+    const addRow = () => {
+      const n = rows.length + 1, k = (x) => `ns-${x}-${n}`;
+      const title = h("input", { type: "text", id: k("title"), maxlength: "200", enterkeyhint: "done", placeholder: n === 1 ? "e.g. Send Jan the measurements" : null });
+      const due = h("input", { type: "date", id: k("due"), value: defaultDue() });
+      const person = h("select", { id: k("person") }, personOptions());
+      person.value = assigneeOf(t) || "both";
+      title.addEventListener("input", relabel);
+      title.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); save(); } });
+      rows.push({ title, due, person });
+      rowsBox.append(h("div", { class: "next-step" },
+        h("div", { class: "field" }, h("label", { for: k("title") }, n === 1 ? "Next step" : `Next step ${n}`), title),
+        h("div", { class: isPrivate ? "field" : "two" },
+          isPrivate ? [h("label", { for: k("due") }, "Date"), due] : [
+            h("div", { class: "field" }, h("label", { for: k("due") }, "Date"), due),
+            h("div", { class: "field" }, h("label", { for: k("person") }, "Person"), person)])));
+      title.focus();
+    };
+    fill(m,
+      h("h2", { id: "modal-title" }, `Next step after “${t.title || "Untitled"}”`),
+      h("div", { class: "field" }, h("label", { for: "ns-outcome" }, "What came out of it? (optional)"), outcome),
+      rowsBox,
+      h("div", {}, h("button", { class: "btn small", type: "button", id: "ns-another", onclick: addRow }, "+ Another step")),
+      h("p", { class: "hint" }, `Next steps go in ${inParent ? pathOf(t) : "the Inbox"}.`, isPrivate && " Private, like this task: only you can see them."),
+      !followUpsSupported && h("p", { class: "hint" }, "The “Follow-up of” link needs the database update: run supabase/migrations/012_follow_ups.sql in Supabase."),
+      h("div", { class: "actions" }, h("button", { class: "btn", type: "button", onclick: () => finish(false) }, "Skip"), yes));
+    addRow();
+  });
+  $("#cascade").classList.remove("quick");
+  if (!res) return;
+  try {
+    if (res.outcome) {
+      // Private tasks have no comments, so there the outcome goes into the notes.
+      if (isPrivate) await updTask(id, { notes: [t.notes, "Outcome: " + res.outcome].filter(Boolean).join("\n") });
+      else {
+        await store.add("comments", { taskId: id, text: res.outcome, by: mySlot() || "", byUser: meId || "", at: Date.now() });
+        notifyEvent("comment", id, res.outcome);
+      }
+    }
+    if (!res.steps.length) { toast("Saved what came out of it"); return; }
+    const now = Date.now();
+    // Started together, so they all land on the device at once and wait in the outbox together when offline.
+    const newIds = await Promise.all(res.steps.map((s, i) => addTask({
+      title: s.title, status: "todo", assignee: s.assignee, priority: "normal", due: s.due, repeat: "", parentId: inParent, notes: "",
+      order: now + i, createdAt: now + i, private: isPrivate, ...(followUpsSupported ? { followUpOf: id } : {}), ...(s.assignee ? { assignedBy: mySlot() || "", assignedAt: now } : {}),
+    })));
+    res.steps.forEach((s, i) => {
+      if (!isPrivate) log(newIds[i], `created it as a next step after “${t.title}”` + assignedNote(s.assignee), s.title);
+      if (s.assignee) notifyEvent("assigned", newIds[i]);
+    });
+    if (inParent) { collapsed.delete(inParent); saveCollapsed(); }
+    await reopenAncestors(inParent);
+    const first = res.steps[0];
+    toast(res.steps.length > 1 ? `Added ${res.steps.length} next steps` : `Next step added: “${first.title}”` + (first.due ? `, due ${fmtDate(first.due)}` : ""), { label: "Show", run: () => showTask(newIds[0]) });
+  } catch (err) { writeFailed(err); }
+}
+// In the editor: "Follow-up of: …" and "Follow-up: …" (tap to open), and the button that closes the task and asks for the next step.
+function renderFollowUps(t) {
+  const box = $("#follow-links"), linked = followUpsSupported && !!t;
+  const link = (label, x) => h("button", { type: "button", class: "follow-link", onclick: () => { openEditor(x.id); $("#editor .fields").scrollTop = 0; } },
+    `${label}: ${x.title || "Untitled"}` + (x.status === "done" ? " (done)" : ""));
+  const of = linked && t.followUpOf && tasks.get(t.followUpOf);
+  const after = linked ? [...tasks.values()].filter((x) => x.followUpOf === t.id).sort((x, y) => (x.createdAt || 0) - (y.createdAt || 0)) : [];
+  const w = canWrite() && t && !t.archived;
+  fill(box, of && link("Follow-up of", of), after.map((x) => link("Follow-up", x)),
+    w && h("button", { type: "button", class: "btn small", id: "next-step-btn", onclick: askNextStep }, t.status === "done" ? "Add a next step" : "Done + next step"));
+  box.hidden = !box.childElementCount;
+}
+// Saves the editor as usual (closing the task if it's open), then opens the next step form.
+let nextStepAsked = false;
+function askNextStep() {
+  if (!$("#f-title").value.trim()) { $("#f-title").focus(); return; }
+  if (tasks.get(editingId)?.status !== "done") $("#s-done").checked = true;
+  nextStepAsked = true;
+  $("#ed-form").requestSubmit();
 }
 
 // ---- archive: a task moves there together with everything below it ----
@@ -1974,7 +2204,7 @@ function closePanels() {
   editingId = null; editingItem = null; resetFoot(); lastFocus?.focus?.();
 }
 function openEditor(id, parentId = "", opts = {}) {
-  const t = id ? tasks.get(id) : { status: "todo", priority: "normal", assignee: opts.area ? "" : mySlot() || "", repeat: "", parentId, due: opts.area ? "" : defaultDue(), private: !!tasks.get(parentId)?.private };
+  const t = id ? tasks.get(id) : { status: "todo", priority: "normal", assignee: opts.area ? "" : inheritedAssignee(parentId), repeat: "", parentId, due: opts.area ? "" : defaultDue(), private: !!tasks.get(parentId)?.private };
   if (!t) return;
   editingId = id;
   const area = editingArea = id ? isArea(t) : !!opts.area;
@@ -1983,29 +2213,36 @@ function openEditor(id, parentId = "", opts = {}) {
   $("#f-title").value = t.title || "";
   for (const s of Object.keys(STATUS)) { $("#s-" + s).checked = (t.status || "todo") === s; $("label[for=s-" + s + "]").replaceChildren(svg(ICON[s], 16), h("span", {}, STATUS[s])); }
   const asg = $("#f-assignee");
-  asg.replaceChildren(...[["", "No one"], ["a", people.a], ["b", people.b], ["both", "Both"]].map(([v, l]) => h("option", { value: v }, l)));
-  asg.value = t.assignee || "";
-  const ab = $("#assigned-by");
-  ab.hidden = !(t.assignee && t.assignedBy && t.assignedAt);
-  if (!ab.hidden) ab.textContent = `Assigned by ${slotName(t.assignedBy)} on ${fmtStamp(t.assignedAt)}`;
+  asg.replaceChildren(...personOptions());
+  asg.value = t.assignee || "both";
+  edPicked = false;
   $("#f-priority").value = t.priority || "normal";
   $("#f-due").value = t.due || "";
+  $("#f-time").value = t.dueTime || "";
+  edRemind = t.dueTime ? new Set((t.remindBefore || "").split(",").filter(Boolean)) : null;
   $("#f-repeat").replaceChildren(...Object.entries(REPEAT).map(([v, l]) => h("option", { value: v }, l)));
   $("#f-repeat").value = t.repeat || "";
   $("#repeat-hint").hidden = !t.repeat;
   $("#f-notes").value = t.notes || "";
   $("#f-private").checked = !!t.private;
+  renderAssignedBy(id ? t : null);
   $("#private-wrap").hidden = !privateAvailable();
   fillParents(t, id, !!t.private, t.parentId);
   for (const el of $("#editor .fields").querySelectorAll("input, select, textarea")) el.disabled = !canWrite() || !!t.archived;
   applyPrivateUI(!!t.private);
   for (const el of document.querySelectorAll("#editor .task-only")) el.hidden = area;
+  $("#time-field").hidden = !dueTimeSupported;
+  renderTimeHint();
+  renderFollowUps(id && !area ? t : null);
   $("#private-label").textContent = area ? "Private: only you can see this area (and everything in it)" : "Private: only you can see it (and its subtasks)";
   $("#extras").hidden = !id || area;
   if (id) {
     $("#f-comment").value = "";
+    $("#f-comment").placeholder = otherSlot() ? `Write a comment (type @ to mention ${slotName(otherSlot())})` : "Write a comment";
+    $("#mention-pick").hidden = true;
     $("#ts-input").value = "";
     renderTaskShop();
+    renderAttachments();
     renderComments();
     $("#history").open = false;
     loadHistory(id);
@@ -2016,6 +2253,49 @@ function openEditor(id, parentId = "", opts = {}) {
   setTimeout(() => { if (!id) $("#f-title").focus(); }, 30);
 }
 $("#f-repeat").addEventListener("change", (e) => { $("#repeat-hint").hidden = !e.target.value; });
+// The reminders ticked in the editor; null until a time is set, which then starts with the default.
+let edRemind = null;
+const editorRemind = () => REMIND.filter(([m]) => edRemind?.has(m)).map(([m]) => m).join(",");
+function removeEditorTime() { $("#f-time").value = ""; edRemind = null; renderTimeHint(); }
+// The reminder choices, and who they go to, the same way notify decides it (private: the owner; both: both of you).
+function renderTimeHint() {
+  const el = $("#time-hint"), time = $("#f-time").value, a = $("#f-assignee").value, off = $("#f-time").disabled;
+  $("#remind-field").hidden = editingArea || !dueTimeSupported || !time;
+  if (!$("#remind-field").hidden) $("#f-remind").replaceChildren(...REMIND.map(([m, label]) => h("button", { type: "button", "aria-pressed": String(!!edRemind?.has(m)), disabled: off,
+    onclick: () => { edRemind = edRemind || new Set(); if (!edRemind.delete(m)) edRemind.add(m); renderTimeHint(); } }, label)));
+  el.hidden = editingArea || (dueTimeSupported && !time);
+  if (el.hidden) return;
+  if (!dueTimeSupported) return fill(el, "Reminders at a time of day need the database update: run supabase/migrations/013_reminders.sql in Supabase.");
+  const mine = $("#f-private").checked || (a && a === mySlot());
+  const who = mine ? "you" : a && a !== "both" ? slotName(a) : "both of you";
+  const chosen = editorRemind(), due = $("#f-due").value;
+  const passed = due ? remindList(chosen).filter(([m]) => new Date(`${due}T${time}`).getTime() - m * 60000 < Date.now()).map(([, l]) => l.toLowerCase()) : [];
+  fill(el, !chosen ? "No reminder. " : `Reminders go to ${who}, up to 5 minutes after each moment. ` + (mine ? "They ring in quiet hours too. " : "In quiet hours they ring only for you, and wait until those hours end for anyone else. ") + (edRemind.has("1440") ? "24 hours before always waits until quiet hours end. " : ""),
+    passed.length ? `Already passed, won't be sent: ${passed.join(", ")}. ` : "",
+    !off && h("button", { type: "button", class: "linkish", onclick: removeEditorTime }, "Remove the time"));
+}
+$("#f-time").addEventListener("input", (e) => {
+  if (e.target.value && !$("#f-due").value) $("#f-due").value = todayStr();
+  if (e.target.value && !edRemind) edRemind = new Set([DEFAULT_REMIND]);
+  renderTimeHint();
+});
+$("#f-due").addEventListener("change", (e) => { if (!e.target.value) removeEditorTime(); else renderTimeHint(); });
+// On a new task the person follows "Belongs under" until you pick someone yourself.
+let edPicked = false;
+$("#f-assignee").addEventListener("change", () => { edPicked = true; renderTimeHint(); });
+$("#f-parent").addEventListener("change", (e) => {
+  if (editingId || editingArea || edPicked) return;
+  $("#f-assignee").value = inheritedAssignee(e.target.value);
+  renderTimeHint();
+});
+// "Assigned by Sławek on 30 Oct, 10:00 · Wiola saw it 10:42" (the mark only on tasks for the other person).
+function renderAssignedBy(t) {
+  const ab = $("#assigned-by");
+  ab.hidden = !(t?.assignee && t.assignedBy && t.assignedAt) || $("#f-private").checked;
+  if (ab.hidden) return;
+  const o = otherSlot(), m = [o, "both"].includes(t.assignee) && t.assignedBy !== o && theirMark(t.id, "assigned", String(t.assignedAt));
+  fill(ab, `Assigned by ${slotName(t.assignedBy)} on ${fmtStamp(t.assignedAt)}`, m && " · ", m && seenLabel(m));
+}
 // Parent choices: open tasks in tree order, never this task or anything below it. Closed tasks take no new subtasks,
 // and a shared task can't sit under a private one (the other person couldn't see its parent).
 function fillParents(t, id, isPrivate, keep) {
@@ -2044,9 +2324,11 @@ $("#f-private").addEventListener("change", (e) => {
   const t = editingId ? tasks.get(editingId) : { parentId: $("#f-parent").value };
   fillParents(t, editingId, e.target.checked, $("#f-parent").value);
   applyPrivateUI(e.target.checked);
+  renderTimeHint();
 });
 $("#ed-form").addEventListener("submit", async (e) => {
   e.preventDefault();
+  const wantNext = nextStepAsked; nextStepAsked = false;
   if (!canWrite()) return;
   if (editingArea) return saveArea();
   const data = {
@@ -2055,6 +2337,7 @@ $("#ed-form").addEventListener("submit", async (e) => {
     assignee: $("#f-assignee").value,
     priority: $("#f-priority").value,
     due: $("#f-due").value,
+    ...(dueTimeSupported ? { dueTime: $("#f-due").value ? $("#f-time").value : "", remindBefore: $("#f-due").value && $("#f-time").value ? editorRemind() : "" } : {}),
     repeat: $("#f-repeat").value,
     parentId: $("#f-parent").value,
     notes: $("#f-notes").value.trim(),
@@ -2065,10 +2348,12 @@ $("#ed-form").addEventListener("submit", async (e) => {
   if (before?.archived) return;
   if (data.private) data.assignee = "";
   else { let p = data.parentId; while (p && tasks.get(p)?.private) p = tasks.get(p).parentId || ""; data.parentId = p; }
-  if ((before?.assignee || "") !== data.assignee) Object.assign(data, data.assignee ? { assignedBy: mySlot() || "", assignedAt: Date.now() } : { assignedBy: "", assignedAt: 0 });
+  // Who set the reminders decides who they can wake at night (see notify).
+  if (data.dueTime && (data.due !== before?.due || data.dueTime !== before?.dueTime || data.remindBefore !== (before?.remindBefore || ""))) data.remindBy = mySlot() || "";
+  if (assigneeOf(before) !== data.assignee) Object.assign(data, data.assignee ? { assignedBy: mySlot() || "", assignedAt: Date.now() } : { assignedBy: "", assignedAt: 0 });
   const open = id && data.status === "done" ? openDescendants(id) : [];
   const choice = open.length ? await confirmCascade(data.title, open) : "close";
-  if (!choice) return;
+  if (!choice) { if (wantNext) $("#s-" + (before.status || "todo")).checked = true; return; }
   closePanels();
   if (data.parentId) { collapsed.delete(data.parentId); saveCollapsed(); }
   try {
@@ -2082,17 +2367,18 @@ $("#ed-form").addEventListener("submit", async (e) => {
         const { private: _p, ...patch } = data;
         await updTask(id, patch);
       }
-      if ((before.assignee || "") !== data.assignee && data.assignee) notifyEvent("assigned", id);
+      if (assigneeOf(before) !== data.assignee && data.assignee) notifyEvent("assigned", id);
       if (data.status === "done" && before.status !== "done") notifyEvent("closed", id);
       if (changes && !data.private) log(id, changes + (open.length ? ` (and closed ${open.length} subtask${open.length > 1 ? "s" : ""})` : ""), data.title);
     } else {
       const newId = await addTask({ ...data, order: Date.now(), createdAt: Date.now() });
       if (data.assignee) notifyEvent("assigned", newId);
-      if (!data.private) log(newId, "created it" + (data.assignee && data.assignee !== mySlot() ? ` and assigned it to ${assigneeName(data.assignee)}` : ""), data.title);
+      if (!data.private) log(newId, "created it" + assignedNote(data.assignee), data.title);
       toast("Task added");
     }
     if (data.status !== "done") await reopenAncestors(data.parentId);
-    else if (id && (before.status !== "done" || choice === "archive")) await afterClose({ ...before, ...data, id }, choice);
+    else if (id && (before.status !== "done" || choice === "archive")) await afterClose({ ...before, ...data, id }, choice, !wantNext);
+    if (wantNext) openNextStep(id);
   } catch (err) { writeFailed(err); }
 });
 async function saveArea() {
@@ -2118,11 +2404,12 @@ async function saveArea() {
 }
 // A top-level task that is really a theme becomes an area, keeping everything under it; and back.
 const TO_AREA = { kind: "area", status: "todo", assignee: "", assignedBy: "", assignedAt: 0, due: "", repeat: "", priority: "normal" };
+const areaPatch = (id) => ({ ...TO_AREA, ...(tasks.get(id)?.dueTime ? { dueTime: "", remindBefore: "", remindBy: "" } : {}) });
 const newAreaData = (title) => ({ ...TO_AREA, title, notes: "", private: false, parentId: "", order: Date.now(), createdAt: Date.now() });
 async function makeArea(id) {
   const t = tasks.get(id); closePanels();
   try {
-    await updTask(id, TO_AREA);
+    await updTask(id, areaPatch(id));
     if (!t.private) log(id, "turned it into an area");
     toast(`“${t.title}” is now an area`);
   } catch (err) { writeFailed(err); }
@@ -2130,7 +2417,7 @@ async function makeArea(id) {
 async function makeTask(id) {
   const t = tasks.get(id); closePanels();
   try {
-    await updTask(id, { kind: "task" });
+    await updTask(id, { kind: "task", ...(t.private ? {} : { assignee: "both" }) });
     if (!t.private) log(id, "turned the area back into a task");
     toast(`“${t.title}” is a task again, in the Inbox`);
   } catch (err) { writeFailed(err); }
@@ -2162,6 +2449,7 @@ function askDelete() {
           log(id, n ? `deleted it with ${n} subtask${n > 1 ? "s" : ""}` : "deleted it", tasks.get(id).title);
           for (const i of ids) {
             for (const c of commentsBy.get(i) || []) await store.remove("comments", c.id);
+            for (const a of attachmentsBy.get(i) || []) await store.remove("attachments", a.id);
             // Items still to buy stay on their shopping list, just no longer linked; bought ones go.
             for (const it of [...items.values()].filter((x) => x.taskId === i)) await (it.bought ? store.remove("items", it.id) : store.update("items", it.id, { taskId: "" }));
             await removeTask(i);
@@ -2174,19 +2462,51 @@ function askDelete() {
 // ---- comments ----
 function renderComments() {
   const id = editingId; if (!id) return;
-  const t = tasks.get(id), items = commentsBy.get(id) || [];
+  const t = tasks.get(id), items = commentsBy.get(id) || [], me = mySlot();
+  const mark = (c) => { const m = me && c.by === me && theirMark(id, "comment", c.id); return m && seenLabel(m); };
   $("#comment-list").replaceChildren(...(items.length ? items.map((c) => h("div", { class: "comment" },
-    h("div", { class: "who" }, h("b", { class: pc(c.by) || null }, slotName(c.by) || "Someone"), h("span", {}, fmtStamp(c.at)),
+    h("div", { class: "who" }, h("b", { class: pc(c.by) || null }, slotName(c.by) || "Someone"), h("span", {}, fmtStamp(c.at)), mark(c),
       c.byUser && c.byUser === meId && canWrite() && !t?.archived && h("button", { type: "button", onclick: () => store.remove("comments", c.id).catch(writeFailed) }, "Delete")),
-    h("p", {}, c.text))) : [h("p", { class: "hint" }, "No comments yet.")]));
+    h("p", {}, withMentions(c.text)))) : [h("p", { class: "hint" }, "No comments yet.")]));
   $("#comment-new").hidden = !canWrite() || !!t?.archived;
+  markOpened(t);
 }
 $("#comment-add").addEventListener("click", async () => {
   const text = $("#f-comment").value.trim();
   if (!text || !editingId) return;
   $("#f-comment").value = "";
+  $("#mention-pick").hidden = true;
   try { await store.add("comments", { taskId: editingId, text, by: mySlot() || "", byUser: meId || "", at: Date.now() }); notifyEvent("comment", editingId, text); }
   catch (err) { writeFailed(err); }
+});
+
+// ---- mentions: "@Wiola" in a comment pushes her even with her Comments switch off (the notify function decides) ----
+const escRe = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function withMentions(text) {
+  const names = ["a", "b"].filter((s) => slotName(s).trim());
+  if (!names.length) return text;
+  const re = new RegExp(`@(${names.map((s) => escRe(slotName(s).trim())).join("|")})(?![\\p{L}\\p{N}])`, "giu");
+  const out = []; let last = 0;
+  for (const m of text.matchAll(re)) {
+    const slot = names.find((s) => slotName(s).trim().toLowerCase() === m[1].toLowerCase());
+    out.push(text.slice(last, m.index), h("span", { class: "mention " + pc(slot) }, m[0]));
+    last = m.index + m[0].length;
+  }
+  out.push(text.slice(last));
+  return out;
+}
+// Typing "@" (or "@Wi") offers the other person's name; tapping it completes the mention.
+$("#f-comment").addEventListener("input", () => {
+  const ta = $("#f-comment"), pick = $("#mention-pick"), o = otherSlot(), name = slotName(o).trim();
+  const frag = ta.value.slice(0, ta.selectionStart).match(/(?:^|\s)@([\p{L}\p{N}]*)$/u)?.[1];
+  pick.hidden = !(name && frag != null && name.toLowerCase().startsWith(frag.toLowerCase()) && frag.length < name.length);
+  if (pick.hidden) return;
+  fill(pick, h("button", { type: "button", class: "chip " + pc(o), onpointerdown: (e) => e.preventDefault(), onclick: () => {
+    const pos = ta.selectionStart, start = pos - frag.length - 1;
+    ta.value = ta.value.slice(0, start) + "@" + name + " " + ta.value.slice(pos);
+    ta.focus(); ta.setSelectionRange(start + name.length + 2, start + name.length + 2);
+    pick.hidden = true;
+  } }, "@" + name));
 });
 
 // ---- checklists: reusable templates ("Leaving Warsaw → Kraków") and the lists started from them ----
@@ -2317,7 +2637,7 @@ function clItemMenu(i, c) {
         !i.heading && act("Make it a task (goes to the Inbox)", async () => {
           try {
             const now = Date.now();
-            const id = await addTask({ title: i.text, status: "todo", assignee: c.private ? "" : mySlot() || "", priority: "normal", due: defaultDue(), repeat: "", parentId: "", notes: `From the checklist “${c.title}”`, order: now, createdAt: now, private: !!c.private });
+            const id = await addTask({ title: i.text, status: "todo", assignee: c.private ? "" : "both", priority: "normal", due: defaultDue(), repeat: "", parentId: "", notes: `From the checklist “${c.title}”`, order: now, createdAt: now, private: !!c.private, ...(c.private ? {} : { assignedBy: mySlot() || "", assignedAt: now }) });
             if (!c.private) log(id, "created it from a checklist", i.text);
             toast(`Added the task “${i.text}”`, { label: "Show", run: () => showTask(id) });
           } catch (err) { writeFailed(err); }
@@ -2559,7 +2879,7 @@ $("#sort-apply").addEventListener("click", async () => {
     const created = new Map();
     for (const [id, to] of choices) {
       const t = tasks.get(id);
-      if (to === "area") { await updTask(id, TO_AREA); if (!t.private) log(id, "turned it into an area"); made++; continue; }
+      if (to === "area") { await updTask(id, areaPatch(id)); if (!t.private) log(id, "turned it into an area"); made++; continue; }
       let areaId = to;
       if (to.startsWith("new:")) {
         const name = to.slice(4);
@@ -2809,15 +3129,302 @@ function renderChips() {
     renderChips();
   } }, c.name)));
 }
+// ---- photos of shopping items ----
+// One photo per item: a file in the private Storage bucket "item-photos" at "<item id>/<random>.jpg", and the item's photo
+// column holds that path. A path is never reused, so a copy is always right. Who may read a file follows the item
+// (migration 015). Files are fetched with the person's sign-in, so there are no shareable links. Each person's phone keeps a
+// copy (for shops without signal) in its own Cache Storage, removed when the item goes and on signing out.
+// The app never deletes files: notify removes the ones no item points at, once a day.
+const PHOTO_BUCKET = "item-photos", PHOTO_SIDE = 1280, PHOTO_MAX_BYTES = 900 * 1024;
+const photos = {
+  urls: new Map(), // path -> address of the picture in this session's memory
+  loading: new Map(), gone: new Set(), syncTimer: 0, bucket: PHOTO_BUCKET, copies: "ot-photos-",
+  type() { return "image/jpeg"; },
+  wanted() { return new Set([...items.values()].map((i) => i.photo).filter(Boolean)); },
+  prefix() { return this.copies + (store.mode === "local" ? "local" : IS_DEV ? "dev" : "prod") + "-"; },
+  box() { return window.caches && !sb.forgotten ? caches.open(this.prefix() + meId).catch(() => null) : Promise.resolve(null); },
+  key(path) { return "photo-copy/" + path; },
+  remember(path, blob) {
+    const url = URL.createObjectURL(blob);
+    this.urls.set(path, url);
+    return url;
+  },
+  // The picture's address, from memory, the phone's copy or the server. Null when it can't be had now (offline, or gone).
+  get(path) {
+    if (this.urls.has(path)) return Promise.resolve(this.urls.get(path));
+    if (this.gone.has(path)) return Promise.resolve(null);
+    if (!this.loading.has(path)) this.loading.set(path, this.fetch(path).finally(() => this.loading.delete(path)));
+    return this.loading.get(path);
+  },
+  async fetch(path) {
+    const box = await this.box(), hit = await box?.match(this.key(path)).catch(() => null);
+    if (hit) return this.remember(path, await hit.blob());
+    if (store.mode !== "supabase" || !navigator.onLine) return null;
+    const { data, error } = await sb.client.storage.from(this.bucket).download(path);
+    if (error || !data) { if (!isNetworkError(error)) this.gone.add(path); return null; }
+    box?.put(this.key(path), new Response(data, { headers: { "Content-Type": this.type(path) } })).catch(() => {});
+    return this.remember(path, data);
+  },
+  // After the items change: fetch new photos so they're on the phone before the shop, drop the copies of those
+  // no longer readable here. The wait outlasts an Undo, so an item brought back keeps its copy.
+  sync() {
+    if (store.mode === "remote") return;
+    const wanted = this.wanted();
+    (async () => {
+      let fresh = false;
+      for (const p of wanted) if (!this.urls.has(p)) fresh = !!(await this.get(p).catch(() => null)) || fresh;
+      if (!fresh) return;
+      render();
+      if (editingId) renderTaskShop();
+      if (editingItem) renderItemPhoto();
+    })();
+    clearTimeout(this.syncTimer);
+    this.syncTimer = setTimeout(() => this.prune(), 15000);
+  },
+  async prune() {
+    const wanted = this.wanted();
+    for (const [p, url] of this.urls) if (!wanted.has(p)) { URL.revokeObjectURL(url); this.urls.delete(p); }
+    const box = await this.box();
+    for (const req of (await box?.keys().catch(() => null)) || []) {
+      const p = new URL(req.url).pathname.split("/photo-copy/")[1];
+      if (p && !wanted.has(decodeURI(p))) await box.delete(req).catch(() => {});
+    }
+  },
+  forget() { return window.caches ? caches.delete(this.prefix() + meId).catch(() => {}) : Promise.resolve(); },
+  async forgetAll() {
+    if (!window.caches) return;
+    for (const k of await caches.keys().catch(() => [])) if (k.startsWith(this.prefix())) await caches.delete(k).catch(() => {});
+  },
+  // Shrinks on the device: longest side 1280 pixels, JPEG. Drawing it anew also drops the location the camera stored in the file.
+  async shrink(file, side = PHOTO_SIDE, maxBytes = PHOTO_MAX_BYTES) {
+    const src = URL.createObjectURL(file);
+    try {
+      const img = await new Promise((ok, no) => { const im = new Image(); im.onload = () => ok(im); im.onerror = no; im.src = src; });
+      const k = Math.min(1, side / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = h("canvas", { width: Math.round(img.naturalWidth * k), height: Math.round(img.naturalHeight * k) }), g = c.getContext("2d");
+      g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
+      g.drawImage(img, 0, 0, c.width, c.height);
+      let blob = null;
+      for (const q of [.8, .65, .5, .35]) {
+        blob = await new Promise((ok) => c.toBlob(ok, "image/jpeg", q));
+        if (blob && blob.size <= maxBytes) return blob;
+      }
+      throw new Error("too big");
+    } finally { URL.revokeObjectURL(src); }
+  },
+  // The file goes first, then the item points at it. If the item can't be saved, the unused file is cleaned up by notify.
+  async add(item, file) {
+    const blob = await this.shrink(file), path = `${item.id}/${crypto.randomUUID()}.jpg`;
+    if (store.mode === "supabase") {
+      const { error } = await sb.client.storage.from(PHOTO_BUCKET).upload(path, blob, { contentType: "image/jpeg", cacheControl: "0" });
+      if (error) throw error;
+    }
+    (await this.box())?.put(this.key(path), new Response(blob, { headers: { "Content-Type": "image/jpeg" } })).catch(() => {});
+    this.remember(path, blob);
+    await store.update("items", item.id, { photo: path });
+  },
+};
+// The small picture on a row: tap to see it large. Shows a camera sign until the picture is there.
+function photoImage(path) {
+  const url = photos.urls.get(path);
+  if (url) return h("img", { src: url, alt: "" });
+  return h("span", { "aria-hidden": "true" }, "📷");
+}
+function photoButton(i) {
+  return h("button", { type: "button", class: "item-photo", title: "See the photo", "aria-label": "See the photo of " + i.name, onclick: () => showPhoto(i) }, photoImage(i.photo));
+}
+async function showPhoto(i) {
+  const url = await photos.get(i.photo);
+  showModal((m, finish) => {
+    m.replaceChildren(h("h2", { id: "modal-title" }, i.name),
+      url ? h("img", { class: "photo-big", src: url, alt: "Photo of " + i.name })
+        : h("p", {}, navigator.onLine ? "This photo is no longer available." : "This photo isn't on this device yet. It will show once you're back online."),
+      h("div", { class: "actions" }, h("button", { class: "btn primary", type: "button", id: "modal-yes", onclick: () => finish(false) }, "Close")));
+    m.querySelector("#modal-yes").focus();
+  });
+}
+let photoBusy = false;
+function renderItemPhoto() {
+  const i = items.get(editingItem), box = $("#it-photo");
+  if (!i) return;
+  if (!photosSupported) return fill(box, h("p", { class: "hint" }, "Photos need the database update: run supabase/migrations/015_item_photos.sql in Supabase."));
+  if (photoBusy) return fill(box, h("p", { class: "hint" }, "Adding the photo…"));
+  const pick = () => {
+    if (!navigator.onLine) return toast("Adding a photo needs a connection. Everything else about this item still saves.");
+    $("#it-photo-file").click();
+  };
+  fill(box,
+    i.photo && h("button", { type: "button", class: "photo-thumb", "aria-label": "See the photo of " + i.name, onclick: () => showPhoto(i) }, photoImage(i.photo)),
+    h("button", { type: "button", class: "btn", onclick: pick }, i.photo ? "Replace photo" : "Add photo"),
+    i.photo && h("button", { type: "button", class: "btn danger", onclick: () => store.update("items", i.id, { photo: "" }).catch(writeFailed) }, "Remove photo"));
+}
+$("#it-photo-file").addEventListener("change", async (e) => {
+  const file = e.target.files[0], i = items.get(editingItem);
+  e.target.value = "";
+  if (!file || !i) return;
+  photoBusy = true; renderItemPhoto();
+  try {
+    // An item added offline must reach the server before its photo can.
+    if (store.mode === "supabase") {
+      await sb.flush();
+      if (sb.outbox.length) throw { waiting: true };
+    }
+    await photos.add(i, file);
+  } catch (err) {
+    toast(err?.waiting ? "This item is still syncing. Try the photo again in a moment."
+      : err?.message === "too big" ? "That photo is too large to shrink. Try another one."
+      : err?.type === "error" ? "Couldn't read that picture. Try taking a new photo."
+      : isNetworkError(err) ? "The connection dropped, so the photo wasn't added. Try again."
+      : "Couldn't add the photo: " + (err?.message || "unknown error"));
+  }
+  photoBusy = false; renderItemPhoto();
+});
+window.addEventListener("online", () => { if (editingItem) renderItemPhoto(); photos.gone.clear(); photos.sync(); taskFiles.gone.clear(); if (editingId) renderAttachments(); });
+
+// ---- files on tasks: photos and PDFs (quotes, invoices) ----
+// A row in "attachments" (name, size, who, when) and a file in the private Storage bucket "task-files" at "<task id>/<random>.jpg|pdf",
+// so Storage never holds the real name. Who may read both follows the task (migration 016). Works like item photos above, with these
+// differences: a picture is larger, to keep small print readable; a copy reaches the phone only once it's been seen (a PDF when opened, a
+// photo when its task is opened), and goes when the task is archived, when the file or task goes, and on signing out.
+const FILE_BUCKET = "task-files", FILE_SIDE = 2000, FILE_PHOTO_BYTES = 1536 * 1024, FILE_PDF_BYTES = 10 * 1024 * 1024, FILE_MAX = 10;
+const taskFiles = { ...photos, urls: new Map(), loading: new Map(), gone: new Set(), bucket: FILE_BUCKET, copies: "ot-files-", ready: false,
+  type(path) { return path.endsWith(".pdf") ? "application/pdf" : "image/jpeg"; },
+  // In preview mode the phone's store is the only place files live, so archived ones stay.
+  wanted() { return new Set([...attachments.values()].filter((a) => { const t = tasks.get(a.taskId); return t && (store.mode === "local" || !t.archived); }).map((a) => a.path)); },
+  // Waits like photos do, so an Undo keeps the copy. Only once both tasks and attachments have loaded: until then everything looks unwanted.
+  sync() {
+    clearTimeout(this.syncTimer);
+    this.syncTimer = setTimeout(() => { if (loaded && this.ready) this.prune(); }, 15000);
+  },
+  // The file to send: a picture shrunk to JPEG, a PDF as it is. Anything else is refused here, the bucket's limits are the backstop.
+  async prepare(file) {
+    const pdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+    const base = file.name.replace(/\.[^.]*$/, "").trim().slice(0, 120);
+    if (pdf) {
+      if (file.size > FILE_PDF_BYTES) throw { refused: `${file.name} is larger than 10 MB, so it wasn't added.` };
+      if (!(await file.slice(0, 1024).text()).includes("%PDF")) throw { refused: `${file.name} doesn't look like a PDF, so it wasn't added.` };
+      return { blob: new Blob([file], { type: "application/pdf" }), ext: "pdf", name: (base || "Document") + ".pdf" };
+    }
+    if (!file.type.startsWith("image/") && !/\.(heic|heif)$/i.test(file.name)) throw { refused: `${file.name} isn't a photo or a PDF, so it wasn't added.` };
+    // The iPhone's camera calls every new picture "image".
+    return { blob: await this.shrink(file, FILE_SIDE, FILE_PHOTO_BYTES), ext: "jpg", name: (!base || /^image$/i.test(base) ? "Photo " + todayStr() : base) + ".jpg" };
+  },
+  // The file goes first, then its row. If the row can't be saved, the unused file is cleaned up by notify.
+  async add(task, file) {
+    const { blob, ext, name } = await this.prepare(file), path = `${task.id}/${crypto.randomUUID()}.${ext}`;
+    if (store.mode === "supabase") {
+      const { error } = await sb.client.storage.from(this.bucket).upload(path, blob, { contentType: this.type(path), cacheControl: "0" });
+      if (error) throw error;
+    }
+    (await this.box())?.put(this.key(path), new Response(blob, { headers: { "Content-Type": this.type(path) } })).catch(() => {});
+    this.remember(path, blob);
+    await store.add("attachments", { taskId: task.id, name, path, size: blob.size, by: mySlot() || "", at: Date.now() });
+    return name;
+  },
+};
+const fmtSize = (n) => n >= 1024 * 1024 ? (n / 1024 / 1024).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB";
+let fileBusy = null; // while adding: { id: the task, text }
+function renderAttachments() {
+  const id = editingId, box = $("#file-list");
+  if (!id) return;
+  const t = tasks.get(id), list = attachmentsBy.get(id) || [], can = canWrite() && !t?.archived;
+  $("#files-field").hidden = store.mode === "remote";
+  if (!attachmentsSupported) return fill(box, h("p", { class: "hint" }, "Files need the database update: run supabase/migrations/016_task_attachments.sql in Supabase."));
+  // A photo's small picture comes down when its task is opened.
+  for (const a of list) if (taskFiles.type(a.path) === "image/jpeg" && !taskFiles.urls.has(a.path)) taskFiles.get(a.path).then((url) => { if (url && editingId === id) renderAttachments(); });
+  const url = (a) => taskFiles.urls.get(a.path);
+  const pick = () => {
+    if (!navigator.onLine) return toast("Adding a file needs a connection. Everything else about this task still saves.");
+    $("#file-pick").click();
+  };
+  fill(box,
+    list.map((a) => h("div", { class: "file-row" },
+      h("button", { type: "button", class: "item-photo", tabindex: "-1", "aria-hidden": "true", onclick: () => showFile(a) },
+        a.path.endsWith(".pdf") ? h("span", {}, "📄") : url(a) ? h("img", { src: url(a), alt: "" }) : h("span", {}, "📷")),
+      h("button", { type: "button", class: "file-open", "aria-label": "Open " + a.name, onclick: () => showFile(a) },
+        h("b", {}, a.name), h("span", {}, [fmtSize(a.size || 0), slotName(a.by), fmtStamp(a.at)].filter(Boolean).join(" · "))),
+      can && h("button", { type: "button", class: "file-remove", "aria-label": "Remove " + a.name, onclick: () => removeAttachment(a) }, "Remove"))),
+    !list.length && !can && h("p", { class: "hint" }, "No files."),
+    fileBusy?.id === id ? h("p", { class: "hint" }, fileBusy.text)
+      : can && list.length >= FILE_MAX ? h("p", { class: "hint" }, `A task holds ${FILE_MAX} files at most. Remove one to add another.`)
+      : can && h("button", { type: "button", class: "btn small", onclick: pick }, "Add photo or PDF"));
+}
+async function removeAttachment(a) {
+  const { id, ...rest } = a;
+  try {
+    await store.remove("attachments", id);
+    log(a.taskId, `removed the file “${a.name}”`);
+    toast(`Removed ${a.name}`, { label: "Undo", run: () => store.put("attachments", id, rest).then(() => log(a.taskId, `put back the file “${a.name}”`)).catch(writeFailed) });
+  } catch (err) { writeFailed(err); }
+}
+function showFile(a) {
+  showModal((m, finish) => {
+    const wait = h("p", {}, "Opening…"), close = () => h("button", { class: "btn primary", type: "button", id: "modal-yes", onclick: () => finish(false) }, "Close");
+    m.replaceChildren(h("h2", { id: "modal-title" }, a.name), wait, h("div", { class: "actions" }, close()));
+    taskFiles.get(a.path).then(async (url) => {
+      // Closed meanwhile.
+      if (m.hidden || !wait.isConnected) return;
+      if (!url) return wait.replaceChildren(navigator.onLine ? "This file is no longer available." : "This file isn't on this device yet. It will open once you're back online.");
+      const pdf = a.path.endsWith(".pdf"), file = new File([await (await fetch(url)).blob()], a.name, { type: taskFiles.type(a.path) });
+      if (m.hidden || !wait.isConnected) return;
+      // On a phone the share sheet shows the whole file and offers saving it; elsewhere it downloads.
+      const share = navigator.maxTouchPoints > 0 && navigator.canShare?.({ files: [file] });
+      fill(m, h("h2", { id: "modal-title" }, a.name),
+        pdf ? h("iframe", { class: "file-big", src: url, title: a.name }) : h("img", { class: "photo-big", src: url, alt: a.name }),
+        pdf && share && h("p", { class: "hint" }, "If only the first page shows, tap Share or save to see them all."),
+        h("div", { class: "actions" },
+          share ? h("button", { class: "btn", type: "button", onclick: () => navigator.share({ files: [file] }).catch((e) => { if (e?.name !== "AbortError") toast("Couldn't open the share sheet."); }) }, "Share or save")
+            : h("a", { class: "btn", href: url, download: a.name }, "Download"),
+          close()));
+      m.querySelector("#modal-yes").focus();
+    }).catch(() => { if (wait.isConnected) wait.replaceChildren("Couldn't open this file. Try again."); });
+  });
+}
+$("#file-pick").addEventListener("change", async (e) => {
+  const chosen = [...e.target.files], id = editingId, t = tasks.get(id);
+  e.target.value = "";
+  if (!chosen.length || !t) return;
+  const room = Math.max(0, FILE_MAX - (attachmentsBy.get(id) || []).length), added = [];
+  let problem = chosen.length > room ? `A task holds ${FILE_MAX} files at most, so ${chosen.length - room} of them ${chosen.length - room === 1 ? "wasn't" : "weren't"} added.` : "";
+  const busy = (text) => { fileBusy = { id, text }; renderAttachments(); };
+  busy("Adding…");
+  try {
+    // A task added offline must reach the server before its files can.
+    if (store.mode === "supabase") {
+      await sb.flush();
+      if (sb.outbox.length) throw { waiting: true };
+    }
+    for (const file of chosen.slice(0, room)) {
+      busy(`Adding ${file.name}…`);
+      try { added.push(await taskFiles.add(t, file)); }
+      catch (err) {
+        if (isNetworkError(err)) throw err;
+        problem = err?.refused || (err?.message === "too big" ? `${file.name} is too large to shrink, so it wasn't added.`
+          : err?.type === "error" ? `Couldn't read ${file.name}. This browser may not open that kind of picture. Try it on your iPhone, or as a JPEG.`
+          : `Couldn't add ${file.name}: ` + (err?.message || "unknown error"));
+      }
+    }
+  } catch (err) {
+    problem = err?.waiting ? "This task is still syncing. Try again in a moment."
+      : isNetworkError(err) ? "The connection dropped, so that file wasn't added. Try again."
+      : "Couldn't add the file: " + (err?.message || "unknown error");
+  }
+  fileBusy = null; if (editingId) renderAttachments();
+  for (const name of added) log(id, `added the file “${name}”`);
+  if (added.length) notifyEvent("file", id, added[0] + (added.length > 1 ? ` and ${added.length - 1} more` : ""));
+  toast(problem || (added.length === 1 ? `Added ${added[0]}` : `Added ${added.length} files`));
+});
+
 function renderItem(i) {
   const t = i.taskId && tasks.get(i.taskId), fresh = isNewItem(i, shoppingHighlightSince);
   const meta = [fresh && "New", t && "For " + (t.title || "a task"), i.addedBy && h("span", { class: pc(i.addedBy) || null }, "Added by " + slotName(i.addedBy))]
     .filter(Boolean).flatMap((m, k) => k ? [" · ", m] : [m]);
-  return h("div", { class: "item" + (i.checked ? " checked" : "") + (fresh ? " is-new" : "") },
+  return h("div", { class: "item" + (i.checked ? " checked" : "") + (fresh ? " is-new" : "") + (i.photo ? " has-photo" : "") },
     h("button", { type: "button", class: "item-main", "aria-pressed": String(!!i.checked), "aria-label": (i.checked ? "Put back: " : "In the basket: ") + i.name,
       onclick: () => canWrite() && toggleItem(i) },
       h("span", { class: "box" }, svg(i.checked ? ICON.done : ICON.todo, 22)),
       h("span", { class: "item-text" }, h("span", { class: "item-name" }, i.name), i.qty && h("span", { class: "qty" }, i.qty), h("span", { class: "item-meta" }, meta))),
+    i.photo && photoButton(i),
     canWrite() ? h("button", { type: "button", class: "item-more", title: "Edit item", "aria-label": "Edit " + i.name, onclick: () => openItemEditor(i.id) }, "⋯") : h("span"));
 }
 function renderShopping(list) {
@@ -2998,6 +3605,8 @@ async function suggestTasks() {
         notes: String(t?.notes || "").trim().slice(0, 2000),
       };
     });
+    // Not named in the text: from the task above, the new group counting as sitting where it will go.
+    for (const t of parsedTasks) if (!t.assignee) t.assignee = t.parent === "group" ? inheritedAssignee(group.parent) : parsedTasks[+t.parent.slice(4)].assignee;
     for (const x of Array.isArray(r?.items) ? r.items.slice(0, 60) : []) {
       const text = String(x?.text || "").trim().slice(0, 200);
       if (text) items.push({ on: true, text, list: listIds.includes(x?.list) ? x.list : "groceries", task: "" });
@@ -3038,7 +3647,7 @@ function renderImportPreview() {
         h("input", { type: "text", value: t.title, maxlength: "200", "aria-label": "Task title", oninput: (e) => { t.title = e.target.value; renderImportFoot(); } })),
       h("div", { class: "imp-meta" },
         h("div", { class: "wide" }, select(parentOpts, t.parent, (e) => { t.parent = e.target.value; }, "Belongs under")),
-        select([["", "No one"], ["a", people.a], ["b", people.b], ["both", "Both"]].map(([v, l]) => h("option", { value: v }, l)), t.assignee, (e) => { t.assignee = e.target.value; }, "Assigned to"),
+        select(personOptions(), t.assignee, (e) => { t.assignee = e.target.value; }, "Assigned to"),
         h("input", { type: "date", value: t.due, "aria-label": "Due date", onchange: (e) => { t.due = e.target.value; } })),
       t.notes && h("p", { class: "imp-notes" }, t.notes)));
   });
@@ -3075,16 +3684,16 @@ async function importAdd() {
   let nt = 0, ni = 0;
   try {
     const create = async (fields, key, order) => {
-      const parentId = resolveParent(fields.parent), now = Date.now();
+      const parentId = resolveParent(fields.parent), now = Date.now(), assignee = fields.assignee || inheritedAssignee(parentId);
       const id = await addTask({
-        title: fields.title.trim(), status: "todo", assignee: fields.assignee || "", priority: fields.priority || "normal", due: fields.due || "", repeat: "",
-        parentId, notes: fields.notes || "", order, createdAt: now, ...(fields.assignee ? { assignedBy: mySlot() || "", assignedAt: now } : {}),
+        title: fields.title.trim(), status: "todo", assignee, priority: fields.priority || "normal", due: fields.due || "", repeat: "",
+        parentId, notes: fields.notes || "", order, createdAt: now, assignedBy: mySlot() || "", assignedAt: now,
       });
       ids[key] = id; nt++;
       if (parentId) collapsed.delete(parentId);
       collapsed.delete(id);
-      if (fields.assignee) notifyEvent("assigned", id);
-      log(id, "created it from text" + (fields.assignee ? ` and assigned it to ${assigneeName(fields.assignee)}` : ""), fields.title.trim());
+      notifyEvent("assigned", id);
+      log(id, "created it from text" + assignedNote(assignee), fields.title.trim());
     };
     const base = Date.now();
     if (g?.on && g.title.trim() && data.tasks.some((t) => t.on && t.title.trim())) await create(g, "group", base);
@@ -3168,6 +3777,8 @@ function openItemEditor(id) {
   $("#it-task").replaceChildren(...taskOptions(i.taskId));
   $("#it-task").value = i.taskId && tasks.has(i.taskId) ? i.taskId : "";
   $("#it-added").textContent = i.addedBy ? `Added by ${slotName(i.addedBy)} on ${fmtStamp(i.addedAt)}` : "";
+  $("#it-photo-field").hidden = !canWrite() || store.mode === "remote";
+  renderItemPhoto();
   openPanel($("#item-panel"));
 }
 $("#it-form").addEventListener("submit", async (e) => {
@@ -3215,7 +3826,8 @@ async function setListPrivate(l, on) {
   } catch (err) { writeFailed(err); renderListsPanel(); }
 }
 async function deleteList(l) {
-  const its = openItems(l.id);
+  // A private list's bought items go too: without their list the access rules would show them, and their photos, to the other person.
+  const its = openItems(l.id), kept = l.private ? [...items.values()].filter((i) => i.bought && i.listId === l.id) : [];
   const ok = await showModal((m, finish) => {
     m.replaceChildren(h("h2", { id: "modal-title" }, `Delete “${l.name}”?`),
       h("p", {}, its.length ? `Its ${its.length} item${its.length > 1 ? "s" : ""} will be removed too.` : "The list is empty."),
@@ -3224,7 +3836,7 @@ async function deleteList(l) {
   });
   if (!ok) return;
   try {
-    for (const i of its) await store.remove("items", i.id);
+    for (const i of [...its, ...kept]) await store.remove("items", i.id);
     await store.remove("lists", l.id);
     if (currentList === l.id) selectList("groceries");
     renderListsPanel();
@@ -3248,6 +3860,7 @@ function renderTaskShop() {
   const t = tasks.get(id);
   const linked = [...items.values()].filter((i) => i.taskId === id).sort((a, b) => (a.bought ? 1 : 0) - (b.bought ? 1 : 0) || (a.addedAt || 0) - (b.addedAt || 0));
   $("#task-shop-list").replaceChildren(...(linked.length ? linked.map((i) => h("div", { class: "task-shop-row" + (i.bought ? " bought" : "") },
+    i.photo && photoButton(i),
     h("span", {}, i.name + (i.qty ? " · " + i.qty : "")),
     h("span", { class: "st-text" }, i.bought ? "Bought" + (i.boughtAt ? " " + fmtStamp(i.boughtAt) : "") : (i.checked ? "In the basket · " : "To buy · ") + listName(i.listId))))
     : [h("p", { class: "hint" }, "Nothing to buy for this task yet.")]));
@@ -3362,6 +3975,7 @@ $("#signout-btn").addEventListener("click", async () => {
   const n = sb.outbox.length;
   if (n && !(await askConfirm("Sign out anyway?", `${n} change${n > 1 ? "s" : ""} made offline ${n > 1 ? "haven't" : "hasn't"} reached the server yet. Signing out deletes ${n > 1 ? "them" : "it"} from this device.`, "Sign out"))) return;
   sb.forget();
+  await Promise.all([photos.forget(), taskFiles.forget()]);
   // Ends every session; offline the server can't be told, so at least this device signs out.
   const { error } = await sb.client.auth.signOut();
   if (error) await sb.client.auth.signOut({ scope: "local" });
@@ -3369,7 +3983,7 @@ $("#signout-btn").addEventListener("click", async () => {
 });
 
 // ---- moving data between claude.ai and own hosting ----
-const TASK_FIELDS = ["title", "status", "assignee", "priority", "due", "repeat", "parentId", "notes", "order", "createdAt", "assignedBy", "assignedAt", "archived", "archivedAt"];
+const TASK_FIELDS = ["title", "status", "assignee", "priority", "due", "dueTime", "remindBefore", "remindBy", "repeat", "parentId", "notes", "order", "createdAt", "assignedBy", "assignedAt", "archived", "archivedAt", "followUpOf"];
 async function exportPrivate() {
   const mine = [...tasks.values()].filter((t) => t.private)
     .map((t) => ({ id: t.id, ...Object.fromEntries(TASK_FIELDS.filter((k) => k in t).map((k) => [k, t[k]])), private: true }));
@@ -3387,7 +4001,7 @@ async function importFile(file) {
   if (d?.format !== "our-tasks-export") { toast("That file isn't an Our Tasks export."); return; }
   const count = (k) => (Array.isArray(d[k]) ? d[k].length : 0), priv = (d.tasks || []).filter((t) => t.private).length;
   const parts = [[count("tasks"), "task", "tasks"], [count("history"), "history entry", "history entries"], [count("comments"), "comment", "comments"],
-    [count("items"), "shopping item", "shopping items"], [count("lists"), "list", "lists"], [count("catalog"), "suggestion", "suggestions"]]
+    [count("items"), "shopping item", "shopping items"], [count("lists"), "list", "lists"], [count("catalog"), "suggestion", "suggestions"], [count("attachments"), "file link", "file links"]]
     .filter(([n]) => n).map(([n, one, many]) => `${n} ${n === 1 ? one : many}`);
   const ok = await showModal((m, finish) => {
     m.replaceChildren(
@@ -3401,7 +4015,7 @@ async function importFile(file) {
   closePanels();
   toast("Importing…");
   try {
-    for (const table of ["lists", "catalog", "tasks", "items", "comments", "history"]) {
+    for (const table of ["lists", "catalog", "tasks", "items", "comments", "history", "attachments"]) {
       // claude.ai user ids don't exist here, so they're dropped; "who" is kept as Person 1 / Person 2.
       const rows = (d[table] || []).map(({ byUser, addedByUser, ...r }) => toRow(r));
       for (let i = 0; i < rows.length; i += 200) sb.check(await sb.client.from(table).upsert(rows.slice(i, i + 200), { defaultToNull: false }));
@@ -3417,7 +4031,7 @@ async function downloadBackup() {
   if (!navigator.onLine) { toast("A backup needs an internet connection."); return; }
   try {
     const out = { format: "our-tasks-export", version: 1, source: "own", savedAt: new Date().toISOString(), people: { a: people.a, b: people.b } };
-    for (const t of DATA_TABLES) out[t] = sb.check(await sb.client.from(t).select("*")).map(fromRow);
+    for (const t of attachmentsSupported ? [...DATA_TABLES, "attachments"] : DATA_TABLES) out[t] = sb.check(await sb.client.from(t).select("*")).map(fromRow);
     const url = URL.createObjectURL(new Blob([JSON.stringify(out, null, 1)], { type: "application/json" }));
     const a = h("a", { href: url, download: `our-tasks-backup-${todayStr()}.json` });
     document.body.append(a); a.click(); a.remove();
@@ -3434,7 +4048,7 @@ async function wipeAll() {
     m.replaceChildren(
       h("span", { class: "step" }, "Step 1 of 2"),
       h("h2", { id: "modal-title" }, "Delete all data?"),
-      h("p", {}, `This deletes every task (${counts.tasks}), comment, history entry, shopping item (${counts.items}), list and suggestion, for both of you. Your names and accounts stay, so you both stay signed in.`),
+      h("p", {}, `This deletes every task (${counts.tasks}), attached file, comment, history entry, shopping item (${counts.items}), list and suggestion, for both of you. Your names and accounts stay, so you both stay signed in.`),
       h("p", {}, "It can't be undone. Download a backup first if there's anything you might want back."),
       h("div", { class: "actions" }, cancelBtn(finish),
         h("button", { class: "btn", type: "button", onclick: async () => { await downloadBackup(); } }, "Download a backup"),
@@ -3492,18 +4106,31 @@ async function fnErrorText(error) {
 async function loadNotifyPrefs() {
   const { data, error } = await sb.client.from("notify_prefs").select("*").eq("user_id", meId).maybeSingle();
   if (error) { $("#notify-status").textContent = /notify_prefs|42P01|schema cache/i.test(error.message + error.code) ? NEEDS_UPDATE : "Couldn't load the notification settings: " + error.message; return; }
-  const p = data || { morning: "07:30", evening: "20:00", on_assigned: true, on_comment: true, on_closed: true };
+  const p = data || { morning: "07:30", evening: "20:00", quiet_from: "22:00", quiet_to: "07:00", on_assigned: true, on_comment: true, on_closed: true, on_reminder: true };
   $("#n-lang").value = p.lang === "pl" ? "pl" : "en";
   $("#n-morning").value = p.morning || "";
   $("#n-evening").value = p.evening || "";
+  $("#n-quiet-from").value = p.quiet_from || "";
+  $("#n-quiet-to").value = p.quiet_to || "";
+  renderQuietHint();
   try { if (!localStorage.getItem("voiceLang")) { voiceLang = p.lang === "pl" ? "pl-PL" : "en-GB"; $("#voice-lang").value = voiceLang; } } catch {}
   $("#n-assigned").checked = p.on_assigned; $("#n-comment").checked = p.on_comment; $("#n-closed").checked = p.on_closed;
+  $("#n-reminder").checked = p.on_reminder !== false; $("#n-reminder-wrap").hidden = !dueTimeSupported;
+}
+// Says what the two times mean, the same way notify reads them: a cleared time or the same time twice means none.
+function renderQuietHint() {
+  const from = $("#n-quiet-from").value, to = $("#n-quiet-to").value;
+  $("#n-quiet-hint").textContent = !from || !to || from === to
+    ? "No quiet hours: notifications can come at any time. Set two different times to have them."
+    : `Quiet from ${from} to ${to}${to < from ? " the next day" : ""}. Pushes about changes and comments aren't sent then, or later. Reminders wait until ${to}, except the ones you set yourself, which ring anyway (not the 24-hour one). Briefings come at the times above. The same time twice means no quiet hours.`;
 }
 async function saveNotifyPrefs(quiet) {
   const row = {
     user_id: meId, tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Warsaw",
     lang: $("#n-lang").value, morning: $("#n-morning").value, evening: $("#n-evening").value,
+    quiet_from: $("#n-quiet-from").value, quiet_to: $("#n-quiet-to").value,
     on_assigned: $("#n-assigned").checked, on_comment: $("#n-comment").checked, on_closed: $("#n-closed").checked,
+    ...(dueTimeSupported ? { on_reminder: $("#n-reminder").checked } : {}),
   };
   const { error } = await sb.client.from("notify_prefs").upsert(row);
   if (error) toast(/notify_prefs|42P01|schema cache/i.test(error.message + error.code) ? NEEDS_UPDATE : "Couldn't save the notification settings: " + error.message);
@@ -3551,7 +4178,8 @@ $("#notify-test").addEventListener("click", async () => {
   const { data, error } = await sb.client.functions.invoke("notify", { body: { action: "test" } });
   toast(error ? await fnErrorText(error) : data?.sent ? "Test sent: it should appear in a few seconds." : "No device received it. Turn notifications on again on this device.");
 });
-for (const id of ["#n-lang", "#n-morning", "#n-evening", "#n-assigned", "#n-comment", "#n-closed"]) $(id).addEventListener("change", () => saveNotifyPrefs());
+for (const id of ["#n-lang", "#n-morning", "#n-evening", "#n-quiet-from", "#n-quiet-to", "#n-assigned", "#n-comment", "#n-closed", "#n-reminder"]) $(id).addEventListener("change", () => saveNotifyPrefs());
+for (const id of ["#n-quiet-from", "#n-quiet-to"]) $(id).addEventListener("input", renderQuietHint);
 
 // ---- briefing and the conversation about it ----
 let briefRows = [];
@@ -3615,12 +4243,13 @@ async function executeActions(actions) {
     else if (a.type === "pin_today" && t && !isPinned(t)) await togglePin(t);
     else if (a.type === "assign" && t && !t.private) {
       const now = Date.now();
-      await updTask(t.id, a.assignee ? { assignee: a.assignee, assignedBy: mySlot() || "", assignedAt: now } : { assignee: "", assignedBy: "", assignedAt: 0 });
-      log(t.id, a.assignee ? `assigned it to ${assigneeName(a.assignee)}` : "removed the assignee");
-      if (a.assignee) notifyEvent("assigned", t.id);
+      const assignee = a.assignee || "both";
+      await updTask(t.id, { assignee, assignedBy: mySlot() || "", assignedAt: now });
+      log(t.id, `assigned it to ${assigneeName(assignee)}`);
+      notifyEvent("assigned", t.id);
     } else if (a.type === "add_task" && a.title) {
       const parent = tasks.get(a.parentId), now = Date.now(), isPrivate = !!parent?.private;
-      const assignee = isPrivate || !["a", "b", "both"].includes(a.assignee) ? "" : a.assignee;
+      const assignee = isPrivate ? "" : ["a", "b", "both"].includes(a.assignee) ? a.assignee : inheritedAssignee(a.parentId);
       const id = await addTask({ title: a.title, status: "todo", assignee, priority: "normal", due: /^\d{4}-\d{2}-\d{2}$/.test(a.due) ? a.due : defaultDue(),
         repeat: "", parentId: parent ? parent.id : "", notes: "", order: now, createdAt: now, private: isPrivate, ...(assignee ? { assignedBy: mySlot() || "", assignedAt: now } : {}) });
       if (!isPrivate) log(id, "created it from the briefing chat", a.title);
@@ -3804,7 +4433,8 @@ function showBanner(msg) { const b = $("#banner"); b.textContent = msg; b.hidden
 let toastTimer;
 function toast(msg, action) {
   const t = $("#toast");
-  t.replaceChildren(...[h("span", {}, msg), action && h("button", { type: "button", onclick: () => { t.hidden = true; action.run(); } }, action.label)].filter(Boolean));
+  // One action, or a list of them.
+  t.replaceChildren(h("span", {}, msg), ...[action].flat().filter(Boolean).map((a) => h("button", { type: "button", onclick: () => { t.hidden = true; a.run(); } }, a.label)));
   t.hidden = false; clearTimeout(toastTimer);
   toastTimer = setTimeout(() => (t.hidden = true), action ? 7000 : 2600);
 }

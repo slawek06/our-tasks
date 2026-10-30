@@ -10,10 +10,11 @@
 // Actions (POST JSON body {action, ...}):
 //   vapid      signed-in  -> the public key the app needs to subscribe a device
 //   test       signed-in  -> sends "Notifications work" to the caller's devices
-//   event      signed-in  -> {type: assigned|comment|closed, taskId, text?}: notifies the other person
+//   event      signed-in  -> {type: assigned|comment|closed|file, taskId, text?}: notifies the other person
 //   brief_now  signed-in  -> writes a briefing for the caller now (no push)
 //   chat       signed-in  -> {message}: replies, and may propose changes the app shows for confirmation
-//   tick       timer      -> sends the briefings that are due (called every 15 minutes by pg_cron)
+//   tick       timer      -> sends the task reminders and briefings that are due, and once a day removes photo and task files
+//                            nothing points at any more (called every 5 minutes by pg_cron)
 
 import Anthropic from "npm:@anthropic-ai/sdk";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -90,7 +91,7 @@ async function getVapid() {
   return vapid;
 }
 // Sends one notification to every device of a user; removes devices the push service says are gone.
-async function pushTo(userId: string, message: { title: string; body: string; url?: string; tag?: string }) {
+async function pushTo(userId: string, message: { title: string; body: string; url?: string; tag?: string }, urgency = "normal") {
   const { data: subs } = await db.from("push_subscriptions").select("*").eq("user_id", userId);
   if (!subs?.length) return 0;
   const vapid = await getVapid();
@@ -99,7 +100,7 @@ async function pushTo(userId: string, message: { title: string; body: string; ur
     try {
       const res = await fetch(s.endpoint, {
         method: "POST",
-        headers: { Authorization: await vapidAuth(s.endpoint, vapid), "Content-Encoding": "aes128gcm", "Content-Type": "application/octet-stream", TTL: "43200", Urgency: "normal" },
+        headers: { Authorization: await vapidAuth(s.endpoint, vapid), "Content-Encoding": "aes128gcm", "Content-Type": "application/octet-stream", TTL: "43200", Urgency: urgency },
         body: await encryptPayload(JSON.stringify(message), s.p256dh, s.auth),
       });
       if (res.status === 404 || res.status === 410) await db.from("push_subscriptions").delete().eq("id", s.id);
@@ -116,7 +117,12 @@ async function people() {
 }
 const slotOf = (p: Awaited<ReturnType<typeof people>>, uid: string) => (p.aUser === uid ? "a" : p.bUser === uid ? "b" : "");
 const nameOf = (p: Awaited<ReturnType<typeof people>>, slot: string) => (slot === "a" ? p.a : slot === "b" ? p.b : slot === "both" ? "both of you" : "") || "";
-const PREF_DEFAULTS = { lang: "en", tz: "Europe/Warsaw", morning: "07:30", evening: "20:00", quiet_from: "22:00", quiet_to: "07:00", on_assigned: true, on_comment: true, on_closed: true, morning_sent: "", evening_sent: "" };
+// "@Wiola" in a comment, not followed by more letters (so "@Wiolka" isn't a mention of Wiola).
+const mentions = (text: string, name: string) => {
+  const n = name.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return !!n && new RegExp(`@${n}(?![\\p{L}\\p{N}])`, "iu").test(text);
+};
+const PREF_DEFAULTS = { lang: "en", tz: "Europe/Warsaw", morning: "07:30", evening: "20:00", quiet_from: "22:00", quiet_to: "07:00", on_assigned: true, on_comment: true, on_closed: true, on_reminder: true, morning_sent: "", evening_sent: "" };
 async function prefsOf(uid: string) {
   const { data } = await db.from("notify_prefs").select("*").eq("user_id", uid).maybeSingle();
   return { ...PREF_DEFAULTS, ...(data ?? {}), user_id: uid };
@@ -126,6 +132,7 @@ function localNow(tz: string) {
     .formatToParts(new Date()).map((x) => [x.type, x.value]));
   return { date: `${parts.year}-${parts.month}-${parts.day}`, time: `${parts.hour === "24" ? "00" : parts.hour}:${parts.minute}`, weekday: parts.weekday };
 }
+// Each person's own hours, on their own clock; they may cross midnight. A cleared time or the same time twice means none.
 const inQuiet = (p: typeof PREF_DEFAULTS, time: string) =>
   p.quiet_from && p.quiet_to && (p.quiet_from <= p.quiet_to ? time >= p.quiet_from && time < p.quiet_to : time >= p.quiet_from || time < p.quiet_to);
 
@@ -153,8 +160,8 @@ async function snapshot(uid: string) {
   const areas = all.filter(isArea).map((t) => `${t.title} (id=${t.id}${t.private ? ", private" : ""})`);
   const lines = open.slice(0, 250).map((t) => [
     `id=${t.id}`, `"${t.title}"`, t.status === "doing" ? "in progress" : "not started",
-    t.due ? `due ${t.due}${t.due < now.date ? " (OVERDUE)" : t.due === now.date ? " (TODAY)" : ""}` : "no due date",
-    t.private ? "private" : t.assignee ? `for ${nameOf(ppl, t.assignee)}` : "unassigned",
+    t.due ? `due ${t.due}${t.due_time ? ` at ${t.due_time}` : ""}${t.due < now.date ? " (OVERDUE)" : t.due === now.date ? " (TODAY)" : ""}` : "no due date",
+    t.private ? "private" : `for ${nameOf(ppl, t.assignee || "both")}`,
     t.priority !== "normal" ? `${t.priority} priority` : "", path(t) ? `under ${path(t)}` : "", pins[t.id] === now.date ? "in MY DAY" : "",
   ].filter(Boolean).join(" | "));
   // Never another person's private shopping lists or checklists.
@@ -237,6 +244,74 @@ async function writeBriefing(uid: string, kind: "morning" | "evening") {
   return { row, push, name: s.myName };
 }
 
+// ---- photos of shopping items and files on tasks: removes files nothing points at any more ----
+// Once a day, in the first timer run after 03:00 UTC, so an Undo right after removing one still has its file.
+// Before migrations 015 and 016 the question fails and nothing happens for that bucket.
+async function removeStaleFiles() {
+  const now = new Date();
+  if (now.getUTCHours() !== 3 || now.getUTCMinutes() >= 5) return;
+  for (const [question, bucket] of [["stale_item_photos", "item-photos"], ["stale_task_files", "task-files"]]) {
+    const { data, error } = await db.rpc(question);
+    if (error) continue;
+    const names = ((data ?? []) as { name: string }[]).map((r) => r.name);
+    for (let i = 0; i < names.length; i += 100) {
+      const { error: failed } = await db.storage.from(bucket).remove(names.slice(i, i + 100));
+      if (failed) throw failed;
+    }
+  }
+}
+
+// ---- reminders: pushes a chosen time before a task's date and time ----
+const REMINDER_LATE_MIN = 10; // two timer runs; later than this the moment has passed (time set too late, timer down): skip it
+const REMINDER_OFFSETS = [1440, 60, 15, 0]; // minutes before
+// The clock time that many minutes before a time.
+const clockBefore = (time: string, minutes: number) => {
+  const [h, m] = time.split(":").map(Number), t = (h * 60 + m - minutes + 1440) % 1440;
+  return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+};
+// How many minutes ago the date and time were, on that person's clock (negative = still to come).
+const minutesSince = (due: string, time: string, now: { date: string; time: string }) =>
+  (Date.parse(`${now.date}T${now.time}:00Z`) - Date.parse(`${due}T${time}:00Z`)) / 60000;
+// A private task only ever reminds its owner; on a shared one the assignee, and both when it's both or nobody's.
+const remindWho = (t: { private: boolean; owner: string | null; assignee: string }, p: Awaited<ReturnType<typeof people>>) =>
+  (t.private ? [t.owner] : t.assignee === "a" ? [p.aUser] : t.assignee === "b" ? [p.bUser] : [p.aUser, p.bUser]).filter(Boolean) as string[];
+async function sendReminders(ppl: Awaited<ReturnType<typeof people>>) {
+  const day = (offset: number) => new Date(Date.now() + offset * 864e5).toISOString().slice(0, 10);
+  // Fails harmlessly before migration 013 (no column): then there's simply nothing to remind.
+  const { data: due } = await db.from("tasks").select("id, title, due, due_time, remind_before, remind_by, assignee, private, owner")
+    .neq("due_time", "").neq("remind_before", "").neq("status", "done").eq("archived", false).neq("kind", "area").gte("due", day(-2)).lte("due", day(2));
+  const done: string[] = [], prefs = new Map<string, typeof PREF_DEFAULTS>();
+  for (const t of due ?? []) {
+    for (const uid of remindWho(t, ppl)) {
+      if (!prefs.has(uid)) prefs.set(uid, await prefsOf(uid));
+      const p = prefs.get(uid)!, now = localNow(p.tz), toEvent = minutesSince(t.due, t.due_time, now);
+      if (!p.on_reminder) continue;
+      const own = t.private || t.remind_by === slotOf(ppl, uid);
+      for (const before of String(t.remind_before).split(",").filter(Boolean).map(Number)) {
+        if (!REMINDER_OFFSETS.includes(before)) continue;
+        const late = toEvent + before;
+        // A moment in quiet hours waits for them to end if it's 24 hours before (time to spare) or someone else set it,
+        // so only your own reminder can wake you. It's dropped if the event is over by then.
+        const held = inQuiet(p, clockBefore(t.due_time, before)) && (before === 1440 || !own);
+        // Counted from the last time the clock passed the end, so an end just before midnight still counts just after it.
+        const fromEnd = held ? (minutesSince(now.date, p.quiet_to, now) + 1440) % 1440 : late;
+        if (!(late >= 0 && fromEnd >= 0 && fromEnd <= REMINDER_LATE_MIN) || (held && toEvent > 0)) continue;
+        // Only the row that gets written may send, so overlapping timers can't send it twice.
+        const id = `${uid}:${t.id}:${t.due} ${t.due_time}:${before}`;
+        const { data: claimed } = await db.from("reminders_sent").upsert({ id, user_id: uid, task_id: t.id, at: Date.now() }, { onConflict: "id", ignoreDuplicates: true }).select("id");
+        if (!claimed?.length) continue;
+        const pl = p.lang === "pl";
+        const when = before === 1440 || held ? (t.due === now.date ? (pl ? "Dziś" : "Today") : (pl ? "Jutro" : "Tomorrow"))
+          : before === 60 ? (pl ? "Za godzinę" : "In 1 hour") : before === 15 ? (pl ? "Za 15 minut" : "In 15 minutes") : (pl ? "Teraz" : "Now");
+        const sent = await pushTo(uid, { title: `${when} · ${t.due_time}`, body: t.title, url: APP_URL + "?task=" + encodeURIComponent(t.id), tag: `reminder-${t.id}-${before}` }, "high");
+        if (sent) done.push(`reminder:${uid}`);
+        else await db.from("reminders_sent").delete().eq("id", id); // no device took it: the next tick tries again
+      }
+    }
+  }
+  return done;
+}
+
 // ---- chat ----
 const ACTION_TYPES = ["complete", "set_due", "assign", "add_task", "add_item", "pin_today"];
 const CHAT_SCHEMA = {
@@ -277,8 +352,8 @@ async function chat(uid: string, message: string) {
   const system = `You are the friendly assistant inside "Our Tasks", a shared task and shopping app for ${s.ppl.a} and ${s.ppl.b}. ` +
     `You are chatting with ${s.myName}. Reply conversationally and briefly (usually 1-4 sentences), in the language of ${s.myName}'s last message (${LANGUAGE[s.prefs.lang] || "English"} if unclear). Use task titles as written; never invent tasks. ${SPOKEN_STYLE}\n` +
     `You can PROPOSE changes in "actions"; the app shows them to ${s.myName}, who confirms. Never say a change is done; say you've suggested it.\n` +
-    `Action types (fill unused fields with ""): complete {taskId}; set_due {taskId, due "YYYY-MM-DD" or "" to remove}; assign {taskId, assignee "a"|"b"|"both"|""}; ` +
-    `add_task {title, due, assignee, parentId}; add_item {text like "2 milk", listId}; pin_today {taskId} (adds to MY DAY). ` +
+    `Action types (fill unused fields with ""): complete {taskId}; set_due {taskId, due "YYYY-MM-DD" or "" to remove}; assign {taskId, assignee "a"|"b"|"both"}; ` +
+    `add_task {title, due, assignee ("" unless someone is named; it then follows the task above, or both), parentId}; add_item {text like "2 milk", listId}; pin_today {taskId} (adds to MY DAY). ` +
     `"label" is a short human description, e.g. "Move \\"Dentist\\" to Fri 31 Oct". Only use ids from the data. Propose nothing when ${s.myName} only asks a question.\n` +
     `You can't delete tasks or change private tasks of the other person; say so if asked.\n\nCurrent data:\n${s.text}`;
   const out = await askClaude(system, history, CHAT_SCHEMA);
@@ -287,7 +362,7 @@ async function chat(uid: string, message: string) {
     if (!ACTION_TYPES.includes(a.type) || !a.label) return false;
     if (["complete", "set_due", "assign", "pin_today"].includes(a.type)) {
       if (!s.byId.has(a.taskId)) return false;
-      if (a.type === "assign") return !s.byId.get(a.taskId)?.private && ["a", "b", "both", ""].includes(a.assignee);
+      if (a.type === "assign") return !s.byId.get(a.taskId)?.private && ["a", "b", "both"].includes(a.assignee);
       if (a.type === "set_due") return !a.due || /^\d{4}-\d{2}-\d{2}$/.test(a.due);
       return true;
     }
@@ -308,11 +383,12 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch { return reply({ error: "bad_request" }, 400); }
 
   try {
-    // Timer: send the briefings that are due.
+    // Timer: send the reminders and briefings that are due. Reminders first: a briefing takes seconds to write.
     if (body.action === "tick") {
       const { data: cfg } = await db.from("push_config").select("cron_secret").eq("id", 1).maybeSingle();
       if (!cfg?.cron_secret || req.headers.get("x-cron-secret") !== cfg.cron_secret) return reply({ error: "forbidden" }, 403);
-      const ppl = await people(), done: string[] = [];
+      const ppl = await people(), done = await sendReminders(ppl);
+      await removeStaleFiles().catch((e) => console.error("files:", e));
       for (const uid of [ppl.aUser, ppl.bUser].filter(Boolean) as string[]) {
         const { count } = await db.from("push_subscriptions").select("id", { count: "exact", head: true }).eq("user_id", uid);
         if (!count) continue; // nobody to notify on this person's devices
@@ -355,10 +431,16 @@ Deno.serve(async (req) => {
       if (inQuiet(p, localNow(p.tz).time)) return reply({ sent: 0, quiet: true });
       const who = nameOf(ppl, sender) || "Someone", url = APP_URL + "?task=" + encodeURIComponent(task.id);
       let message: { title: string; body: string } | null = null;
-      if (body.type === "assigned" && p.on_assigned && [otherSlot, "both"].includes(task.assignee))
-        message = { title: `${who} assigned you a task`, body: task.title + (task.due ? ` (due ${task.due})` : "") };
-      else if (body.type === "comment" && p.on_comment)
-        message = { title: `${who} commented on ${task.title}`, body: String(body.text ?? "").slice(0, 160) };
+      const mentioned = body.type === "comment" && mentions(String(body.text ?? ""), nameOf(ppl, otherSlot));
+      // Only when they're picked by name: a task for both is the default, and shows as new in the app without a push.
+      if (body.type === "assigned" && p.on_assigned && task.assignee === otherSlot)
+        message = { title: `${who} assigned you a task`, body: task.title + (task.due ? ` (due ${task.due}${task.due_time ? ` at ${task.due_time}` : ""})` : "") };
+      else if (body.type === "comment" && (p.on_comment || mentioned))
+        // An @mention reaches them even with the Comments switch off, under its own title (one push, never two).
+        message = { title: `${who} ${mentioned ? "mentioned you in" : "commented on"} ${task.title}`, body: String(body.text ?? "").slice(0, 160) };
+      else if (body.type === "file" && p.on_comment)
+        // Goes with comments: same switch, same quiet hours.
+        message = { title: `${who} added a file to ${task.title}`, body: String(body.text ?? "").slice(0, 160) };
       else if (body.type === "closed" && p.on_closed)
         message = { title: `${who} closed a task`, body: task.title };
       return reply({ sent: message ? await pushTo(other, { ...message, url, tag: `${body.type}-${task.id}` }) : 0 });
