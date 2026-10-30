@@ -129,7 +129,8 @@ Notes from daily use go here, then we pick what to improve.
 | ⬜ | Recurring shopping ("coffee every 2 weeks") | S | |
 | ⬜ | Shop-specific order (learned from ticking order) | S | |
 | ⬜ | Prices and budget per list / trip | M | |
-| ⬜ | Photo of an item ("this exact brand") | M | Next release (chosen 30 Oct 2026). Supabase Storage (free plan 1 GB, so shrink photos on the phone); private lists' photos private too |
+| 🔶 | Photo of an item ("this exact brand") | M | Built on dev 30 Oct 2026, migration 015. Decided: one photo per item (a new one replaces it), camera or library; it goes with the item (Finish shopping, Remove, deleting the list; Undo brings it back; an item bought for a task keeps it); a small picture on the row, tap for large; the phone keeps a copy so photos show in a shop without signal, deleted on sign-out; adding needs a connection. Shrunk on the phone to 1280 pixels (1 GB holds thousands). Private rules follow the item; the server removes unused files once a day |
+| ⬜ | Remember an item's photo for next time ("coffee" brings back its photo) | S | Considered for the first version and left out: photos would pile up and need rules of their own on private lists |
 
 ## Platform
 

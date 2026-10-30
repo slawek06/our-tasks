@@ -184,6 +184,15 @@ h1 { font: 700 34px/1.05 var(--f-display); letter-spacing: -.02em; margin: 0; te
 .item-meta:empty { display: none; }
 .item-more { border: 0; background: none; width: 40px; height: 40px; border-radius: 8px; color: var(--muted); font-size: 18px; }
 .item-more:hover { background: var(--line); }
+.item.has-photo { grid-template-columns: minmax(0, 1fr) 44px 40px; }
+.item-photo, .photo-thumb { border: 1px solid var(--line); background: var(--hover); padding: 0; border-radius: 8px; overflow: hidden; display: grid; place-items: center; color: var(--muted); font-size: 16px; }
+.item-photo { width: 40px; height: 40px; }
+.item.checked .item-photo { opacity: .55; }
+.item-photo img, .photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.photo-thumb { width: 88px; height: 88px; font-size: 22px; }
+.photo-big { display: block; width: 100%; max-height: calc(100vh - 220px); object-fit: contain; border-radius: 9px; background: var(--hover); }
+.task-shop-row .item-photo { width: 32px; height: 32px; flex: none; align-self: center; }
 .basket-head .btn { margin-left: auto; text-transform: none; letter-spacing: 0; }
 .lists-mode { align-self: flex-start; }
 body.shop-mode #lists-mode { display: none; }
@@ -216,8 +225,8 @@ body.shop-mode .item .box svg { width: 26px; height: 26px; }
 .list-row .check { font-size: 13px; white-space: nowrap; }
 .list-row input[type=text] { flex: 1; min-width: 0; border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 9px 11px; }
 .task-shop-row { display: flex; gap: 8px; font-size: 14px; align-items: baseline; padding: 3px 0; }
-.task-shop-row > span:first-child { overflow-wrap: anywhere; min-width: 0; }
-.task-shop-row.bought > span:first-child { color: var(--muted); text-decoration: line-through; }
+.task-shop-row > span:not(.st-text) { overflow-wrap: anywhere; min-width: 0; }
+.task-shop-row.bought > span:not(.st-text) { color: var(--muted); text-decoration: line-through; }
 .task-shop-row .st-text { color: var(--muted); font-size: 12.5px; margin-left: auto; text-align: right; }
 .task-shop-add { display: flex; gap: 6px; flex-wrap: wrap; }
 .field .task-shop-add input { flex: 1 1 150px; width: auto; }
@@ -568,6 +577,8 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
       </div>
       <div class="field"><label for="it-list">List</label><select id="it-list"></select></div>
       <div class="field"><label for="it-task">For task</label><select id="it-task"></select></div>
+      <div class="field" id="it-photo-field"><span class="lbl">Photo</span><div class="photo-row" id="it-photo"></div>
+        <input type="file" id="it-photo-file" accept="image/*" hidden aria-label="Choose a photo"></div>
       <p class="hint" id="it-added"></p>
       <p class="hint">Changing the section is remembered for next time you add this item.</p>
     </div>
@@ -721,7 +732,7 @@ let byParent = new Map(), byParentAll = new Map(), commentsBy = new Map();
 let editingId = null;
 let view = (() => { try { return localStorage.getItem("view") || "today"; } catch { return "today"; } })();
 let searchMode = false, searchSnippets = new Map(), flashId = null;
-let todayPins = {}, pinsSupported = true, perListSupported = true, areasSupported = true, privateListsSupported = true, followUpsSupported = true, dueTimeSupported = true, editingArea = false;
+let todayPins = {}, pinsSupported = true, perListSupported = true, areasSupported = true, privateListsSupported = true, followUpsSupported = true, dueTimeSupported = true, photosSupported = true, editingArea = false;
 // New tasks are due tomorrow unless you pick another date (or clear it).
 const defaultDue = () => addDays(todayStr(), 1);
 const filter = { who: "all", hideDone: false, q: "" };
@@ -990,13 +1001,14 @@ const store = {
     const { data } = await sb.client.auth.getSession();
     if (linkError || back.has("access_token")) history.replaceState(null, "", location.pathname);
     if (!data.session) {
+      photos.forgetAll(); // in case signing out was cut short
       showSignIn();
       if (linkError) $("#signin-msg").textContent = `That link didn't work (${linkError.replace(/\+/g, " ")}). Each link works once and expires after about an hour. Send yourself a new one below.`;
       return;
     }
     meId = data.session.user.id;
     // Also when signed out from another device ("Sign out" there ends every session).
-    sb.client.auth.onAuthStateChange((event) => { if (event === "SIGNED_OUT") { sb.forget(); location.reload(); } });
+    sb.client.auth.onAuthStateChange((event) => { if (event === "SIGNED_OUT") { sb.forget(); photos.forget().finally(() => location.reload()); } });
     sb.restore();
     await sb.flush();  // changes left from an earlier offline session go first
     sb.subscribe();
@@ -1013,6 +1025,8 @@ const store = {
     sb.client.from("tasks").select("follow_up_of").limit(1).then(({ error }) => { followUpsSupported = !error || isNetworkError(error); });
     // Reminders at a time of day need supabase/migrations/013_reminders.sql; until then the editor has no time field and says so.
     sb.client.from("tasks").select("remind_by").limit(1).then(({ error }) => { dueTimeSupported = !error || isNetworkError(error); });
+    // Photos of shopping items need supabase/migrations/015_item_photos.sql; until then the item editor says so.
+    sb.client.from("items").select("photo").limit(1).then(({ error }) => { photosSupported = !error || isNetworkError(error); if (editingItem) renderItemPhoto(); });
     // Per-list frequent items need supabase/migrations/003_catalog_per_list.sql; until then Frequent is shared.
     sb.client.from("catalog").select("list_counts").limit(1).then(({ error }) => { perListSupported = !error || isNetworkError(error); if (view === "shopping") renderChips(); });
   },
@@ -1133,7 +1147,7 @@ function startListening() {
   store.listen("comments", (m) => { comments = m; render(); if (editingId) renderComments(); });
   store.listenDoc("config/people", (d) => { people = { ...DEFAULT_PEOPLE, ...(d || {}) }; render(); });
   store.listenRecent("history", "at", 150, (arr) => { activity = arr; render(); });
-  store.listen("items", (m) => { items = m; render(); if (editingId) renderTaskShop(); });
+  store.listen("items", (m) => { items = m; render(); if (editingId) renderTaskShop(); if (editingItem) renderItemPhoto(); photos.sync(); });
   store.listen("lists", (m) => { lists = m; render(); if (!$("#lists-panel").hidden && !$("#lists-panel").contains(document.activeElement)) renderListsPanel(); });
   store.listen("catalog", (m) => { catalog = m; if (view === "shopping") renderChips(); });
   listenIdeas();
@@ -3079,15 +3093,166 @@ function renderChips() {
     renderChips();
   } }, c.name)));
 }
+// ---- photos of shopping items ----
+// One photo per item: a file in the private Storage bucket "item-photos" at "<item id>/<random>.jpg", and the item's photo
+// column holds that path. A path is never reused, so a copy is always right. Who may read a file follows the item
+// (migration 015). Files are fetched with the person's sign-in, so there are no shareable links. Each person's phone keeps a
+// copy (for shops without signal) in its own Cache Storage, removed when the item goes and on signing out.
+// The app never deletes files: notify removes the ones no item points at, once a day.
+const PHOTO_BUCKET = "item-photos", PHOTO_SIDE = 1280, PHOTO_MAX_BYTES = 900 * 1024;
+const photos = {
+  urls: new Map(), // path -> address of the picture in this session's memory
+  loading: new Map(), gone: new Set(), syncTimer: 0,
+  prefix() { return "ot-photos-" + (store.mode === "local" ? "local" : IS_DEV ? "dev" : "prod") + "-"; },
+  box() { return window.caches && !sb.forgotten ? caches.open(this.prefix() + meId).catch(() => null) : Promise.resolve(null); },
+  key(path) { return "photo-copy/" + path; },
+  remember(path, blob) {
+    const url = URL.createObjectURL(blob);
+    this.urls.set(path, url);
+    return url;
+  },
+  // The picture's address, from memory, the phone's copy or the server. Null when it can't be had now (offline, or gone).
+  get(path) {
+    if (this.urls.has(path)) return Promise.resolve(this.urls.get(path));
+    if (this.gone.has(path)) return Promise.resolve(null);
+    if (!this.loading.has(path)) this.loading.set(path, this.fetch(path).finally(() => this.loading.delete(path)));
+    return this.loading.get(path);
+  },
+  async fetch(path) {
+    const box = await this.box(), hit = await box?.match(this.key(path)).catch(() => null);
+    if (hit) return this.remember(path, await hit.blob());
+    if (store.mode !== "supabase" || !navigator.onLine) return null;
+    const { data, error } = await sb.client.storage.from(PHOTO_BUCKET).download(path);
+    if (error || !data) { if (!isNetworkError(error)) this.gone.add(path); return null; }
+    box?.put(this.key(path), new Response(data, { headers: { "Content-Type": "image/jpeg" } })).catch(() => {});
+    return this.remember(path, data);
+  },
+  // After the items change: fetch new photos so they're on the phone before the shop, drop the copies of those
+  // no longer readable here. The wait outlasts an Undo, so an item brought back keeps its copy.
+  sync() {
+    if (store.mode === "remote") return;
+    const wanted = new Set([...items.values()].map((i) => i.photo).filter(Boolean));
+    (async () => {
+      let fresh = false;
+      for (const p of wanted) if (!this.urls.has(p)) fresh = !!(await this.get(p).catch(() => null)) || fresh;
+      if (!fresh) return;
+      render();
+      if (editingId) renderTaskShop();
+      if (editingItem) renderItemPhoto();
+    })();
+    clearTimeout(this.syncTimer);
+    this.syncTimer = setTimeout(() => this.prune(), 15000);
+  },
+  async prune() {
+    const wanted = new Set([...items.values()].map((i) => i.photo).filter(Boolean));
+    for (const [p, url] of this.urls) if (!wanted.has(p)) { URL.revokeObjectURL(url); this.urls.delete(p); }
+    const box = await this.box();
+    for (const req of (await box?.keys().catch(() => null)) || []) {
+      const p = new URL(req.url).pathname.split("/photo-copy/")[1];
+      if (p && !wanted.has(decodeURI(p))) await box.delete(req).catch(() => {});
+    }
+  },
+  forget() { return window.caches ? caches.delete(this.prefix() + meId).catch(() => {}) : Promise.resolve(); },
+  async forgetAll() {
+    if (!window.caches) return;
+    for (const k of await caches.keys().catch(() => [])) if (k.startsWith(this.prefix())) await caches.delete(k).catch(() => {});
+  },
+  // Shrinks on the device: longest side 1280 pixels, JPEG. Drawing it anew also drops the location the camera stored in the file.
+  async shrink(file) {
+    const src = URL.createObjectURL(file);
+    try {
+      const img = await new Promise((ok, no) => { const im = new Image(); im.onload = () => ok(im); im.onerror = no; im.src = src; });
+      const k = Math.min(1, PHOTO_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = h("canvas", { width: Math.round(img.naturalWidth * k), height: Math.round(img.naturalHeight * k) }), g = c.getContext("2d");
+      g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
+      g.drawImage(img, 0, 0, c.width, c.height);
+      let blob = null;
+      for (const q of [.8, .65, .5, .35]) {
+        blob = await new Promise((ok) => c.toBlob(ok, "image/jpeg", q));
+        if (blob && blob.size <= PHOTO_MAX_BYTES) return blob;
+      }
+      throw new Error("too big");
+    } finally { URL.revokeObjectURL(src); }
+  },
+  // The file goes first, then the item points at it. If the item can't be saved, the unused file is cleaned up by notify.
+  async add(item, file) {
+    const blob = await this.shrink(file), path = `${item.id}/${crypto.randomUUID()}.jpg`;
+    if (store.mode === "supabase") {
+      const { error } = await sb.client.storage.from(PHOTO_BUCKET).upload(path, blob, { contentType: "image/jpeg", cacheControl: "0" });
+      if (error) throw error;
+    }
+    (await this.box())?.put(this.key(path), new Response(blob, { headers: { "Content-Type": "image/jpeg" } })).catch(() => {});
+    this.remember(path, blob);
+    await store.update("items", item.id, { photo: path });
+  },
+};
+// The small picture on a row: tap to see it large. Shows a camera sign until the picture is there.
+function photoImage(path) {
+  const url = photos.urls.get(path);
+  if (url) return h("img", { src: url, alt: "" });
+  return h("span", { "aria-hidden": "true" }, "📷");
+}
+function photoButton(i) {
+  return h("button", { type: "button", class: "item-photo", title: "See the photo", "aria-label": "See the photo of " + i.name, onclick: () => showPhoto(i) }, photoImage(i.photo));
+}
+async function showPhoto(i) {
+  const url = await photos.get(i.photo);
+  showModal((m, finish) => {
+    m.replaceChildren(h("h2", { id: "modal-title" }, i.name),
+      url ? h("img", { class: "photo-big", src: url, alt: "Photo of " + i.name })
+        : h("p", {}, navigator.onLine ? "This photo is no longer available." : "This photo isn't on this device yet. It will show once you're back online."),
+      h("div", { class: "actions" }, h("button", { class: "btn primary", type: "button", id: "modal-yes", onclick: () => finish(false) }, "Close")));
+    m.querySelector("#modal-yes").focus();
+  });
+}
+let photoBusy = false;
+function renderItemPhoto() {
+  const i = items.get(editingItem), box = $("#it-photo");
+  if (!i) return;
+  if (!photosSupported) return fill(box, h("p", { class: "hint" }, "Photos need the database update: run supabase/migrations/015_item_photos.sql in Supabase."));
+  if (photoBusy) return fill(box, h("p", { class: "hint" }, "Adding the photo…"));
+  const pick = () => {
+    if (!navigator.onLine) return toast("Adding a photo needs a connection. Everything else about this item still saves.");
+    $("#it-photo-file").click();
+  };
+  fill(box,
+    i.photo && h("button", { type: "button", class: "photo-thumb", "aria-label": "See the photo of " + i.name, onclick: () => showPhoto(i) }, photoImage(i.photo)),
+    h("button", { type: "button", class: "btn", onclick: pick }, i.photo ? "Replace photo" : "Add photo"),
+    i.photo && h("button", { type: "button", class: "btn danger", onclick: () => store.update("items", i.id, { photo: "" }).catch(writeFailed) }, "Remove photo"));
+}
+$("#it-photo-file").addEventListener("change", async (e) => {
+  const file = e.target.files[0], i = items.get(editingItem);
+  e.target.value = "";
+  if (!file || !i) return;
+  photoBusy = true; renderItemPhoto();
+  try {
+    // An item added offline must reach the server before its photo can.
+    if (store.mode === "supabase") {
+      await sb.flush();
+      if (sb.outbox.length) throw { waiting: true };
+    }
+    await photos.add(i, file);
+  } catch (err) {
+    toast(err?.waiting ? "This item is still syncing. Try the photo again in a moment."
+      : err?.message === "too big" ? "That photo is too large to shrink. Try another one."
+      : err?.type === "error" ? "Couldn't read that picture. Try taking a new photo."
+      : isNetworkError(err) ? "The connection dropped, so the photo wasn't added. Try again."
+      : "Couldn't add the photo: " + (err?.message || "unknown error"));
+  }
+  photoBusy = false; renderItemPhoto();
+});
+window.addEventListener("online", () => { if (editingItem) renderItemPhoto(); photos.gone.clear(); photos.sync(); });
+
 function renderItem(i) {
   const t = i.taskId && tasks.get(i.taskId), fresh = isNewItem(i, shoppingHighlightSince);
   const meta = [fresh && "New", t && "For " + (t.title || "a task"), i.addedBy && h("span", { class: pc(i.addedBy) || null }, "Added by " + slotName(i.addedBy))]
     .filter(Boolean).flatMap((m, k) => k ? [" · ", m] : [m]);
-  return h("div", { class: "item" + (i.checked ? " checked" : "") + (fresh ? " is-new" : "") },
+  return h("div", { class: "item" + (i.checked ? " checked" : "") + (fresh ? " is-new" : "") + (i.photo ? " has-photo" : "") },
     h("button", { type: "button", class: "item-main", "aria-pressed": String(!!i.checked), "aria-label": (i.checked ? "Put back: " : "In the basket: ") + i.name,
       onclick: () => canWrite() && toggleItem(i) },
       h("span", { class: "box" }, svg(i.checked ? ICON.done : ICON.todo, 22)),
       h("span", { class: "item-text" }, h("span", { class: "item-name" }, i.name), i.qty && h("span", { class: "qty" }, i.qty), h("span", { class: "item-meta" }, meta))),
+    i.photo && photoButton(i),
     canWrite() ? h("button", { type: "button", class: "item-more", title: "Edit item", "aria-label": "Edit " + i.name, onclick: () => openItemEditor(i.id) }, "⋯") : h("span"));
 }
 function renderShopping(list) {
@@ -3440,6 +3605,8 @@ function openItemEditor(id) {
   $("#it-task").replaceChildren(...taskOptions(i.taskId));
   $("#it-task").value = i.taskId && tasks.has(i.taskId) ? i.taskId : "";
   $("#it-added").textContent = i.addedBy ? `Added by ${slotName(i.addedBy)} on ${fmtStamp(i.addedAt)}` : "";
+  $("#it-photo-field").hidden = !canWrite() || store.mode === "remote";
+  renderItemPhoto();
   openPanel($("#item-panel"));
 }
 $("#it-form").addEventListener("submit", async (e) => {
@@ -3487,7 +3654,8 @@ async function setListPrivate(l, on) {
   } catch (err) { writeFailed(err); renderListsPanel(); }
 }
 async function deleteList(l) {
-  const its = openItems(l.id);
+  // A private list's bought items go too: without their list the access rules would show them, and their photos, to the other person.
+  const its = openItems(l.id), kept = l.private ? [...items.values()].filter((i) => i.bought && i.listId === l.id) : [];
   const ok = await showModal((m, finish) => {
     m.replaceChildren(h("h2", { id: "modal-title" }, `Delete “${l.name}”?`),
       h("p", {}, its.length ? `Its ${its.length} item${its.length > 1 ? "s" : ""} will be removed too.` : "The list is empty."),
@@ -3496,7 +3664,7 @@ async function deleteList(l) {
   });
   if (!ok) return;
   try {
-    for (const i of its) await store.remove("items", i.id);
+    for (const i of [...its, ...kept]) await store.remove("items", i.id);
     await store.remove("lists", l.id);
     if (currentList === l.id) selectList("groceries");
     renderListsPanel();
@@ -3520,6 +3688,7 @@ function renderTaskShop() {
   const t = tasks.get(id);
   const linked = [...items.values()].filter((i) => i.taskId === id).sort((a, b) => (a.bought ? 1 : 0) - (b.bought ? 1 : 0) || (a.addedAt || 0) - (b.addedAt || 0));
   $("#task-shop-list").replaceChildren(...(linked.length ? linked.map((i) => h("div", { class: "task-shop-row" + (i.bought ? " bought" : "") },
+    i.photo && photoButton(i),
     h("span", {}, i.name + (i.qty ? " · " + i.qty : "")),
     h("span", { class: "st-text" }, i.bought ? "Bought" + (i.boughtAt ? " " + fmtStamp(i.boughtAt) : "") : (i.checked ? "In the basket · " : "To buy · ") + listName(i.listId))))
     : [h("p", { class: "hint" }, "Nothing to buy for this task yet.")]));
@@ -3634,6 +3803,7 @@ $("#signout-btn").addEventListener("click", async () => {
   const n = sb.outbox.length;
   if (n && !(await askConfirm("Sign out anyway?", `${n} change${n > 1 ? "s" : ""} made offline ${n > 1 ? "haven't" : "hasn't"} reached the server yet. Signing out deletes ${n > 1 ? "them" : "it"} from this device.`, "Sign out"))) return;
   sb.forget();
+  await photos.forget();
   // Ends every session; offline the server can't be told, so at least this device signs out.
   const { error } = await sb.client.auth.signOut();
   if (error) await sb.client.auth.signOut({ scope: "local" });

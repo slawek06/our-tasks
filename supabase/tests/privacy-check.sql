@@ -1,7 +1,7 @@
 -- Privacy check: can each person see only what they should?
 -- Run any time: Supabase dashboard > SQL Editor > New query > paste this whole file > Run.
 -- It adds a few test rows, looks at them as each of the two people, then undoes everything, so nothing is left.
--- The result is a table with PASS or FAIL per line. Needs migrations 009, 010, 011 and 013.
+-- The result is a table with PASS or FAIL per line. Needs migrations 009, 010, 011, 013 and 015.
 --
 -- "A" is the person who owns the private test task and list (the first account), "B" is the other person.
 -- Works with a single account, so also in a development project with only one user.
@@ -70,6 +70,69 @@ begin
   return ok;
 end $$;
 
+-- Tries to add a photo file for an item, as the given person (the same insert Storage makes for the app).
+create or replace function pg_temp.can_add_photo(uid uuid, item text, file text) returns boolean language plpgsql as $$
+declare ok boolean;
+begin
+  perform set_config('request.jwt.claims', json_build_object('sub', uid, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  begin
+    insert into storage.objects (bucket_id, name) values ('item-photos', item || '/' || file);
+    ok := true;
+  exception when others then ok := false;
+  end;
+  execute 'reset role';
+  return ok;
+end $$;
+
+-- Is this photo file visible to the given person? No person: an anonymous visitor.
+create or replace function pg_temp.sees_photo(uid uuid, path text) returns boolean language plpgsql as $$
+declare n int;
+begin
+  perform set_config('request.jwt.claims', case when uid is null then '{"role":"anon"}' else json_build_object('sub', uid, 'role', 'authenticated')::text end, true);
+  execute case when uid is null then 'set local role anon' else 'set local role authenticated' end;
+  select count(*) into n from storage.objects where bucket_id = 'item-photos' and name = path;
+  execute 'reset role';
+  return n > 0;
+end $$;
+
+-- Tries to change or remove a photo file, which only the server may do (as the given person).
+create or replace function pg_temp.can_change_photo(uid uuid, path text) returns boolean language plpgsql as $$
+declare ok boolean := false; n int;
+begin
+  perform set_config('request.jwt.claims', json_build_object('sub', uid, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  begin
+    update storage.objects set name = path || '.changed' where bucket_id = 'item-photos' and name = path;
+    get diagnostics n = row_count;
+    ok := n > 0;
+  exception when others then null;
+  end;
+  begin
+    delete from storage.objects where bucket_id = 'item-photos' and name = path;
+    get diagnostics n = row_count;
+    ok := ok or n > 0;
+  exception when others then null;
+  end;
+  execute 'reset role';
+  return ok;
+end $$;
+
+-- Tries to ask for the list of photo files to remove, which only the server may do (as the given person).
+create or replace function pg_temp.can_list_stale_photos(uid uuid) returns boolean language plpgsql as $$
+declare ok boolean;
+begin
+  perform set_config('request.jwt.claims', json_build_object('sub', uid, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  begin
+    perform * from public.stale_item_photos();
+    ok := true;
+  exception when others then ok := false;
+  end;
+  execute 'reset role';
+  return ok;
+end $$;
+
 do $$
 declare
   ua uuid; ub uuid; res jsonb := '[]';
@@ -90,7 +153,7 @@ declare
     ["B", "seen_marks", "privacy-check-m2", false, "A''s seen marker on A''s private task"],
     ["A", "seen_marks", "privacy-check-m2", true,  "own seen marker on own private task"]
   ]';
-  c jsonb; got boolean; i int := 0;
+  c jsonb; got boolean; i int := 0; ph jsonb := '[]';
 begin
   -- A owns rows, so must be a real account; B only looks, so any made-up id stands in for "the other person".
   select id into ua from auth.users order by created_at limit 1;
@@ -130,6 +193,38 @@ begin
       'expected', 'no', 'actual', case when got then 'yes' else 'no' end, 'result', case when got then 'FAIL' else 'PASS' end);
     got := pg_temp.can_touch_reminders(ub, 'privacy-check-t1');
     res := res || jsonb_build_object('n', i + 4, 'who', 'B', 'what', 'can read or add reminder records (server only)',
+      'expected', 'no', 'actual', case when got then 'yes' else 'no' end, 'result', case when got then 'FAIL' else 'PASS' end);
+
+    -- Photos of shopping items, tried in this order: each line is who, what happened, what it should be.
+    i := i + 4;
+    ph := ph || jsonb_build_array(jsonb_build_array('A', 'can add a photo to an item on own private list', pg_temp.can_add_photo(ua, 'privacy-check-i1', 'a.jpg'), true));
+    ph := ph || jsonb_build_array(jsonb_build_array('A', 'can add a photo to an item on Groceries', pg_temp.can_add_photo(ua, 'privacy-check-i2', 'a.jpg'), true));
+    ph := ph || jsonb_build_array(jsonb_build_array('B', 'can add a photo to an item on A''s private list', pg_temp.can_add_photo(ub, 'privacy-check-i1', 'b.jpg'), false));
+    ph := ph || jsonb_build_array(jsonb_build_array('B', 'can add a photo for an item that doesn''t exist', pg_temp.can_add_photo(ub, 'privacy-check-none', 'b.jpg'), false));
+    ph := ph || jsonb_build_array(jsonb_build_array('A', 'sees the photo of an item on own private list', pg_temp.sees_photo(ua, 'privacy-check-i1/a.jpg'), true));
+    ph := ph || jsonb_build_array(jsonb_build_array('B', 'sees the photo of an item on A''s private list', pg_temp.sees_photo(ub, 'privacy-check-i1/a.jpg'), false));
+    ph := ph || jsonb_build_array(jsonb_build_array('B', 'sees the photo of an item on Groceries', pg_temp.sees_photo(ub, 'privacy-check-i2/a.jpg'), true));
+    ph := ph || jsonb_build_array(jsonb_build_array('Nobody', 'anonymous visitor sees the photo of an item on Groceries', pg_temp.sees_photo(null, 'privacy-check-i2/a.jpg'), false));
+    ph := ph || jsonb_build_array(jsonb_build_array('B', 'can change or remove the photo of an item on A''s private list', pg_temp.can_change_photo(ub, 'privacy-check-i1/a.jpg'), false));
+    ph := ph || jsonb_build_array(jsonb_build_array('B', 'can change or remove the photo of an item on Groceries', pg_temp.can_change_photo(ub, 'privacy-check-i2/a.jpg'), false));
+    ph := ph || jsonb_build_array(jsonb_build_array('B', 'can ask for the list of photo files to remove (server only)', pg_temp.can_list_stale_photos(ub), false));
+    ph := ph || jsonb_build_array(jsonb_build_array('Everyone', 'photo storage is open to the public', coalesce((select public from storage.buckets where id = 'item-photos'), true), false));
+    for c in select * from jsonb_array_elements(ph) loop
+      i := i + 1;
+      got := (c->>2)::boolean;
+      res := res || jsonb_build_object('n', i, 'who', c->>0, 'what', c->>1,
+        'expected', case when (c->>3)::boolean then 'yes' else 'no' end, 'actual', case when got then 'yes' else 'no' end,
+        'result', case when got = (c->>3)::boolean then 'PASS' else 'FAIL' end);
+    end loop;
+    -- A photo follows its item: moved onto A's private list, the Groceries photo disappears for B.
+    update public.items set list_id = 'privacy-check-l1' where id = 'privacy-check-i2';
+    got := pg_temp.sees_photo(ub, 'privacy-check-i2/a.jpg');
+    res := res || jsonb_build_object('n', i + 1, 'who', 'B', 'what', 'sees the photo after its item moved to A''s private list',
+      'expected', 'no', 'actual', case when got then 'yes' else 'no' end, 'result', case when got then 'FAIL' else 'PASS' end);
+    -- A file whose item is gone is readable by nobody, not even by the person who added it.
+    delete from public.items where id = 'privacy-check-i1';
+    got := pg_temp.sees_photo(ua, 'privacy-check-i1/a.jpg');
+    res := res || jsonb_build_object('n', i + 2, 'who', 'A', 'what', 'sees a photo whose item was deleted',
       'expected', 'no', 'actual', case when got then 'yes' else 'no' end, 'result', case when got then 'FAIL' else 'PASS' end);
 
     raise exception 'privacy_check_undo'; -- undoes every test row above

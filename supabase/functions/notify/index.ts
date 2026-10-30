@@ -13,7 +13,8 @@
 //   event      signed-in  -> {type: assigned|comment|closed, taskId, text?}: notifies the other person
 //   brief_now  signed-in  -> writes a briefing for the caller now (no push)
 //   chat       signed-in  -> {message}: replies, and may propose changes the app shows for confirmation
-//   tick       timer      -> sends the task reminders and briefings that are due (called every 5 minutes by pg_cron)
+//   tick       timer      -> sends the task reminders and briefings that are due, and once a day removes photo files
+//                            no shopping item points at any more (called every 5 minutes by pg_cron)
 
 import Anthropic from "npm:@anthropic-ai/sdk";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -242,6 +243,21 @@ async function writeBriefing(uid: string, kind: "morning" | "evening") {
   return { row, push, name: s.myName };
 }
 
+// ---- photos of shopping items: removes files no item points at any more ----
+// Once a day, in the first timer run after 03:00 UTC, so an Undo right after removing an item still has its photo.
+// Before migration 015 the question fails and nothing happens.
+async function removeStalePhotos() {
+  const now = new Date();
+  if (now.getUTCHours() !== 3 || now.getUTCMinutes() >= 5) return;
+  const { data, error } = await db.rpc("stale_item_photos");
+  if (error) return;
+  const names = ((data ?? []) as { name: string }[]).map((r) => r.name);
+  for (let i = 0; i < names.length; i += 100) {
+    const { error: failed } = await db.storage.from("item-photos").remove(names.slice(i, i + 100));
+    if (failed) throw failed;
+  }
+}
+
 // ---- reminders: pushes a chosen time before a task's date and time ----
 const REMINDER_LATE_MIN = 10; // two timer runs; later than this the moment has passed (time set too late, timer down): skip it
 const REMINDER_OFFSETS = [1440, 60, 15, 0]; // minutes before
@@ -368,6 +384,7 @@ Deno.serve(async (req) => {
       const { data: cfg } = await db.from("push_config").select("cron_secret").eq("id", 1).maybeSingle();
       if (!cfg?.cron_secret || req.headers.get("x-cron-secret") !== cfg.cron_secret) return reply({ error: "forbidden" }, 403);
       const ppl = await people(), done = await sendReminders(ppl);
+      await removeStalePhotos().catch((e) => console.error("photos:", e));
       for (const uid of [ppl.aUser, ppl.bUser].filter(Boolean) as string[]) {
         const { count } = await db.from("push_subscriptions").select("id", { count: "exact", head: true }).eq("user_id", uid);
         if (!count) continue; // nobody to notify on this person's devices

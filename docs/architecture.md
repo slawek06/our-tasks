@@ -22,6 +22,7 @@ and in the browser.
         │ supabase-js (publishable key + the person's sign-in)
         ▼
  Supabase project ─ Postgres (tables + row level security) ─ Realtime (live changes)
+                  ─ Storage (private bucket item-photos: photos of shopping items)
                   ─ Auth (email + password, email code/link; invited people only)
                   ─ Edge Functions:  claude  (Smart add, From text, Sort into areas)
                                      notify  (push, reminders, briefings, chat)  ◄── pg_cron every 5 min
@@ -42,6 +43,7 @@ There is no own server: GitHub hosts the files, Supabase holds data, sign-in and
 | Offline | Service worker (`sw.js`) + device copy in `localStorage` | Network first for app files; changes queue in an outbox |
 | Installable | Web app manifest + icons | Add to Home Screen (iPhone), Add to Dock (Mac Safari) |
 | Database | Supabase Postgres | Row level security on every table |
+| Files | Supabase Storage, private bucket `item-photos` | Photos of shopping items, shrunk on the device; access rules follow the item |
 | Live updates | Supabase Realtime (`postgres_changes`) | Access rules also filter what each person receives |
 | Sign-in | Supabase Auth | Sign-ups off; email + password, or email code / link |
 | Server code | Supabase Edge Functions (Deno, TypeScript) | `claude`, `notify` |
@@ -96,8 +98,8 @@ Field names: the app uses camelCase, the database snake_case (`parentId` ↔ `pa
 `pinsSupported` (002), `perListSupported` (003), notifications (004), Ideas (006), `areasSupported` (007),
 checklists (008), `privateListsSupported` (009), seen markers (011: no marks until it runs), `followUpsSupported`
 (012: a next step is a plain new task, without the link, and the form says which file to run), `dueTimeSupported`
-(013, checks `remind_by`: no time field in the editor, which says which file to run; quick add leaves "10:30" in the title). 010 only tightens
-access rules; the app works the same before it.
+(013, checks `remind_by`: no time field in the editor, which says which file to run; quick add leaves "10:30" in the title), `photosSupported`
+(015: the item editor's Photo field says which file to run). 010 only tightens access rules; the app works the same before it.
 
 **Views.** Today · Tasks (Inbox + areas) · Upcoming · Lists (Shopping | Checklists) · Activity · Archive.
 Panels: task editor, People (names, password, notifications, data), Briefing, From text, Ideas, Sort into areas,
@@ -137,6 +139,22 @@ task", repeats and an area turned back into a task. Empty on a shared task (an o
 everywhere (`assigneeOf`) and is filled in on the next save without marking the task as newly assigned. Both shows as new for the
 other person (`isNew`, because `assignedBy` is set) but sends no push (see §7).
 
+**Photos of shopping items** (`photos`, decided 30 Oct 2026). One photo per item. The item editor's Add / Replace / Remove photo act at
+once, like a comment; a hidden `<input type="file" accept="image/*">` makes the iPhone offer the camera and the library. `photos.shrink`
+redraws it at most 1280 pixels on the longest side as JPEG (at most 900 KB, usually far less), which also drops the location the camera
+stored in the file. The file goes up first (`<item id>/<random>.jpg`, never reused, sent with `cacheControl: "0"` so the browser's own
+cache keeps no reusable copy), then `items.photo` points at it. Rows show a small picture (`photoButton`, in the shopping list and on the task's To buy rows); tapping it opens the large
+view (`showPhoto`), tapping the rest of the row still ticks the item. Files are read with the person's sign-in (`download`), never
+through a shareable link.
+Offline: adding says it needs a connection, removing waits in the outbox like any change, and photos already seen still show: `photos.sync`
+fetches every photo of a visible item ahead of time into Cache Storage (`ot-photos-<prod|dev|local>-<user>`). The service worker doesn't touch
+it. A copy goes 15 seconds after its item stops pointing at it (`prune`; the wait outlasts an Undo), also when the item stopped being
+readable, and the whole store goes on signing out, signing out from another device, or on reaching the sign-in screen. In preview mode the same store is the only place photos live.
+A photo goes when its item goes (Finish shopping, Remove, deleting the list, Delete all data); the app never deletes files itself, `notify` removes the ones no item points at
+(see §7), so an Undo brings the item back with its photo. An item bought for a task stays, with its photo. Deleting a private list also removes
+its bought items, since without the list the access rules would show them to the other person. Backups hold the path, not the picture:
+after a restore a photo that's gone shows as "no longer available".
+
 **People.** `config` row `people` = `{a, b, aUser, bUser}`: the two names and which account is which. The first person
 is shown blue, the second green (`--p-a`, `--p-b`).
 
@@ -154,7 +172,7 @@ on the device).
 | `comments` | Comments on tasks | `task_id`, `text`, `author`, `by_user`, `at` | schema |
 | `history` | Change log (Activity, task history) | `task_id`, `text`, `title`, `author`, `at` | schema |
 | `lists` | Shopping lists (Groceries exists without a row) | `name`, `sort_order`, `private`, `owner` | schema, 009 |
-| `items` | Shopping items | `list_id`, `name`, `qty`, `section`, `checked`, `bought`, `task_id`, `added_by`, … | schema |
+| `items` | Shopping items | `list_id`, `name`, `qty`, `section`, `checked`, `bought`, `task_id`, `added_by`, `photo` (path of its file in `item-photos`, `''` = none), … | schema, 015 |
 | `catalog` | Items bought before: suggestions and shop sections | `name`, `section`, `manual`, `count`, `list_counts` | schema, 003 |
 | `config` | Shared settings (`people`) | `key`, `value` (json) | schema |
 | `seen_marks` | "Wiola saw it 10:42": first time a person saw an assignment or comment | `id` (`<user>:<task>:<kind>:<ref>`), `user_id`, `task_id` (deleted with the task), `kind` (`assigned`/`comment`), `ref` (assigned_at or comment id), `at` | 011 |
@@ -187,6 +205,11 @@ on the device).
   itself be filtered by the access rules, never see the private row, and let everything through (009's mistake).
   The `private` schema isn't exposed by the API.
 - Check the rules any time with `supabase/tests/privacy-check.sql`.
+- **Photos** (015): bucket `item-photos` is private (1 MB limit, JPEG only). The rules on `storage.objects` go by the item in the file's path,
+  through the security definer function `private.item_photo_allowed(path)`: the item must exist and not be on the other person's private list.
+  So a photo follows its item when it moves or its list turns private, and a file whose item is gone is readable by nobody. Signed-in people can
+  only read and add; there are no update or delete rules. `items.photo` gives no access by itself: pointing an item at someone else's file shows nothing.
+- `public.stale_item_photos()` (015) lists the files to remove; only the service role may call it.
 - `follow_up_of` (012) is a plain column on `tasks` and adds no rule: a task's link to the other person's private task
   shows them nothing, because they can't read that row.
 - `seen_marks` (011): everyone writes only their own rows (the id must match what they mark); both read them, except
@@ -218,7 +241,8 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
   back as `actions` that the app applies only after confirmation
 - Errors answer `server_error` without details; the reason goes to the function's logs.
 - `tick`: called by the timer with header `x-cron-secret` (from `push_config`); sends due reminders, then due
-  morning/evening briefings
+  morning/evening briefings. Once a day, in the first run after 03:00 UTC, also `removeStalePhotos`: removes the files `stale_item_photos()` lists,
+  those no item points at (item or list deleted, photo replaced or removed) and more than an hour old. It does nothing before 015 and a failure only goes to the logs.
 - `APP_URL` (secret, optional): address opened from notifications; defaults to production
 
 ## 8. Notifications and briefings
@@ -264,6 +288,7 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 | 012 follow-ups (Done + next step) | ⬜ next release | ✅ 30 Oct 2026 |
 | 013 reminders (due time, reminder choices, sent records, 5-minute timer) | ⬜ next release | ⬜ to run |
 | 014 every task has an owner (open shared tasks with nobody assigned become Both) | ⬜ next release | ⬜ to run |
+| 015 photos of shopping items (`items.photo`, bucket `item-photos`, its rules, `stale_item_photos`) | ⬜ next release | ⬜ to run |
 
 ## 10. Configuration reference
 
@@ -282,6 +307,7 @@ Secrets are never stored in this repository or sent in chats. They live only whe
 | Magic Link template | Auth → Emails → Templates | `<h2>Sign in to Our Tasks</h2><p>Your code: <strong>{{ .Token }}</strong></p><p>Or open this link: <a href="{{ .ConfirmationURL }}">Sign in</a></p>` |
 | Users | Auth → Users → Invite user | The two people |
 | Function settings | Edge Functions → each function | Name `claude` / `notify` (set the name before the first deploy); Verify JWT off |
+| Photo storage | Created by migration 015 / setup file | Bucket `item-photos`, private; shows under Storage in the dashboard. Nothing to set by hand |
 | Timer | Created by migration 004 / setup file; every 5 minutes since 013 | Job `our-tasks-notify` |
 | GitHub Pages | Repo → Settings → Pages | Source: **GitHub Actions** |
 | Deployment branches | Repo → Settings → Environments → github-pages | `main` and `dev` allowed |
@@ -322,4 +348,5 @@ Secrets are never stored in this repository or sent in chats. They live only whe
 | Dev app not updating after a push | `dev` not allowed under Environments → github-pages |
 | Saves refused | Check the toast's server reason; Supabase status page for incidents |
 | No notifications on iPhone | Only in the home-screen app; turn on under People in that app |
+| Item photo stays on the camera sign | Offline and not yet on this device, or the file is gone; online it's fetched by itself |
 | Function returns 404 / `not_configured` | Function missing, misnamed, or `ANTHROPIC_API_KEY` not set |
