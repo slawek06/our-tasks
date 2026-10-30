@@ -93,11 +93,8 @@ Notes from daily use go here, then we pick what to improve.
 | 🔶 | **Seen markers**: "Wiola saw it 10:42" on assigned tasks and comments | S | Built on dev 30 Oct 2026 (migration 011). Shown in the task editor: on tasks you assigned to the other person and on your comments; the time is when they first opened it. Not on task rows (could follow) |
 | 🔶 | **Mentions in comments**: @Wiola sends her a push | S | Built on dev 30 Oct 2026 (notify updated). Decided 30 Oct 2026: typing @ offers the other's name, shown in their colour; a mention pushes even with their Comments switch off, titled "Sławek mentioned you in …", one push only; quiet hours still apply; no new switch, not in the briefing |
 | ⬜ | **Gentle nudge**: "Remind Wiola" push worded by Claude, at most once a day per task | S | |
-| ⬜ | ⭐ **"Where are we this week?"**: which home each of you is at; that home's tasks first in Today, briefing mentions it, "Next time in Warsaw" lists | M | Top pick; pairs with Checklists and areas |
-| ⬜ | **Decisions and approvals**: options (with photos) to vote on or approve ("OK to order this sofa?"); result kept in the task | M | Replaces the old "Approvals" item |
 | ✅ | **"To talk about" list**: a standing checklist (never closed); shows who raised each topic; tick when discussed, then Clear ticked; briefings may mention topics | | Released 29 Oct 2026 (migration 009) |
 | ⬜ | **Our week**: who's doing what this week and what each finished, incl. planning and shopping; awareness, not scorekeeping | S | Replaces "Who's doing what this week" |
-| ⬜ | **Rotating chores**: repeating tasks alternate the assignee ("Bins: Sławek this week, Wiola next") | S | |
 | ⬜ | ⭐ **"Thanks ❤️"**: one-tap thanks on "closed by the other" notifications | S | Top pick; covers "reactions" |
 | ⬜ | ⭐ **Weekly check-in with Claude**: 10-minute Sunday conversation (done, stuck, to talk about, who takes what), changes applied on confirm | M | Top pick; builds on the briefing chat |
 | ⬜ | Quick replies on comments | S | |
@@ -116,7 +113,6 @@ Notes from daily use go here, then we pick what to improve.
 | ✅ | Templates (reusable checklists) | | Covered by Checklists |
 | ⬜ | Calendar view (month grid) | M | |
 | ⬜ | Attachments and photos (quotes, invoices) | M | Supabase Storage |
-| ⬜ | Cost tracking per project | M | |
 | ⬜ | Break a task into steps with Claude | S | The chat can add tasks already |
 
 ## Shopping
@@ -128,7 +124,6 @@ Notes from daily use go here, then we pick what to improve.
 | ✅ | Private shopping lists (whole list private; private items not needed) | | Released 29 Oct 2026 (migration 009) |
 | ⬜ | Recurring shopping ("coffee every 2 weeks") | S | |
 | ⬜ | Shop-specific order (learned from ticking order) | S | |
-| ⬜ | Prices and budget per list / trip | M | |
 | 🔶 | Photo of an item ("this exact brand") | M | Built on dev 30 Oct 2026, migration 015. Decided: one photo per item (a new one replaces it), camera or library; it goes with the item (Finish shopping, Remove, deleting the list; Undo brings it back; an item bought for a task keeps it); a small picture on the row, tap for large; the phone keeps a copy so photos show in a shop without signal, deleted on sign-out; adding needs a connection. Shrunk on the phone to 1280 pixels (1 GB holds thousands). Private rules follow the item; the server removes unused files once a day |
 | ⬜ | Remember an item's photo for next time ("coffee" brings back its photo) | S | Considered for the first version and left out: photos would pile up and need rules of their own on private lists |
 
