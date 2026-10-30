@@ -135,6 +135,7 @@ Notes from daily use go here, then we pick what to improve.
 | ✅ | Separate production and development environments | | Two Supabase projects, `main` / `dev` branches |
 | ✅ | Password and e-mail code sign-in | | |
 | ⬜ | Native iPhone/Mac app: widgets, Siri intents, Watch | L | $99/year Apple Developer Program |
+| ✅ | One-file database update for a release (`scripts/make-release-sql.py`) | S | Decided 30 Oct 2026, after a migration went to the wrong project: one file per project, migrations plus the privacy check, refuses to run in the wrong project. Not yet tried in a real release |
 
 ## Security (review 26 Oct 2026)
 
