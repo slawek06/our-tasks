@@ -100,7 +100,7 @@ Field names: the app uses camelCase, the database snake_case (`parentId` ↔ `pa
 checklists (008), `privateListsSupported` (009), seen markers (011: no marks until it runs), `followUpsSupported`
 (012: a next step is a plain new task, without the link, and the form says which file to run), `dueTimeSupported`
 (013, checks `remind_by`: no time field in the editor, which says which file to run; quick add leaves "10:30" in the title), `photosSupported`
-(015: the item editor's Photo field says which file to run), `attachmentsSupported` (016: the task editor's Files field says which file to run). 010 only tightens access rules; the app works the same before it.
+(015: the item editor's Photo field says which file to run), `attachmentsSupported` (016: the task editor's Files field says which file to run), `thanksSupported` (017: no thanks until it runs). 010 only tightens access rules; the app works the same before it.
 
 **Views.** Today · Tasks (Inbox + areas) · Upcoming · Lists (Shopping | Checklists) · Activity · Archive.
 Panels: task editor, People (names, password, notifications, data), Briefing, From text, Ideas, Sort into areas,
@@ -110,6 +110,8 @@ shopping list editor.
 `seen_marks` the first time (`markOpened`, only while the app is visible, never for private tasks). The editor shows
 the other person's marks: "Assigned by … · Wiola saw it 10:42" on tasks for them, and "Wiola saw it …" on your
 comments. You never see your own marks.
+
+**Thanks.** On a shared closed task whose last closer was the other person (`closerOf`, from `history`), the editor offers the `THANKS` pictures under Status. `sendThanks` saves one row per person per task: another picture replaces it, the same one removes it, and only the first asks `notify` for a push. Thanks show on the task's row, in the editor and in Activity (`feed`, built from the rows like comments, so a removed one disappears); one that arrives while the app is open also gets a toast. Adding a picture only needs a change to `THANKS`.
 
 **Mentions.** Typing `@` in a comment offers the other person's name (`#mention-pick`); `@Name` is shown in that
 person's colour (`withMentions`). The push is decided by `notify` (see §7).
@@ -193,6 +195,7 @@ on the device).
 | `seen_marks` | "Wiola saw it 10:42": first time a person saw an assignment or comment | `id` (`<user>:<task>:<kind>:<ref>`), `user_id`, `task_id` (deleted with the task), `kind` (`assigned`/`comment`), `ref` (assigned_at or comment id), `at` | 011 |
 | `user_state` | Per person: "new for you" and Activity/Shopping read markers, My day pins | `user_id`, `seen`, `activity_at`, `shopping_at`, `today` | schema, 002 |
 | `push_subscriptions` | Devices that get push | `user_id`, `endpoint`, `p256dh`, `auth`, `device` | 004 |
+| `thanks` | A thank-you for a closed task | `id` (`<user>:<task>`), `user_id`, `task_id` (deleted with the task), `emoji`, `at` | 017 |
 | `notify_prefs` | Notification settings per person | `lang`, `tz`, `morning`, `evening`, `quiet_from/to`, `on_assigned/comment/closed`, `on_reminder`, `morning_sent`, `evening_sent` | 004, 005, 013 |
 | `briefings` | Briefings and chat messages | `user_id`, `kind`, `role`, `text`, `actions` (json), `applied` | 004 |
 | `push_config` | Server only: VAPID keys, timer password | `vapid`, `cron_secret` | 004 |
@@ -230,6 +233,7 @@ on the device).
   only read and add; there are no update or delete rules. A row's `path` gives no access by itself. `public.stale_task_files()` lists the files to remove; only the service role may call it.
 - `follow_up_of` (012) is a plain column on `tasks` and adds no rule: a task's link to the other person's private task
   shows them nothing, because they can't read that row.
+- `thanks` (017): everyone writes only their own rows (the id must match), only on shared tasks; both read them, except on the other person's private tasks.
 - `seen_marks` (011): everyone writes only their own rows (the id must match what they mark); both read them, except
   marks on the other person's private task.
 - `user_state`, `push_subscriptions`, `notify_prefs`, `briefings`: own rows only.
@@ -249,11 +253,11 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 **`notify`.** Body `{action, …}`:
 - `vapid`: public push key (keys are created and stored in `push_config` on first use)
 - `test`: push to the caller's devices
-- `event` (`assigned`, `comment`, `closed`, `file`): instant push to the other person, respecting their switches and quiet hours.
+- `event` (`assigned`, `comment`, `closed`, `file`, `thanks`): instant push to the other person, respecting their switches and quiet hours.
   `assigned` pushes only when the task is theirs by name, never for Both. This is the one place that rule lives: the app calls
   `notifyEvent("assigned", …)` on every assignment and `notify` decides
   A comment with `@<their name>` is a mention: it pushes even with their Comments switch off, titled
-  "Sławek mentioned you in …" (one push, never two); quiet hours still apply. `file` ("Sławek added a file to …", the file's name below) follows the Comments switch; nothing for private tasks
+  "Sławek mentioned you in …" (one push, never two); quiet hours still apply. `file` ("Sławek added a file to …", the file's name below) follows the Comments switch; `thanks` ("Sławek sent you 🌻", the picture read from the saved row) follows it too, only for a closed task; nothing for private tasks
 - `brief_now`, `chat`: briefing and conversation, written by Claude from a snapshot of the caller's open tasks,
   shopping, standing-list topics and recent activity (never the other person's private items); proposed changes come
   back as `actions` that the app applies only after confirmation
@@ -313,6 +317,7 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 | 014 every task has an owner (open shared tasks with nobody assigned become Both) | ✅ 30 Oct 2026, privacy check 53 lines all PASS | ✅ privacy check all PASS (30 Oct 2026) |
 | 015 photos of shopping items (`items.photo`, bucket `item-photos`, its rules, `stale_item_photos`) | ✅ 30 Oct 2026, privacy check 53 lines all PASS | ✅ privacy check all PASS (30 Oct 2026) |
 | 016 files on tasks (`attachments`, bucket `task-files`, its rules, `stale_task_files`) | ✅ 30 Oct 2026, privacy check 53 lines all PASS | ✅ privacy check all PASS (30 Oct 2026) |
+| 017 thanks (`thanks`, its rules) | ⬜ Release 3 | ⬜ |
 
 ## 10. Configuration reference
 
@@ -360,6 +365,7 @@ Secrets are never stored in this repository or sent in chats. They live only whe
 - Collect several items, then **release**: run `python3 scripts/make-release-sql.py <first migration of the release>`, try `supabase/release-our-tasks.sql` in development, merge `dev` into `main`,
   run `supabase/release-our-tasks-prod.sql` in production (it ends with the privacy check), deploy changed functions to production, update §9.
   The file stops with "STOP: this is the wrong Supabase project" in the other project, before changing anything.
+- Releases are numbered, starting with Release 3 (begun 30 Oct 2026; earlier releases go by their date).
 - Record decisions and status in `docs/backlog.md`; structure and settings here.
 - Commit messages explain why; no secrets, no personal data in the repository.
 

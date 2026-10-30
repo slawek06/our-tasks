@@ -288,6 +288,11 @@ body.shop-mode .fab { display: none; }
 .remind-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .remind-pick button { border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 9px 8px; font-size: 14px; }
 .remind-pick button[aria-pressed=true] { background: var(--accent-soft); border-color: var(--accent); font-weight: 600; }
+.thanks-pick { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.thanks-pick button { border: 1px solid var(--line); background: var(--bg); border-radius: 9px; min-height: 44px; padding: 0; font-size: 21px; line-height: 1; }
+.thanks-pick button[aria-pressed=true] { background: var(--accent-soft); border-color: var(--accent); }
+.thanks-got { margin: 0; font-size: 14px; }
+.thanks-got .pic { font-size: 21px; vertical-align: -2px; }
 .hint .linkish { border: 0; background: none; padding: 0; color: var(--accent); font: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
 /* Checkbox rows inside a field are normal text, not field labels. */
 .field > label.check { text-transform: none; letter-spacing: 0; font-size: 14px; font-weight: 400; color: var(--ink); }
@@ -478,6 +483,7 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
           <input type="radio" name="status" id="s-done" value="done"><label for="s-done" class="s-done"></label>
         </div>
       </div>
+      <div class="field" id="thanks" hidden></div>
       <div class="follow-links" id="follow-links" hidden></div>
       <div class="two task-only">
         <div class="field" id="assignee-field"><label for="f-assignee">Assigned to</label><select id="f-assignee"></select></div>
@@ -1172,6 +1178,7 @@ function startListening() {
   listenIdeas();
   listenChecklists();
   listenSeenMarks();
+  listenThanks();
   listenAttachments();
   if (meId) store.listenDoc("data/users/" + meId + "/seen", (d) => { seen = d?.map || {}; activitySeenAt = d?.activityAt || 0; shoppingSeenAt = d?.shoppingAt || 0; todayPins = d?.today || {}; render(); });
 }
@@ -1247,6 +1254,59 @@ function seenWhen(ms) {
   return d.toDateString() === new Date().toDateString() ? time : d.toDateString() === y.toDateString() ? "yesterday " + time : fmtStamp(ms);
 }
 const seenLabel = (m) => h("span", { class: "seen-mark" }, h("b", { class: pc(otherSlot()) || null }, slotName(otherSlot())), " saw it " + seenWhen(m.at));
+
+// ---- thanks: a one-tap thank-you for a task the other person closed ----
+// One per person per task (supabase/migrations/017_thanks.sql; until it runs the editor shows nothing).
+const THANKS = [["❤️", "Heart"], ["🌹", "Rose"], ["🌷", "Tulip"], ["🌻", "Sunflower"], ["🌸", "Blossom"], ["💐", "Bouquet"], ["☀️", "Sun"],
+  ["🍺", "Beer"], ["☕", "Coffee"], ["🍕", "Pizza"], ["💪", "Muscle"], ["🏆", "Trophy"], ["🔧", "Wrench"], ["🚗", "Car"]];
+let thanks = new Map(), thanksSupported = false, thanksSince = 0, thanksCloser = "";
+function listenThanks() {
+  thanksSince = Date.now();
+  const cb = (m) => {
+    // Arriving while the app is open: say so. Older ones just show on the task and in Activity.
+    for (const [id, x] of m) if (!thanks.has(id) && x.userId !== meId && x.at > thanksSince && tasks.has(x.taskId)) toast(`${slotName(otherSlot())} sent you ${x.emoji} for “${tasks.get(x.taskId).title}”`);
+    thanks = m; thanksSupported = true; render(); if (editingId) renderThanks();
+  };
+  if (store.mode === "supabase") sb.listen("thanks", cb).catch(() => { thanksSupported = false; delete sb.queries.thanks; });
+  else store.listen("thanks", cb);
+}
+const myThanks = (taskId) => thanks.get(meId + ":" + taskId) || null;
+const theirThanks = (taskId) => { const o = otherSlot(), uid = o && people[o + "User"]; return uid ? thanks.get(uid + ":" + taskId) || null : null; };
+const slotOfUser = (uid) => uid && people.aUser === uid ? "a" : uid && people.bUser === uid ? "b" : "";
+// Who closed it last: the history keeps that, and the status alone doesn't say.
+async function closerOf(id) {
+  const rows = await store.query("history", "taskId", id);
+  return rows.filter((e) => /status to Done|^closed it/.test(e.text || "")).sort((a, b) => (b.at || 0) - (a.at || 0))[0]?.by || "";
+}
+function loadThanks(id) {
+  thanksCloser = "";
+  renderThanks();
+  if (!thanksSupported || tasks.get(id)?.status !== "done" || tasks.get(id)?.private) return;
+  closerOf(id).then((by) => { if (editingId === id) { thanksCloser = by; renderThanks(); } }).catch(() => {});
+}
+function renderThanks() {
+  const el = $("#thanks"), id = editingId, t = tasks.get(id), o = otherSlot();
+  const got = id ? theirThanks(id) : null, mine = id ? myThanks(id) : null;
+  const canSend = !!t && !!o && t.status === "done" && thanksCloser === o && canWrite() && !t.archived;
+  el.hidden = !thanksSupported || !t || isArea(t) || t.private || $("#f-private").checked || !(got || mine || canSend);
+  if (el.hidden) return;
+  fill(el,
+    got && h("p", { class: "thanks-got" }, h("b", { class: pc(o) || null }, slotName(o)), " sent you ", h("span", { class: "pic" }, got.emoji), " · " + seenWhen(got.at)),
+    canSend && h("span", { class: "lbl" }, "Say thanks to " + slotName(o)),
+    canSend && h("div", { class: "thanks-pick", role: "group", "aria-label": "Say thanks to " + slotName(o) }, ...THANKS.map(([pic, name]) =>
+      h("button", { type: "button", title: name, "aria-label": name, "aria-pressed": String(mine?.emoji === pic), onclick: () => sendThanks(id, pic) }, pic))),
+    !canSend && mine && h("p", { class: "thanks-got" }, "You sent ", h("span", { class: "pic" }, mine.emoji), " · " + seenWhen(mine.at)));
+}
+// Tapping the same picture takes it back; another one replaces it. Only the first one pushes.
+async function sendThanks(taskId, pic) {
+  const id = meId + ":" + taskId, mine = thanks.get(id);
+  try {
+    if (mine?.emoji === pic) { await store.remove("thanks", id); return; }
+    await store.put("thanks", id, { userId: meId, taskId, emoji: pic, at: Date.now() });
+    toast(`Sent ${pic} to ${slotName(otherSlot())}`);
+    if (!mine) notifyEvent("thanks", taskId);
+  } catch (err) { writeFailed(err); }
+}
 // Activity and Shopping highlight what the other person did since you last looked at them.
 function switchView(k) {
   if (k === view) return;
@@ -1265,8 +1325,9 @@ function switchView(k) {
 // ---- activity feed: recent changes and comments from both of you ----
 function feed() {
   const fromComments = [...comments.values()].map((c) => ({ id: "c" + c.id, taskId: c.taskId, by: c.by, at: c.at || 0, text: `commented: “${c.text}”`, mine: !!meId && c.byUser === meId }));
+  const fromThanks = [...thanks.values()].filter((x) => tasks.has(x.taskId)).map((x) => ({ id: "n" + x.id, taskId: x.taskId, by: slotOfUser(x.userId), at: x.at || 0, text: `sent ${x.emoji} as thanks`, mine: !!meId && x.userId === meId }));
   const me = mySlot();
-  return [...activity.map((e) => ({ ...e, mine: !!me && e.by === me })), ...fromComments].sort((a, b) => b.at - a.at).slice(0, 150);
+  return [...activity.map((e) => ({ ...e, mine: !!me && e.by === me })), ...fromComments, ...fromThanks].sort((a, b) => b.at - a.at).slice(0, 150);
 }
 const newActivityCount = () => mySlot() ? feed().filter((e) => !e.mine && e.at > activitySeenAt).length : 0;
 function dayLabel(ms) {
@@ -1510,6 +1571,8 @@ function renderTask(t, depth) {
   const nf = (attachmentsBy.get(t.id) || []).length;
   if (nf) meta.append(h("span", {}, nf + (nf === 1 ? " file" : " files")));
   if (t.notes) meta.append(h("span", { title: "Has notes" }, "Notes"));
+  const thx = [theirThanks(t.id), myThanks(t.id)].filter(Boolean).map((x) => x.emoji).join(" ");
+  if (thx) meta.append(h("span", { title: "Thanks" }, thx));
 
   const row = h("div", { class: "row" + (matches(t) ? "" : " ctx") + (status === "done" ? " is-done" : ""), style: "--d:" + depth, "data-depth": depth },
     h("button", { type: "button", class: "handle", title: "Drag to reorder (or use the arrow keys)", "aria-label": "Reorder " + t.title,
@@ -2207,6 +2270,7 @@ function openEditor(id, parentId = "", opts = {}) {
   const t = id ? tasks.get(id) : { status: "todo", priority: "normal", assignee: opts.area ? "" : inheritedAssignee(parentId), repeat: "", parentId, due: opts.area ? "" : defaultDue(), private: !!tasks.get(parentId)?.private };
   if (!t) return;
   editingId = id;
+  thanksCloser = "";
   const area = editingArea = id ? isArea(t) : !!opts.area;
   $("#ed-title").textContent = area ? (id ? (t.archived ? "Archived area" : "Edit area") : "New area")
     : id ? (t.archived ? "Archived task" : "Edit task") : isArea(tasks.get(parentId)) ? "New task in " + tasks.get(parentId).title : parentId ? "New subtask" : "New task";
@@ -2246,6 +2310,7 @@ function openEditor(id, parentId = "", opts = {}) {
     renderComments();
     $("#history").open = false;
     loadHistory(id);
+    loadThanks(id);
     if (isNew(t)) markSeen([id]);
   }
   resetFoot();
@@ -2316,6 +2381,7 @@ function fillParents(t, id, isPrivate, keep) {
 function applyPrivateUI(isPrivate) {
   $("#assignee-field").hidden = isPrivate;
   if (isPrivate) $("#assigned-by").hidden = true;
+  renderThanks();
   $("#comments-field").hidden = isPrivate;
   $("#history").hidden = isPrivate;
   $("#private-note").hidden = !isPrivate;

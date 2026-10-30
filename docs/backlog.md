@@ -2,6 +2,8 @@
 
 Status: ✅ done · 🔶 partly done · ⬜ open · ➖ dropped. Effort: S (one session) · M · L.
 
+Release in progress: **Release 3** (numbering decided 30 Oct 2026; earlier releases go by their date).
+
 ## Notifications, briefings, voice
 
 | | Item | Effort | Notes |
@@ -94,11 +96,23 @@ Notes from daily use go here, then we pick what to improve.
 | ⬜ | **Gentle nudge**: "Remind Wiola" push worded by Claude, at most once a day per task | S | |
 | ✅ | **"To talk about" list**: a standing checklist (never closed); shows who raised each topic; tick when discussed, then Clear ticked; briefings may mention topics | | Released 29 Oct 2026 (migration 009) |
 | ⬜ | **Our week**: who's doing what this week and what each finished, incl. planning and shopping; awareness, not scorekeeping | S | Replaces "Who's doing what this week" |
-| ⬜ | ⭐ **"Thanks ❤️"**: one-tap thanks on "closed by the other" notifications | S | Top pick; covers "reactions" |
+| 🔶 | ⭐ **"Thanks ❤️"**: one-tap thanks for a task the other person closed | S | Built on dev for Release 3 (migration 017, notify changed). Decided 30 Oct 2026: 14 pictures in two rows, flowers, heart and sun, then "for the boy" (beer, coffee, pizza, muscle, trophy, wrench, car); anyone can send any of them. iPhones show no buttons on a web app's notifications, so tapping the "closed" push opens the task, where the pictures are near the top. Also reached from Activity or the task's row. One per person per task: another picture replaces it, the same one takes it back, and only the first one pushes. The push follows the Comments switch and quiet hours. Shows on the task's row, in the editor and in Activity; never on private tasks. Who closed it comes from the history |
 | ⬜ | ⭐ **Weekly check-in with Claude**: 10-minute Sunday conversation (done, stuck, to talk about, who takes what), changes applied on confirm | M | Top pick; builds on the briefing chat |
 | ⬜ | Quick replies on comments | S | |
 | ✅ | **Done + next step**: closing a task offers a follow-up task (same area/project, link "Follow-up of …"); the outcome is saved as a comment | S | Released 30 Oct 2026 (migration 012). Decided 30 Oct 2026: closing stays one tap, the toast offers "Next step"; the editor has "Done + next step" (open tasks) and "Add a next step" (closed ones). The task closes first, so Skip leaves it closed. The form asks for the outcome (optional, saved once) and one or more next steps: "+ Another step" adds a row of title, date (tomorrow) and person (you), no limit, and a row without a title is ignored. Each step is its own task (several steps added 30 Oct 2026, the owner's request after trying one). An outcome without a title saves just the outcome. Private tasks have no comments, so their outcome goes in the notes; their follow-up is private. Links show in the editor only, not on task rows (could follow). Comment and assignment pushes work as usual |
+| ⬜ | **Our chat with a local AI**: a shared chat that turns into tasks, plus a private side; see the design below | L | Waiting for the owner's local AI model, expected about 2-3 months from 30 Oct 2026. Decided 30 Oct 2026: for privacy, the chat isn't sent to Anthropic |
 | ⬜ | Done + next step, extras: Claude suggests the next step's title and date from the outcome; the briefing mentions follow-ups | S | Options left out of the first version, waiting for the owner's decision (30 Oct 2026). Suggestion: `claude` function; briefing: `notify` redeploy |
+
+### Design: Our chat with a local AI (concept, 30 Oct 2026, not final)
+
+- **Us**: the shared chat, with photos, push and seen markers. The AI offers one-tap cards for tasks, shopping items, dates and reminders, answers @questions from shared data, and offers to save decisions on the task or area. A comment on a task also shows in the chat.
+- **Just me**: private to each person, with reminders about your own tasks and promises, private questions, and the briefings.
+- **Rules**: the database keeps Just me private. In Us the AI gets shared data only. Nothing changes without a tap. It never compares people, comments on tone or passes on what was said in private.
+- **Local AI**: runs on the owner's computer and fetches new messages from Supabase itself, so no router ports are opened. It has its own limited access, not the service role key. If the computer is off, the chat and existing reminders keep working and only the AI waits.
+- **Before building**: Wiola agrees; try the model on real Polish and English examples, including dates like "w czwartek".
+- **Stages**: 1) chat, @questions, press a message to make a task, briefings in Just me. 2) The AI suggests by itself, private reminders about promises. 3) Saved decisions and search across old messages, weekly check-in.
+- **Absorbs when built**: "Can you take this?", Thanks ❤️, quick replies and Gentle nudge become chat actions.
+- **Open**: where the chat sits (no seventh tab so far); whether briefings, Smart add and From text also move to the local AI, since they send data to Anthropic today.
 
 ## Tasks and projects
 
