@@ -10,7 +10,7 @@
 // Actions (POST JSON body {action, ...}):
 //   vapid      signed-in  -> the public key the app needs to subscribe a device
 //   test       signed-in  -> sends "Notifications work" to the caller's devices
-//   event      signed-in  -> {type: assigned|comment|closed|file, taskId, text?}: notifies the other person
+//   event      signed-in  -> {type: assigned|comment|closed|file|thanks, taskId, text?}: notifies the other person
 //   brief_now  signed-in  -> writes a briefing for the caller now (no push)
 //   chat       signed-in  -> {message}: replies, and may propose changes the app shows for confirmation
 //   tick       timer      -> sends the task reminders and briefings that are due, and once a day removes photo and task files
@@ -443,6 +443,11 @@ Deno.serve(async (req) => {
         message = { title: `${who} added a file to ${task.title}`, body: String(body.text ?? "").slice(0, 160) };
       else if (body.type === "closed" && p.on_closed)
         message = { title: `${who} closed a task`, body: task.title };
+      else if (body.type === "thanks" && p.on_comment && task.status === "done") {
+        // Goes with comments: same switch, same quiet hours. The picture comes from the saved row, not from the request.
+        const { data: sent } = await db.from("thanks").select("emoji").eq("id", `${uid}:${task.id}`).maybeSingle();
+        if (sent) message = { title: `${who} sent you ${sent.emoji}`, body: `Thanks for: ${task.title}` };
+      }
       return reply({ sent: message ? await pushTo(other, { ...message, url, tag: `${body.type}-${task.id}` }) : 0 });
     }
 

@@ -1,7 +1,7 @@
 -- Privacy check: can each person see only what they should?
 -- Run any time: Supabase dashboard > SQL Editor > New query > paste this whole file > Run.
 -- It adds a few test rows, looks at them as each of the two people, then undoes everything, so nothing is left.
--- The result is a table with PASS or FAIL per line. Needs migrations 009, 010, 011, 013, 015 and 016.
+-- The result is a table with PASS or FAIL per line. Needs migrations 009, 010, 011, 013, 015, 016 and 017.
 --
 -- "A" is the person who owns the private test task and list (the first account), "B" is the other person.
 -- Works with a single account, so also in a development project with only one user.
@@ -43,6 +43,21 @@ begin
   execute 'set local role authenticated';
   begin
     insert into public.seen_marks (id, user_id, task_id, kind, ref) values (as_uid || ':' || tid || ':comment:x', as_uid, tid, 'comment', 'x');
+    ok := true;
+  exception when others then ok := false;
+  end;
+  execute 'reset role';
+  return ok;
+end $$;
+
+-- Tries to send a thank-you on a task (as the given person, signed as "as_uid").
+create or replace function pg_temp.can_thank(uid uuid, as_uid uuid, tid text) returns boolean language plpgsql as $$
+declare ok boolean;
+begin
+  perform set_config('request.jwt.claims', json_build_object('sub', uid, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  begin
+    insert into public.thanks (id, user_id, task_id, emoji) values (as_uid || ':' || tid, as_uid, tid, '🌻');
     ok := true;
   exception when others then ok := false;
   end;
@@ -169,7 +184,10 @@ declare
     ["A", "seen_marks", "privacy-check-m2", true,  "own seen marker on own private task"],
     ["B", "attachments", "privacy-check-a1", true,  "attachment of a shared task"],
     ["B", "attachments", "privacy-check-a2", false, "attachment (with its file name) of A''s private task"],
-    ["A", "attachments", "privacy-check-a2", true,  "attachment of own private task"]
+    ["A", "attachments", "privacy-check-a2", true,  "attachment of own private task"],
+    ["B", "thanks", "privacy-check-n1", true,  "A''s thanks on a shared task"],
+    ["B", "thanks", "privacy-check-n2", false, "A''s thanks on A''s private task"],
+    ["A", "thanks", "privacy-check-n2", true,  "own thanks on own private task"]
   ]';
   c jsonb; got boolean; i int := 0; ph jsonb := '[]';
 begin
@@ -194,6 +212,8 @@ begin
     insert into public.reminders_sent (id, user_id, task_id) values ('privacy-check-r1', ua, 'privacy-check-t2');
     insert into public.attachments (id, task_id, name, path) values
       ('privacy-check-a1', 'privacy-check-t1', 'shared.pdf', 'privacy-check-t1/a.pdf'), ('privacy-check-a2', 'privacy-check-t2', 'private.pdf', 'privacy-check-t2/a.pdf');
+    insert into public.thanks (id, user_id, task_id, emoji) values
+      ('privacy-check-n1', ua, 'privacy-check-t1', '🌻'), ('privacy-check-n2', ua, 'privacy-check-t2', '🌻');
 
     for c in select * from jsonb_array_elements(checks) loop
       i := i + 1;
@@ -238,6 +258,10 @@ begin
     ph := ph || jsonb_build_array(jsonb_build_array('A', 'sees the file of own private task', pg_temp.sees_file('task-files', ua, 'privacy-check-t2/a.pdf'), true));
     ph := ph || jsonb_build_array(jsonb_build_array('B', 'sees the file of A''s private task', pg_temp.sees_file('task-files', ub, 'privacy-check-t2/a.pdf'), false));
     ph := ph || jsonb_build_array(jsonb_build_array('B', 'sees the file of a shared task', pg_temp.sees_file('task-files', ub, 'privacy-check-t1/a.pdf'), true));
+    -- Thanks: only in your own name, never on a private task.
+    ph := ph || jsonb_build_array(jsonb_build_array('B', 'can send thanks in A''s name', pg_temp.can_thank(ub, ua, 'privacy-check-t1'), false));
+    ph := ph || jsonb_build_array(jsonb_build_array('A', 'can send thanks on own private task', pg_temp.can_thank(ua, ua, 'privacy-check-t2'), false));
+    ph := ph || jsonb_build_array(jsonb_build_array('A', 'can send thanks on a shared task', pg_temp.can_thank(ua, ua, 'privacy-check-t1'), true));
     ph := ph || jsonb_build_array(jsonb_build_array('Nobody', 'anonymous visitor sees the file of a shared task', pg_temp.sees_file('task-files', null, 'privacy-check-t1/a.pdf'), false));
     ph := ph || jsonb_build_array(jsonb_build_array('B', 'can change or remove the file of A''s private task', pg_temp.can_change_file('task-files', ub, 'privacy-check-t2/a.pdf'), false));
     ph := ph || jsonb_build_array(jsonb_build_array('B', 'can change or remove the file of a shared task', pg_temp.can_change_file('task-files', ub, 'privacy-check-t1/a.pdf'), false));
