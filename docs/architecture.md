@@ -309,7 +309,7 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 | 013 reminders (due time, reminder choices, sent records, 5-minute timer) | ✅ run early by mistake 30 Oct 2026, harmless (rerun at the release) | ✅ privacy check all PASS (30 Oct 2026) |
 | 014 every task has an owner (open shared tasks with nobody assigned become Both) | ⬜ next release | ✅ privacy check all PASS (30 Oct 2026) |
 | 015 photos of shopping items (`items.photo`, bucket `item-photos`, its rules, `stale_item_photos`) | ⬜ next release | ✅ privacy check all PASS (30 Oct 2026) |
-| 016 files on tasks (`attachments`, bucket `task-files`, its rules, `stale_task_files`) | ⬜ next release | ⬜ to run |
+| 016 files on tasks (`attachments`, bucket `task-files`, its rules, `stale_task_files`) | ⬜ next release | ✅ privacy check all PASS (30 Oct 2026) |
 
 ## 10. Configuration reference
 
