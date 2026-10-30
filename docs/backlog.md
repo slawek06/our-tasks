@@ -2,7 +2,7 @@
 
 Status: ✅ done · 🔶 partly done · ⬜ open · ➖ dropped. Effort: S (one session) · M · L.
 
-Release in progress: **Release 3** (numbering decided 30 Oct 2026; earlier releases go by their date).
+Release in progress: **Release 4**. Last: **Release 3**, 30 Oct 2026 (numbering decided that day; earlier releases go by their date).
 
 ## Notifications, briefings, voice
 
@@ -96,7 +96,7 @@ Notes from daily use go here, then we pick what to improve.
 | ⬜ | **Gentle nudge**: "Remind Wiola" push worded by Claude, at most once a day per task | S | |
 | ✅ | **"To talk about" list**: a standing checklist (never closed); shows who raised each topic; tick when discussed, then Clear ticked; briefings may mention topics | | Released 29 Oct 2026 (migration 009) |
 | ⬜ | **Our week**: who's doing what this week and what each finished, incl. planning and shopping; awareness, not scorekeeping | S | Replaces "Who's doing what this week" |
-| 🔶 | ⭐ **"Thanks ❤️"**: one-tap thanks for a task the other person closed | S | Built on dev for Release 3 (migration 017, notify changed). Decided 30 Oct 2026: 14 pictures in two rows, flowers, heart and sun, then "for the boy" (beer, coffee, pizza, muscle, trophy, wrench, car); anyone can send any of them. iPhones show no buttons on a web app's notifications, so tapping the "closed" push opens the task, where the pictures are near the top. Also reached from Activity or the task's row. One per person per task: another picture replaces it, the same one takes it back, and only the first one pushes. The push follows the Comments switch and quiet hours. Shows on the task's row, in the editor and in Activity; never on private tasks. Who closed it comes from the history |
+| ✅ | ⭐ **"Thanks ❤️"**: one-tap thanks for a task the other person closed | S | Released in Release 3, 30 Oct 2026 (migration 017, notify changed). Not yet tried between two people. Decided 30 Oct 2026: 14 pictures in two rows, flowers, heart and sun, then "for the boy" (beer, coffee, pizza, muscle, trophy, wrench, car); anyone can send any of them. iPhones show no buttons on a web app's notifications, so tapping the "closed" push opens the task, where the pictures are near the top. Also reached from Activity or the task's row. One per person per task: another picture replaces it, the same one takes it back, and only the first one pushes. The push follows the Comments switch and quiet hours. Shows on the task's row, in the editor and in Activity; never on private tasks. Who closed it comes from the history |
 | ⬜ | ⭐ **Weekly check-in with Claude**: 10-minute Sunday conversation (done, stuck, to talk about, who takes what), changes applied on confirm | M | Top pick; builds on the briefing chat |
 | ⬜ | Quick replies on comments | S | |
 | ✅ | **Done + next step**: closing a task offers a follow-up task (same area/project, link "Follow-up of …"); the outcome is saved as a comment | S | Released 30 Oct 2026 (migration 012). Decided 30 Oct 2026: closing stays one tap, the toast offers "Next step"; the editor has "Done + next step" (open tasks) and "Add a next step" (closed ones). The task closes first, so Skip leaves it closed. The form asks for the outcome (optional, saved once) and one or more next steps: "+ Another step" adds a row of title, date (tomorrow) and person (you), no limit, and a row without a title is ignored. Each step is its own task (several steps added 30 Oct 2026, the owner's request after trying one). An outcome without a title saves just the outcome. Private tasks have no comments, so their outcome goes in the notes; their follow-up is private. Links show in the editor only, not on task rows (could follow). Comment and assignment pushes work as usual |
@@ -149,7 +149,7 @@ Notes from daily use go here, then we pick what to improve.
 | ✅ | Separate production and development environments | | Two Supabase projects, `main` / `dev` branches |
 | ✅ | Password and e-mail code sign-in | | |
 | ⬜ | Native iPhone/Mac app: widgets, Siri intents, Watch | L | $99/year Apple Developer Program |
-| ✅ | One-file database update for a release (`scripts/make-release-sql.py`) | S | Decided 30 Oct 2026, after a migration went to the wrong project: one file per project, migrations plus the privacy check, refuses to run in the wrong project. Not yet tried in a real release |
+| ✅ | One-file database update for a release (`scripts/make-release-sql.py`) | S | Decided 30 Oct 2026, after a migration went to the wrong project: one file per project, migrations plus the privacy check, refuses to run in the wrong project. Used for the releases of 30 Oct 2026 and Release 3 |
 
 ## Security (review 26 Oct 2026)
 
