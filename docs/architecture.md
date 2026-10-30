@@ -250,7 +250,10 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 - The app subscribes the device with the VAPID public key and stores the subscription in `push_subscriptions`.
 - On iPhone, push works only in the home-screen app (iOS 16.4+).
 - Briefings: morning (default 07:30) and evening (20:00) per person, in English or Polish, friendly and short,
-  written to sound natural when read aloud. Quiet hours 22:00–07:00 for instant notifications.
+  written to sound natural when read aloud. They go out at the time the person chose, even inside their quiet hours.
+- Quiet hours: per person, set under People (`quiet_from`, `quiet_to`, default 22:00 to 07:00), on that person's own clock
+  (`tz`). They may cross midnight; the same time twice, or a cleared time, means no quiet hours (`inQuiet` in `notify`).
+  Instant pushes in quiet hours are not sent, then or later.
 - Reminders (decided 30 Oct 2026): pushes the chosen time before a task's date and time (24 hours, 1 hour, 15 minutes, at the
   time; several allowed), on the person's own clock (`tz`), at most about 5 minutes late. Titled "In 1 hour · 10:30". Goes to the
   owner of a private task; on a shared task to the assignee, and to both when it's set to Both (or still empty).
@@ -260,7 +263,9 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
   switch (`on_reminder`, under People) turns theirs off altogether. Closed, archived and area rows never send.
   Each goes out once: writing its `reminders_sent` row decides that, so overlapping timers can't double-send; a new date or
   time is a new id, so it's recalculated. If no device takes it the row is removed and the next tick tries again. A moment
-  more than 10 minutes past (`REMINDER_LATE_MIN`, two timer runs: time set too late, timer down) is skipped.
+  more than 10 minutes past (`REMINDER_LATE_MIN`, two timer runs: time set too late, timer down) is skipped. Quiet hours are read
+  when the timer runs, so a reminder that's waiting follows any change to them; if the new end has already passed by more than
+  those 10 minutes, it isn't sent.
 - Timer: `pg_cron` job `our-tasks-notify`, `*/5 * * * *` (changed from every 15 minutes by 013, which alters only the
   schedule, so it's safe in either project), `net.http_post` to the project's `/functions/v1/notify`. Briefings don't go out
   twice: `morning_sent` / `evening_sent` are set to today's date before each is written.

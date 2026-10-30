@@ -132,6 +132,7 @@ function localNow(tz: string) {
     .formatToParts(new Date()).map((x) => [x.type, x.value]));
   return { date: `${parts.year}-${parts.month}-${parts.day}`, time: `${parts.hour === "24" ? "00" : parts.hour}:${parts.minute}`, weekday: parts.weekday };
 }
+// Each person's own hours, on their own clock; they may cross midnight. A cleared time or the same time twice means none.
 const inQuiet = (p: typeof PREF_DEFAULTS, time: string) =>
   p.quiet_from && p.quiet_to && (p.quiet_from <= p.quiet_to ? time >= p.quiet_from && time < p.quiet_to : time >= p.quiet_from || time < p.quiet_to);
 
@@ -290,7 +291,8 @@ async function sendReminders(ppl: Awaited<ReturnType<typeof people>>) {
         // A moment in quiet hours waits for them to end if it's 24 hours before (time to spare) or someone else set it,
         // so only your own reminder can wake you. It's dropped if the event is over by then.
         const held = inQuiet(p, clockBefore(t.due_time, before)) && (before === 1440 || !own);
-        const fromEnd = held ? minutesSince(now.date, p.quiet_to, now) : late;
+        // Counted from the last time the clock passed the end, so an end just before midnight still counts just after it.
+        const fromEnd = held ? (minutesSince(now.date, p.quiet_to, now) + 1440) % 1440 : late;
         if (!(late >= 0 && fromEnd >= 0 && fromEnd <= REMINDER_LATE_MIN) || (held && toEvent > 0)) continue;
         // Only the row that gets written may send, so overlapping timers can't send it twice.
         const id = `${uid}:${t.id}:${t.due} ${t.due_time}:${before}`;
