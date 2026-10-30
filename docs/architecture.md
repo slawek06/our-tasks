@@ -22,7 +22,7 @@ and in the browser.
         │ supabase-js (publishable key + the person's sign-in)
         ▼
  Supabase project ─ Postgres (tables + row level security) ─ Realtime (live changes)
-                  ─ Storage (private bucket item-photos: photos of shopping items)
+                  ─ Storage (private buckets item-photos: photos of shopping items; task-files: photos and PDFs on tasks)
                   ─ Auth (email + password, email code/link; invited people only)
                   ─ Edge Functions:  claude  (Smart add, From text, Sort into areas)
                                      notify  (push, reminders, briefings, chat)  ◄── pg_cron every 5 min
@@ -43,7 +43,7 @@ There is no own server: GitHub hosts the files, Supabase holds data, sign-in and
 | Offline | Service worker (`sw.js`) + device copy in `localStorage` | Network first for app files; changes queue in an outbox |
 | Installable | Web app manifest + icons | Add to Home Screen (iPhone), Add to Dock (Mac Safari) |
 | Database | Supabase Postgres | Row level security on every table |
-| Files | Supabase Storage, private bucket `item-photos` | Photos of shopping items, shrunk on the device; access rules follow the item |
+| Files | Supabase Storage, private buckets `item-photos` and `task-files` | Photos of shopping items and files on tasks, photos shrunk on the device; access rules follow the item or task. Both share the free plan's 1 GB |
 | Live updates | Supabase Realtime (`postgres_changes`) | Access rules also filter what each person receives |
 | Sign-in | Supabase Auth | Sign-ups off; email + password, or email code / link |
 | Server code | Supabase Edge Functions (Deno, TypeScript) | `claude`, `notify` |
@@ -99,7 +99,7 @@ Field names: the app uses camelCase, the database snake_case (`parentId` ↔ `pa
 checklists (008), `privateListsSupported` (009), seen markers (011: no marks until it runs), `followUpsSupported`
 (012: a next step is a plain new task, without the link, and the form says which file to run), `dueTimeSupported`
 (013, checks `remind_by`: no time field in the editor, which says which file to run; quick add leaves "10:30" in the title), `photosSupported`
-(015: the item editor's Photo field says which file to run). 010 only tightens access rules; the app works the same before it.
+(015: the item editor's Photo field says which file to run), `attachmentsSupported` (016: the task editor's Files field says which file to run). 010 only tightens access rules; the app works the same before it.
 
 **Views.** Today · Tasks (Inbox + areas) · Upcoming · Lists (Shopping | Checklists) · Activity · Archive.
 Panels: task editor, People (names, password, notifications, data), Briefing, From text, Ideas, Sort into areas,
@@ -155,6 +155,17 @@ A photo goes when its item goes (Finish shopping, Remove, deleting the list, Del
 its bought items, since without the list the access rules would show them to the other person. Backups hold the path, not the picture:
 after a restore a photo that's gone shows as "no longer available".
 
+**Files on tasks** (`taskFiles`, decided 30 Oct 2026). Photos and PDFs for quotes and invoices, up to 10 per task (`FILE_MAX`), in the task editor's Files field; saved tasks only, like
+comments. Add and Remove act at once. Pictures of any kind the browser can open (JPEG, PNG, HEIC…) are redrawn on the device at most 2000 pixels on the longest side as JPEG (at most 1.5 MB, usually about 0.5 MB, larger than
+item photos so small print stays readable), which also drops the camera's location; Chrome on a Mac can't open HEIC and says so. A PDF goes as it is, at most 10 MB. Anything else is refused with a message. `taskFiles` is `photos` with its own bucket, store and rules: the same fetching
+and copies, with `<task id>/<random>.jpg|pdf` as the path, so Storage never holds the real name. The name, size, who and when are the row in `attachments`. Rows show "2 files"; search finds file names; the view (`showFile`) shows the picture or the PDF in a frame, with Share or save (on a phone: the share
+sheet, which also shows every page of a PDF) or Download. Files are read with the person's sign-in, never through a shareable link.
+Offline: adding says it needs a connection, removing waits in the outbox, files already seen still open. A copy reaches the phone once seen (a PDF when opened, a photo when its task is opened), in Cache Storage (`ot-files-<prod|dev|local>-<user>`). It goes 15 seconds after the file, its task or the right to
+read it goes, or the task is archived (`prune`), and the whole store goes on signing out, signing out from another device, or on reaching the sign-in screen.
+Closing a task changes nothing. An archived task keeps its files, to look at only, and restoring brings them back. Deleting a task removes its rows at once (and on the server with the task, `on delete cascade`); `notify` removes the files. Either person can remove a file on a shared task; Undo puts the row back. A next step or
+a repeat's next copy starts without files. Adding pushes the other person (`notifyEvent("file", …)`, see §7). History names the file on shared tasks (`log` writes nothing for private tasks, so a private task's file is never named, also after the task is deleted). Backups hold the rows, not the files:
+after a restore a file that's gone shows as "no longer available".
+
 **People.** `config` row `people` = `{a, b, aUser, bUser}`: the two names and which account is which. The first person
 is shown blue, the second green (`--p-a`, `--p-b`).
 
@@ -173,6 +184,7 @@ on the device).
 | `history` | Change log (Activity, task history) | `task_id`, `text`, `title`, `author`, `at` | schema |
 | `lists` | Shopping lists (Groceries exists without a row) | `name`, `sort_order`, `private`, `owner` | schema, 009 |
 | `items` | Shopping items | `list_id`, `name`, `qty`, `section`, `checked`, `bought`, `task_id`, `added_by`, `photo` (path of its file in `item-photos`, `''` = none), … | schema, 015 |
+| `attachments` | Files on tasks | `task_id` (deleted with the task), `name` (shown), `path` (in `task-files`), `size` (bytes), `author`, `at` | 016 |
 | `catalog` | Items bought before: suggestions and shop sections | `name`, `section`, `manual`, `count`, `list_counts` | schema, 003 |
 | `config` | Shared settings (`people`) | `key`, `value` (json) | schema |
 | `seen_marks` | "Wiola saw it 10:42": first time a person saw an assignment or comment | `id` (`<user>:<task>:<kind>:<ref>`), `user_id`, `task_id` (deleted with the task), `kind` (`assigned`/`comment`), `ref` (assigned_at or comment id), `at` | 011 |
@@ -210,6 +222,9 @@ on the device).
   So a photo follows its item when it moves or its list turns private, and a file whose item is gone is readable by nobody. Signed-in people can
   only read and add; there are no update or delete rules. `items.photo` gives no access by itself: pointing an item at someone else's file shows nothing.
 - `public.stale_item_photos()` (015) lists the files to remove; only the service role may call it.
+- **Files on tasks** (016): bucket `task-files` is private (10 MB limit, JPEG and PDF only). `attachments` rows follow their task like comments (`private.others_private_task`), and go with it. The rules on `storage.objects` go by the task in the file's path,
+  through the security definer function `private.task_file_allowed(path)`: the task must exist and not be the other person's private task. So a file follows its task when it turns private, and a file whose task is gone is readable by nobody. Signed-in people can
+  only read and add; there are no update or delete rules. A row's `path` gives no access by itself. `public.stale_task_files()` lists the files to remove; only the service role may call it.
 - `follow_up_of` (012) is a plain column on `tasks` and adds no rule: a task's link to the other person's private task
   shows them nothing, because they can't read that row.
 - `seen_marks` (011): everyone writes only their own rows (the id must match what they mark); both read them, except
@@ -231,18 +246,18 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 **`notify`.** Body `{action, …}`:
 - `vapid`: public push key (keys are created and stored in `push_config` on first use)
 - `test`: push to the caller's devices
-- `event` (`assigned`, `comment`, `closed`): instant push to the other person, respecting their switches and quiet hours.
+- `event` (`assigned`, `comment`, `closed`, `file`): instant push to the other person, respecting their switches and quiet hours.
   `assigned` pushes only when the task is theirs by name, never for Both. This is the one place that rule lives: the app calls
   `notifyEvent("assigned", …)` on every assignment and `notify` decides
   A comment with `@<their name>` is a mention: it pushes even with their Comments switch off, titled
-  "Sławek mentioned you in …" (one push, never two); quiet hours still apply
+  "Sławek mentioned you in …" (one push, never two); quiet hours still apply. `file` ("Sławek added a file to …", the file's name below) follows the Comments switch; nothing for private tasks
 - `brief_now`, `chat`: briefing and conversation, written by Claude from a snapshot of the caller's open tasks,
   shopping, standing-list topics and recent activity (never the other person's private items); proposed changes come
   back as `actions` that the app applies only after confirmation
 - Errors answer `server_error` without details; the reason goes to the function's logs.
 - `tick`: called by the timer with header `x-cron-secret` (from `push_config`); sends due reminders, then due
-  morning/evening briefings. Once a day, in the first run after 03:00 UTC, also `removeStalePhotos`: removes the files `stale_item_photos()` lists,
-  those no item points at (item or list deleted, photo replaced or removed) and more than an hour old. It does nothing before 015 and a failure only goes to the logs.
+  morning/evening briefings. Once a day, in the first run after 03:00 UTC, also `removeStaleFiles`: removes the files `stale_item_photos()` lists,
+  those no item points at (item or list deleted, photo replaced or removed), and those `stale_task_files()` lists, those no attachment points at (task deleted, file removed), all more than an hour old. Each does nothing before its migration (015, 016) and a failure only goes to the logs.
 - `APP_URL` (secret, optional): address opened from notifications; defaults to production
 
 ## 8. Notifications and briefings
@@ -294,6 +309,7 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 | 013 reminders (due time, reminder choices, sent records, 5-minute timer) | ✅ run early by mistake 30 Oct 2026, harmless (rerun at the release) | ✅ privacy check all PASS (30 Oct 2026) |
 | 014 every task has an owner (open shared tasks with nobody assigned become Both) | ⬜ next release | ✅ privacy check all PASS (30 Oct 2026) |
 | 015 photos of shopping items (`items.photo`, bucket `item-photos`, its rules, `stale_item_photos`) | ⬜ next release | ✅ privacy check all PASS (30 Oct 2026) |
+| 016 files on tasks (`attachments`, bucket `task-files`, its rules, `stale_task_files`) | ⬜ next release | ⬜ to run |
 
 ## 10. Configuration reference
 
@@ -312,7 +328,7 @@ Secrets are never stored in this repository or sent in chats. They live only whe
 | Magic Link template | Auth → Emails → Templates | `<h2>Sign in to Our Tasks</h2><p>Your code: <strong>{{ .Token }}</strong></p><p>Or open this link: <a href="{{ .ConfirmationURL }}">Sign in</a></p>` |
 | Users | Auth → Users → Invite user | The two people |
 | Function settings | Edge Functions → each function | Name `claude` / `notify` (set the name before the first deploy); Verify JWT off |
-| Photo storage | Created by migration 015 / setup file | Bucket `item-photos`, private; shows under Storage in the dashboard. Nothing to set by hand |
+| Photo and file storage | Created by migrations 015 and 016 / setup file | Buckets `item-photos` and `task-files`, private; show under Storage in the dashboard. Nothing to set by hand |
 | Timer | Created by migration 004 / setup file; every 5 minutes since 013 | Job `our-tasks-notify` |
 | GitHub Pages | Repo → Settings → Pages | Source: **GitHub Actions** |
 | Deployment branches | Repo → Settings → Environments → github-pages | `main` and `dev` allowed |
@@ -354,4 +370,5 @@ Secrets are never stored in this repository or sent in chats. They live only whe
 | Saves refused | Check the toast's server reason; Supabase status page for incidents |
 | No notifications on iPhone | Only in the home-screen app; turn on under People in that app |
 | Item photo stays on the camera sign | Offline and not yet on this device, or the file is gone; online it's fetched by itself |
+| A file won't open or shows the camera sign | Offline and not yet on this device, or the file is gone; online it's fetched by itself |
 | Function returns 404 / `not_configured` | Function missing, misnamed, or `ANTHROPIC_API_KEY` not set |

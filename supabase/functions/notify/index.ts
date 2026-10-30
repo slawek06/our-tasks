@@ -10,11 +10,11 @@
 // Actions (POST JSON body {action, ...}):
 //   vapid      signed-in  -> the public key the app needs to subscribe a device
 //   test       signed-in  -> sends "Notifications work" to the caller's devices
-//   event      signed-in  -> {type: assigned|comment|closed, taskId, text?}: notifies the other person
+//   event      signed-in  -> {type: assigned|comment|closed|file, taskId, text?}: notifies the other person
 //   brief_now  signed-in  -> writes a briefing for the caller now (no push)
 //   chat       signed-in  -> {message}: replies, and may propose changes the app shows for confirmation
-//   tick       timer      -> sends the task reminders and briefings that are due, and once a day removes photo files
-//                            no shopping item points at any more (called every 5 minutes by pg_cron)
+//   tick       timer      -> sends the task reminders and briefings that are due, and once a day removes photo and task files
+//                            nothing points at any more (called every 5 minutes by pg_cron)
 
 import Anthropic from "npm:@anthropic-ai/sdk";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -244,18 +244,20 @@ async function writeBriefing(uid: string, kind: "morning" | "evening") {
   return { row, push, name: s.myName };
 }
 
-// ---- photos of shopping items: removes files no item points at any more ----
-// Once a day, in the first timer run after 03:00 UTC, so an Undo right after removing an item still has its photo.
-// Before migration 015 the question fails and nothing happens.
-async function removeStalePhotos() {
+// ---- photos of shopping items and files on tasks: removes files nothing points at any more ----
+// Once a day, in the first timer run after 03:00 UTC, so an Undo right after removing one still has its file.
+// Before migrations 015 and 016 the question fails and nothing happens for that bucket.
+async function removeStaleFiles() {
   const now = new Date();
   if (now.getUTCHours() !== 3 || now.getUTCMinutes() >= 5) return;
-  const { data, error } = await db.rpc("stale_item_photos");
-  if (error) return;
-  const names = ((data ?? []) as { name: string }[]).map((r) => r.name);
-  for (let i = 0; i < names.length; i += 100) {
-    const { error: failed } = await db.storage.from("item-photos").remove(names.slice(i, i + 100));
-    if (failed) throw failed;
+  for (const [question, bucket] of [["stale_item_photos", "item-photos"], ["stale_task_files", "task-files"]]) {
+    const { data, error } = await db.rpc(question);
+    if (error) continue;
+    const names = ((data ?? []) as { name: string }[]).map((r) => r.name);
+    for (let i = 0; i < names.length; i += 100) {
+      const { error: failed } = await db.storage.from(bucket).remove(names.slice(i, i + 100));
+      if (failed) throw failed;
+    }
   }
 }
 
@@ -386,7 +388,7 @@ Deno.serve(async (req) => {
       const { data: cfg } = await db.from("push_config").select("cron_secret").eq("id", 1).maybeSingle();
       if (!cfg?.cron_secret || req.headers.get("x-cron-secret") !== cfg.cron_secret) return reply({ error: "forbidden" }, 403);
       const ppl = await people(), done = await sendReminders(ppl);
-      await removeStalePhotos().catch((e) => console.error("photos:", e));
+      await removeStaleFiles().catch((e) => console.error("files:", e));
       for (const uid of [ppl.aUser, ppl.bUser].filter(Boolean) as string[]) {
         const { count } = await db.from("push_subscriptions").select("id", { count: "exact", head: true }).eq("user_id", uid);
         if (!count) continue; // nobody to notify on this person's devices
@@ -436,6 +438,9 @@ Deno.serve(async (req) => {
       else if (body.type === "comment" && (p.on_comment || mentioned))
         // An @mention reaches them even with the Comments switch off, under its own title (one push, never two).
         message = { title: `${who} ${mentioned ? "mentioned you in" : "commented on"} ${task.title}`, body: String(body.text ?? "").slice(0, 160) };
+      else if (body.type === "file" && p.on_comment)
+        // Goes with comments: same switch, same quiet hours.
+        message = { title: `${who} added a file to ${task.title}`, body: String(body.text ?? "").slice(0, 160) };
       else if (body.type === "closed" && p.on_closed)
         message = { title: `${who} closed a task`, body: task.title };
       return reply({ sent: message ? await pushTo(other, { ...message, url, tag: `${body.type}-${task.id}` }) : 0 });

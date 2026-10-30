@@ -111,7 +111,7 @@ Notes from daily use go here, then we pick what to improve.
 | ✅ | Progress bar per project | | Part of Areas → Projects → Tasks |
 | ✅ | Templates (reusable checklists) | | Covered by Checklists |
 | ⬜ | Calendar view (month grid) | M | |
-| ⬜ | Attachments and photos (quotes, invoices) | M | Supabase Storage |
+| 🔶 | **Attachments and photos** (quotes, invoices) | M | Built on dev 30 Oct 2026 (migration 016). Decided 30 Oct 2026: photos (JPEG, PNG, HEIC, stored as a shrunk JPEG, up to about 1.5 MB) and PDFs up to 10 MB; up to 10 per task, saved tasks only. Closed and archived tasks keep their files (archived: look only); deleting a task removes them for good. Either person can remove a file on a shared task, with Undo. Push to the other person, under the Comments switch, never for private tasks. A file seen once stays on the phone for use without signal; adding needs a connection. Could follow: storage used shown in the app, attaching while creating a task |
 | ⬜ | Break a task into steps with Claude | S | The chat can add tasks already |
 
 ## Shopping

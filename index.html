@@ -193,6 +193,14 @@ h1 { font: 700 34px/1.05 var(--f-display); letter-spacing: -.02em; margin: 0; te
 .photo-thumb { width: 88px; height: 88px; font-size: 22px; }
 .photo-big { display: block; width: 100%; max-height: calc(100vh - 220px); object-fit: contain; border-radius: 9px; background: var(--hover); }
 .task-shop-row .item-photo { width: 32px; height: 32px; flex: none; align-self: center; }
+.modal a.btn { color: var(--ink); text-decoration: none; }
+.file-big { display: block; width: 100%; height: calc(100vh - 260px); border: 0; border-radius: 9px; background: var(--hover); }
+.file-row { display: flex; gap: 10px; align-items: center; padding: 6px 0; }
+.file-row .item-photo { flex: none; }
+.file-open { flex: 1; min-width: 0; border: 0; background: none; padding: 0; text-align: left; color: var(--ink); font-size: 14px; }
+.file-open b { display: block; font-weight: 500; overflow-wrap: anywhere; }
+.file-open span { display: block; font-size: 12px; color: var(--muted); }
+.file-remove { flex: none; border: 0; background: none; padding: 8px 0 8px 4px; font-size: 12px; color: var(--muted); text-decoration: underline; }
 .basket-head .btn { margin-left: auto; text-transform: none; letter-spacing: 0; }
 .lists-mode { align-self: flex-start; }
 body.shop-mode #lists-mode { display: none; }
@@ -495,6 +503,10 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
             <button class="btn small" type="button" id="ts-add">Add</button>
           </div>
         </div>
+        <div class="field" id="files-field"><span class="lbl">Files</span>
+          <div id="file-list"></div>
+          <input type="file" id="file-pick" accept="image/*,.heic,.heif,application/pdf,.pdf" multiple hidden aria-label="Choose photos or PDFs">
+        </div>
         <p class="hint" id="private-note" hidden>Private tasks have no comments and don't appear in Activity. Items you add to buy still go on the shared shopping list.</p>
         <div class="field" id="comments-field"><span class="lbl">Comments</span>
           <div class="comments" id="comment-list"></div>
@@ -540,7 +552,7 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
           <div class="field"><label for="n-evening">Evening check</label><input type="time" id="n-evening"></div>
         </div>
         <label class="check"><input type="checkbox" id="n-assigned"> When a task is assigned to me by name</label>
-        <label class="check"><input type="checkbox" id="n-comment"> New comments</label>
+        <label class="check"><input type="checkbox" id="n-comment"> New comments and files</label>
         <label class="check"><input type="checkbox" id="n-closed"> When the other person closes a task</label>
         <label class="check" id="n-reminder-wrap"><input type="checkbox" id="n-reminder"> Task reminders</label>
         <div class="two">
@@ -733,7 +745,7 @@ let items = new Map(), lists = new Map(), catalog = new Map(), toBuyBy = new Map
 let shoppingSeenAt = 0, shoppingHighlightSince = 0;
 let meId = null;
 let loaded = false;
-let byParent = new Map(), byParentAll = new Map(), commentsBy = new Map();
+let byParent = new Map(), byParentAll = new Map(), commentsBy = new Map(), attachments = new Map(), attachmentsBy = new Map(), attachmentsSupported = true;
 let editingId = null;
 let view = (() => { try { return localStorage.getItem("view") || "today"; } catch { return "today"; } })();
 let searchMode = false, searchSnippets = new Map(), flashId = null;
@@ -1006,14 +1018,14 @@ const store = {
     const { data } = await sb.client.auth.getSession();
     if (linkError || back.has("access_token")) history.replaceState(null, "", location.pathname);
     if (!data.session) {
-      photos.forgetAll(); // in case signing out was cut short
+      photos.forgetAll(); taskFiles.forgetAll(); // in case signing out was cut short
       showSignIn();
       if (linkError) $("#signin-msg").textContent = `That link didn't work (${linkError.replace(/\+/g, " ")}). Each link works once and expires after about an hour. Send yourself a new one below.`;
       return;
     }
     meId = data.session.user.id;
     // Also when signed out from another device ("Sign out" there ends every session).
-    sb.client.auth.onAuthStateChange((event) => { if (event === "SIGNED_OUT") { sb.forget(); photos.forget().finally(() => location.reload()); } });
+    sb.client.auth.onAuthStateChange((event) => { if (event === "SIGNED_OUT") { sb.forget(); Promise.all([photos.forget(), taskFiles.forget()]).finally(() => location.reload()); } });
     sb.restore();
     await sb.flush();  // changes left from an earlier offline session go first
     sb.subscribe();
@@ -1147,7 +1159,7 @@ async function setPrivacy(id, makePrivate, rootData) {
 }
 
 function startListening() {
-  store.listen("tasks", (m) => { sharedTasks = m; mergeTasks(); loaded = true; render(); });
+  store.listen("tasks", (m) => { sharedTasks = m; mergeTasks(); loaded = true; render(); if (taskFiles.ready) taskFiles.sync(); });
   if (privColl()) store.listen(privColl(), (m) => { privateTasks = m; mergeTasks(); render(); });
   store.listen("comments", (m) => { comments = m; render(); if (editingId) renderComments(); });
   store.listenDoc("config/people", (d) => { people = { ...DEFAULT_PEOPLE, ...(d || {}) }; render(); });
@@ -1158,7 +1170,15 @@ function startListening() {
   listenIdeas();
   listenChecklists();
   listenSeenMarks();
+  listenAttachments();
   if (meId) store.listenDoc("data/users/" + meId + "/seen", (d) => { seen = d?.map || {}; activitySeenAt = d?.activityAt || 0; shoppingSeenAt = d?.shoppingAt || 0; todayPins = d?.today || {}; render(); });
+}
+
+// Files on tasks need supabase/migrations/016_task_attachments.sql; until then the task editor says so.
+function listenAttachments() {
+  const cb = (m) => { attachments = m; attachmentsSupported = true; taskFiles.ready = true; render(); if (editingId) renderAttachments(); taskFiles.sync(); };
+  if (store.mode === "supabase") sb.listen("attachments", cb).catch(() => { attachmentsSupported = false; delete sb.queries.attachments; if (editingId) renderAttachments(); });
+  else store.listen("attachments", cb);
 }
 
 // ---- people and identity ----
@@ -1304,7 +1324,7 @@ function describeChanges(before, data) {
 // ---- tree helpers ----
 // byParent holds the active tree; byParentAll also includes archived tasks.
 function buildIndex() {
-  byParent = new Map(); byParentAll = new Map(); commentsBy = new Map();
+  byParent = new Map(); byParentAll = new Map(); commentsBy = new Map(); attachmentsBy = new Map();
   const push = (map, p, t) => { if (!map.has(p)) map.set(p, []); map.get(p).push(t); };
   for (const t of tasks.values()) {
     const parent = tasks.get(t.parentId);
@@ -1313,6 +1333,8 @@ function buildIndex() {
   }
   for (const map of [byParent, byParentAll]) for (const arr of map.values()) arr.sort((a, b) => (a.order || 0) - (b.order || 0));
   for (const c of comments.values()) push(commentsBy, c.taskId, c);
+  for (const a of attachments.values()) push(attachmentsBy, a.taskId, a);
+  for (const arr of attachmentsBy.values()) arr.sort((a, b) => (a.at || 0) - (b.at || 0));
   toBuyBy = new Map();
   for (const i of items.values()) if (i.taskId && !i.bought) toBuyBy.set(i.taskId, (toBuyBy.get(i.taskId) || 0) + 1);
   for (const arr of commentsBy.values()) arr.sort((a, b) => (a.at || 0) - (b.at || 0));
@@ -1483,6 +1505,8 @@ function renderTask(t, depth) {
   if (nb) meta.append(h("span", {}, nb + " to buy"));
   const nc = (commentsBy.get(t.id) || []).length;
   if (nc) meta.append(h("span", {}, nc + (nc === 1 ? " comment" : " comments")));
+  const nf = (attachmentsBy.get(t.id) || []).length;
+  if (nf) meta.append(h("span", {}, nf + (nf === 1 ? " file" : " files")));
   if (t.notes) meta.append(h("span", { title: "Has notes" }, "Notes"));
 
   const row = h("div", { class: "row" + (matches(t) ? "" : " ctx") + (status === "done" ? " is-done" : ""), style: "--d:" + depth, "data-depth": depth },
@@ -1717,8 +1741,9 @@ function renderSearch(list) {
   const hits = [];
   for (const t of tasks.values()) {
     const c = (commentsBy.get(t.id) || []).find((x) => has(x.text));
-    if (!has(t.title) && !has(t.notes) && !c) continue;
-    if (!has(t.title)) searchSnippets.set(t.id, c ? `Comment: “${c.text.slice(0, 80)}${c.text.length > 80 ? "…" : ""}”` : "Match in the notes");
+    const file = (attachmentsBy.get(t.id) || []).find((x) => has(x.name));
+    if (!has(t.title) && !has(t.notes) && !c && !file) continue;
+    if (!has(t.title)) searchSnippets.set(t.id, c ? `Comment: “${c.text.slice(0, 80)}${c.text.length > 80 ? "…" : ""}”` : file && !has(t.notes) ? `File: ${file.name}` : "Match in the notes");
     hits.push(t);
   }
   const rank = (t) => (t.archived ? 2 : t.status === "done" ? 1 : 0);
@@ -2213,6 +2238,7 @@ function openEditor(id, parentId = "", opts = {}) {
     $("#mention-pick").hidden = true;
     $("#ts-input").value = "";
     renderTaskShop();
+    renderAttachments();
     renderComments();
     $("#history").open = false;
     loadHistory(id);
@@ -2419,6 +2445,7 @@ function askDelete() {
           log(id, n ? `deleted it with ${n} subtask${n > 1 ? "s" : ""}` : "deleted it", tasks.get(id).title);
           for (const i of ids) {
             for (const c of commentsBy.get(i) || []) await store.remove("comments", c.id);
+            for (const a of attachmentsBy.get(i) || []) await store.remove("attachments", a.id);
             // Items still to buy stay on their shopping list, just no longer linked; bought ones go.
             for (const it of [...items.values()].filter((x) => x.taskId === i)) await (it.bought ? store.remove("items", it.id) : store.update("items", it.id, { taskId: "" }));
             await removeTask(i);
@@ -3107,8 +3134,10 @@ function renderChips() {
 const PHOTO_BUCKET = "item-photos", PHOTO_SIDE = 1280, PHOTO_MAX_BYTES = 900 * 1024;
 const photos = {
   urls: new Map(), // path -> address of the picture in this session's memory
-  loading: new Map(), gone: new Set(), syncTimer: 0,
-  prefix() { return "ot-photos-" + (store.mode === "local" ? "local" : IS_DEV ? "dev" : "prod") + "-"; },
+  loading: new Map(), gone: new Set(), syncTimer: 0, bucket: PHOTO_BUCKET, copies: "ot-photos-",
+  type() { return "image/jpeg"; },
+  wanted() { return new Set([...items.values()].map((i) => i.photo).filter(Boolean)); },
+  prefix() { return this.copies + (store.mode === "local" ? "local" : IS_DEV ? "dev" : "prod") + "-"; },
   box() { return window.caches && !sb.forgotten ? caches.open(this.prefix() + meId).catch(() => null) : Promise.resolve(null); },
   key(path) { return "photo-copy/" + path; },
   remember(path, blob) {
@@ -3127,16 +3156,16 @@ const photos = {
     const box = await this.box(), hit = await box?.match(this.key(path)).catch(() => null);
     if (hit) return this.remember(path, await hit.blob());
     if (store.mode !== "supabase" || !navigator.onLine) return null;
-    const { data, error } = await sb.client.storage.from(PHOTO_BUCKET).download(path);
+    const { data, error } = await sb.client.storage.from(this.bucket).download(path);
     if (error || !data) { if (!isNetworkError(error)) this.gone.add(path); return null; }
-    box?.put(this.key(path), new Response(data, { headers: { "Content-Type": "image/jpeg" } })).catch(() => {});
+    box?.put(this.key(path), new Response(data, { headers: { "Content-Type": this.type(path) } })).catch(() => {});
     return this.remember(path, data);
   },
   // After the items change: fetch new photos so they're on the phone before the shop, drop the copies of those
   // no longer readable here. The wait outlasts an Undo, so an item brought back keeps its copy.
   sync() {
     if (store.mode === "remote") return;
-    const wanted = new Set([...items.values()].map((i) => i.photo).filter(Boolean));
+    const wanted = this.wanted();
     (async () => {
       let fresh = false;
       for (const p of wanted) if (!this.urls.has(p)) fresh = !!(await this.get(p).catch(() => null)) || fresh;
@@ -3149,7 +3178,7 @@ const photos = {
     this.syncTimer = setTimeout(() => this.prune(), 15000);
   },
   async prune() {
-    const wanted = new Set([...items.values()].map((i) => i.photo).filter(Boolean));
+    const wanted = this.wanted();
     for (const [p, url] of this.urls) if (!wanted.has(p)) { URL.revokeObjectURL(url); this.urls.delete(p); }
     const box = await this.box();
     for (const req of (await box?.keys().catch(() => null)) || []) {
@@ -3163,18 +3192,18 @@ const photos = {
     for (const k of await caches.keys().catch(() => [])) if (k.startsWith(this.prefix())) await caches.delete(k).catch(() => {});
   },
   // Shrinks on the device: longest side 1280 pixels, JPEG. Drawing it anew also drops the location the camera stored in the file.
-  async shrink(file) {
+  async shrink(file, side = PHOTO_SIDE, maxBytes = PHOTO_MAX_BYTES) {
     const src = URL.createObjectURL(file);
     try {
       const img = await new Promise((ok, no) => { const im = new Image(); im.onload = () => ok(im); im.onerror = no; im.src = src; });
-      const k = Math.min(1, PHOTO_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+      const k = Math.min(1, side / Math.max(img.naturalWidth, img.naturalHeight));
       const c = h("canvas", { width: Math.round(img.naturalWidth * k), height: Math.round(img.naturalHeight * k) }), g = c.getContext("2d");
       g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
       g.drawImage(img, 0, 0, c.width, c.height);
       let blob = null;
       for (const q of [.8, .65, .5, .35]) {
         blob = await new Promise((ok) => c.toBlob(ok, "image/jpeg", q));
-        if (blob && blob.size <= PHOTO_MAX_BYTES) return blob;
+        if (blob && blob.size <= maxBytes) return blob;
       }
       throw new Error("too big");
     } finally { URL.revokeObjectURL(src); }
@@ -3246,7 +3275,141 @@ $("#it-photo-file").addEventListener("change", async (e) => {
   }
   photoBusy = false; renderItemPhoto();
 });
-window.addEventListener("online", () => { if (editingItem) renderItemPhoto(); photos.gone.clear(); photos.sync(); });
+window.addEventListener("online", () => { if (editingItem) renderItemPhoto(); photos.gone.clear(); photos.sync(); taskFiles.gone.clear(); if (editingId) renderAttachments(); });
+
+// ---- files on tasks: photos and PDFs (quotes, invoices) ----
+// A row in "attachments" (name, size, who, when) and a file in the private Storage bucket "task-files" at "<task id>/<random>.jpg|pdf",
+// so Storage never holds the real name. Who may read both follows the task (migration 016). Works like item photos above, with these
+// differences: a picture is larger, to keep small print readable; a copy reaches the phone only once it's been seen (a PDF when opened, a
+// photo when its task is opened), and goes when the task is archived, when the file or task goes, and on signing out.
+const FILE_BUCKET = "task-files", FILE_SIDE = 2000, FILE_PHOTO_BYTES = 1536 * 1024, FILE_PDF_BYTES = 10 * 1024 * 1024, FILE_MAX = 10;
+const taskFiles = { ...photos, urls: new Map(), loading: new Map(), gone: new Set(), bucket: FILE_BUCKET, copies: "ot-files-", ready: false,
+  type(path) { return path.endsWith(".pdf") ? "application/pdf" : "image/jpeg"; },
+  // In preview mode the phone's store is the only place files live, so archived ones stay.
+  wanted() { return new Set([...attachments.values()].filter((a) => { const t = tasks.get(a.taskId); return t && (store.mode === "local" || !t.archived); }).map((a) => a.path)); },
+  // Waits like photos do, so an Undo keeps the copy. Only once both tasks and attachments have loaded: until then everything looks unwanted.
+  sync() {
+    clearTimeout(this.syncTimer);
+    this.syncTimer = setTimeout(() => { if (loaded && this.ready) this.prune(); }, 15000);
+  },
+  // The file to send: a picture shrunk to JPEG, a PDF as it is. Anything else is refused here, the bucket's limits are the backstop.
+  async prepare(file) {
+    const pdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+    const base = file.name.replace(/\.[^.]*$/, "").trim().slice(0, 120);
+    if (pdf) {
+      if (file.size > FILE_PDF_BYTES) throw { refused: `${file.name} is larger than 10 MB, so it wasn't added.` };
+      if (!(await file.slice(0, 1024).text()).includes("%PDF")) throw { refused: `${file.name} doesn't look like a PDF, so it wasn't added.` };
+      return { blob: new Blob([file], { type: "application/pdf" }), ext: "pdf", name: (base || "Document") + ".pdf" };
+    }
+    if (!file.type.startsWith("image/") && !/\.(heic|heif)$/i.test(file.name)) throw { refused: `${file.name} isn't a photo or a PDF, so it wasn't added.` };
+    // The iPhone's camera calls every new picture "image".
+    return { blob: await this.shrink(file, FILE_SIDE, FILE_PHOTO_BYTES), ext: "jpg", name: (!base || /^image$/i.test(base) ? "Photo " + todayStr() : base) + ".jpg" };
+  },
+  // The file goes first, then its row. If the row can't be saved, the unused file is cleaned up by notify.
+  async add(task, file) {
+    const { blob, ext, name } = await this.prepare(file), path = `${task.id}/${crypto.randomUUID()}.${ext}`;
+    if (store.mode === "supabase") {
+      const { error } = await sb.client.storage.from(this.bucket).upload(path, blob, { contentType: this.type(path), cacheControl: "0" });
+      if (error) throw error;
+    }
+    (await this.box())?.put(this.key(path), new Response(blob, { headers: { "Content-Type": this.type(path) } })).catch(() => {});
+    this.remember(path, blob);
+    await store.add("attachments", { taskId: task.id, name, path, size: blob.size, by: mySlot() || "", at: Date.now() });
+    return name;
+  },
+};
+const fmtSize = (n) => n >= 1024 * 1024 ? (n / 1024 / 1024).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB";
+let fileBusy = null; // while adding: { id: the task, text }
+function renderAttachments() {
+  const id = editingId, box = $("#file-list");
+  if (!id) return;
+  const t = tasks.get(id), list = attachmentsBy.get(id) || [], can = canWrite() && !t?.archived;
+  $("#files-field").hidden = store.mode === "remote";
+  if (!attachmentsSupported) return fill(box, h("p", { class: "hint" }, "Files need the database update: run supabase/migrations/016_task_attachments.sql in Supabase."));
+  // A photo's small picture comes down when its task is opened.
+  for (const a of list) if (taskFiles.type(a.path) === "image/jpeg" && !taskFiles.urls.has(a.path)) taskFiles.get(a.path).then((url) => { if (url && editingId === id) renderAttachments(); });
+  const url = (a) => taskFiles.urls.get(a.path);
+  const pick = () => {
+    if (!navigator.onLine) return toast("Adding a file needs a connection. Everything else about this task still saves.");
+    $("#file-pick").click();
+  };
+  fill(box,
+    list.map((a) => h("div", { class: "file-row" },
+      h("button", { type: "button", class: "item-photo", tabindex: "-1", "aria-hidden": "true", onclick: () => showFile(a) },
+        a.path.endsWith(".pdf") ? h("span", {}, "📄") : url(a) ? h("img", { src: url(a), alt: "" }) : h("span", {}, "📷")),
+      h("button", { type: "button", class: "file-open", "aria-label": "Open " + a.name, onclick: () => showFile(a) },
+        h("b", {}, a.name), h("span", {}, [fmtSize(a.size || 0), slotName(a.by), fmtStamp(a.at)].filter(Boolean).join(" · "))),
+      can && h("button", { type: "button", class: "file-remove", "aria-label": "Remove " + a.name, onclick: () => removeAttachment(a) }, "Remove"))),
+    !list.length && !can && h("p", { class: "hint" }, "No files."),
+    fileBusy?.id === id ? h("p", { class: "hint" }, fileBusy.text)
+      : can && list.length >= FILE_MAX ? h("p", { class: "hint" }, `A task holds ${FILE_MAX} files at most. Remove one to add another.`)
+      : can && h("button", { type: "button", class: "btn small", onclick: pick }, "Add photo or PDF"));
+}
+async function removeAttachment(a) {
+  const { id, ...rest } = a;
+  try {
+    await store.remove("attachments", id);
+    log(a.taskId, `removed the file “${a.name}”`);
+    toast(`Removed ${a.name}`, { label: "Undo", run: () => store.put("attachments", id, rest).then(() => log(a.taskId, `put back the file “${a.name}”`)).catch(writeFailed) });
+  } catch (err) { writeFailed(err); }
+}
+function showFile(a) {
+  showModal((m, finish) => {
+    const wait = h("p", {}, "Opening…"), close = () => h("button", { class: "btn primary", type: "button", id: "modal-yes", onclick: () => finish(false) }, "Close");
+    m.replaceChildren(h("h2", { id: "modal-title" }, a.name), wait, h("div", { class: "actions" }, close()));
+    taskFiles.get(a.path).then(async (url) => {
+      // Closed meanwhile.
+      if (m.hidden || !wait.isConnected) return;
+      if (!url) return wait.replaceChildren(navigator.onLine ? "This file is no longer available." : "This file isn't on this device yet. It will open once you're back online.");
+      const pdf = a.path.endsWith(".pdf"), file = new File([await (await fetch(url)).blob()], a.name, { type: taskFiles.type(a.path) });
+      if (m.hidden || !wait.isConnected) return;
+      // On a phone the share sheet shows the whole file and offers saving it; elsewhere it downloads.
+      const share = navigator.maxTouchPoints > 0 && navigator.canShare?.({ files: [file] });
+      fill(m, h("h2", { id: "modal-title" }, a.name),
+        pdf ? h("iframe", { class: "file-big", src: url, title: a.name }) : h("img", { class: "photo-big", src: url, alt: a.name }),
+        pdf && share && h("p", { class: "hint" }, "If only the first page shows, tap Share or save to see them all."),
+        h("div", { class: "actions" },
+          share ? h("button", { class: "btn", type: "button", onclick: () => navigator.share({ files: [file] }).catch((e) => { if (e?.name !== "AbortError") toast("Couldn't open the share sheet."); }) }, "Share or save")
+            : h("a", { class: "btn", href: url, download: a.name }, "Download"),
+          close()));
+      m.querySelector("#modal-yes").focus();
+    }).catch(() => { if (wait.isConnected) wait.replaceChildren("Couldn't open this file. Try again."); });
+  });
+}
+$("#file-pick").addEventListener("change", async (e) => {
+  const chosen = [...e.target.files], id = editingId, t = tasks.get(id);
+  e.target.value = "";
+  if (!chosen.length || !t) return;
+  const room = Math.max(0, FILE_MAX - (attachmentsBy.get(id) || []).length), added = [];
+  let problem = chosen.length > room ? `A task holds ${FILE_MAX} files at most, so ${chosen.length - room} of them ${chosen.length - room === 1 ? "wasn't" : "weren't"} added.` : "";
+  const busy = (text) => { fileBusy = { id, text }; renderAttachments(); };
+  busy("Adding…");
+  try {
+    // A task added offline must reach the server before its files can.
+    if (store.mode === "supabase") {
+      await sb.flush();
+      if (sb.outbox.length) throw { waiting: true };
+    }
+    for (const file of chosen.slice(0, room)) {
+      busy(`Adding ${file.name}…`);
+      try { added.push(await taskFiles.add(t, file)); }
+      catch (err) {
+        if (isNetworkError(err)) throw err;
+        problem = err?.refused || (err?.message === "too big" ? `${file.name} is too large to shrink, so it wasn't added.`
+          : err?.type === "error" ? `Couldn't read ${file.name}. This browser may not open that kind of picture. Try it on your iPhone, or as a JPEG.`
+          : `Couldn't add ${file.name}: ` + (err?.message || "unknown error"));
+      }
+    }
+  } catch (err) {
+    problem = err?.waiting ? "This task is still syncing. Try again in a moment."
+      : isNetworkError(err) ? "The connection dropped, so that file wasn't added. Try again."
+      : "Couldn't add the file: " + (err?.message || "unknown error");
+  }
+  fileBusy = null; if (editingId) renderAttachments();
+  for (const name of added) log(id, `added the file “${name}”`);
+  if (added.length) notifyEvent("file", id, added[0] + (added.length > 1 ? ` and ${added.length - 1} more` : ""));
+  toast(problem || (added.length === 1 ? `Added ${added[0]}` : `Added ${added.length} files`));
+});
 
 function renderItem(i) {
   const t = i.taskId && tasks.get(i.taskId), fresh = isNewItem(i, shoppingHighlightSince);
@@ -3808,7 +3971,7 @@ $("#signout-btn").addEventListener("click", async () => {
   const n = sb.outbox.length;
   if (n && !(await askConfirm("Sign out anyway?", `${n} change${n > 1 ? "s" : ""} made offline ${n > 1 ? "haven't" : "hasn't"} reached the server yet. Signing out deletes ${n > 1 ? "them" : "it"} from this device.`, "Sign out"))) return;
   sb.forget();
-  await photos.forget();
+  await Promise.all([photos.forget(), taskFiles.forget()]);
   // Ends every session; offline the server can't be told, so at least this device signs out.
   const { error } = await sb.client.auth.signOut();
   if (error) await sb.client.auth.signOut({ scope: "local" });
@@ -3834,7 +3997,7 @@ async function importFile(file) {
   if (d?.format !== "our-tasks-export") { toast("That file isn't an Our Tasks export."); return; }
   const count = (k) => (Array.isArray(d[k]) ? d[k].length : 0), priv = (d.tasks || []).filter((t) => t.private).length;
   const parts = [[count("tasks"), "task", "tasks"], [count("history"), "history entry", "history entries"], [count("comments"), "comment", "comments"],
-    [count("items"), "shopping item", "shopping items"], [count("lists"), "list", "lists"], [count("catalog"), "suggestion", "suggestions"]]
+    [count("items"), "shopping item", "shopping items"], [count("lists"), "list", "lists"], [count("catalog"), "suggestion", "suggestions"], [count("attachments"), "file link", "file links"]]
     .filter(([n]) => n).map(([n, one, many]) => `${n} ${n === 1 ? one : many}`);
   const ok = await showModal((m, finish) => {
     m.replaceChildren(
@@ -3848,7 +4011,7 @@ async function importFile(file) {
   closePanels();
   toast("Importing…");
   try {
-    for (const table of ["lists", "catalog", "tasks", "items", "comments", "history"]) {
+    for (const table of ["lists", "catalog", "tasks", "items", "comments", "history", "attachments"]) {
       // claude.ai user ids don't exist here, so they're dropped; "who" is kept as Person 1 / Person 2.
       const rows = (d[table] || []).map(({ byUser, addedByUser, ...r }) => toRow(r));
       for (let i = 0; i < rows.length; i += 200) sb.check(await sb.client.from(table).upsert(rows.slice(i, i + 200), { defaultToNull: false }));
@@ -3864,7 +4027,7 @@ async function downloadBackup() {
   if (!navigator.onLine) { toast("A backup needs an internet connection."); return; }
   try {
     const out = { format: "our-tasks-export", version: 1, source: "own", savedAt: new Date().toISOString(), people: { a: people.a, b: people.b } };
-    for (const t of DATA_TABLES) out[t] = sb.check(await sb.client.from(t).select("*")).map(fromRow);
+    for (const t of attachmentsSupported ? [...DATA_TABLES, "attachments"] : DATA_TABLES) out[t] = sb.check(await sb.client.from(t).select("*")).map(fromRow);
     const url = URL.createObjectURL(new Blob([JSON.stringify(out, null, 1)], { type: "application/json" }));
     const a = h("a", { href: url, download: `our-tasks-backup-${todayStr()}.json` });
     document.body.append(a); a.click(); a.remove();
@@ -3881,7 +4044,7 @@ async function wipeAll() {
     m.replaceChildren(
       h("span", { class: "step" }, "Step 1 of 2"),
       h("h2", { id: "modal-title" }, "Delete all data?"),
-      h("p", {}, `This deletes every task (${counts.tasks}), comment, history entry, shopping item (${counts.items}), list and suggestion, for both of you. Your names and accounts stay, so you both stay signed in.`),
+      h("p", {}, `This deletes every task (${counts.tasks}), attached file, comment, history entry, shopping item (${counts.items}), list and suggestion, for both of you. Your names and accounts stay, so you both stay signed in.`),
       h("p", {}, "It can't be undone. Download a backup first if there's anything you might want back."),
       h("div", { class: "actions" }, cancelBtn(finish),
         h("button", { class: "btn", type: "button", onclick: async () => { await downloadBackup(); } }, "Download a backup"),
