@@ -148,7 +148,7 @@ h1 { font: 700 34px/1.05 var(--f-display); letter-spacing: -.02em; margin: 0; te
 .sort-row .hint { font-size: 12.5px; }
 .sort-row select { border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 8px 10px; width: 100%; }
 .add { width: 32px; height: 32px; font-size: 20px; color: var(--muted); opacity: 0; }
-@media (hover: none) { .add, .day { opacity: .7; } .handle { opacity: .8; } }
+@media (hover: none) { .add { opacity: .7; } .handle { opacity: .8; } }
 .group-head { display: flex; gap: 8px; align-items: baseline; padding: 14px 10px 4px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .group-head:first-child { padding-top: 6px; }
 .group-head.over { color: var(--danger); }
@@ -260,7 +260,7 @@ body.shop-mode .item .box svg { width: 26px; height: 26px; }
 .signin-card input { border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 11px 12px; font-size: 16px; }
 .signin-card .btn { padding: 11px 14px; font-size: 15px; }
 .day { width: 32px; height: 32px; color: var(--muted); opacity: 0; }
-@media (hover: none) { .quick-archive { opacity: .7; } }
+@media (hover: none) { .day { opacity: .7; } }
 .row.flash { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); transition: background 1s; }
 .chip.myday { background: var(--accent-soft); border-color: transparent; color: var(--accent); font-weight: 600; }
 .fab { position: fixed; z-index: 15; right: calc(20px + env(safe-area-inset-right, 0px)); bottom: calc(20px + env(safe-area-inset-bottom, 0px));
@@ -1526,7 +1526,7 @@ function renderTask(t, depth) {
     canWrite() && !archived && status !== "done"
       ? h("button", { type: "button", class: "day", title: "My day or postpone", "aria-label": "Add to My day or postpone: " + t.title, onclick: () => openDayMenu(t) }, svg(ICON.clock, 17))
       : canWrite() && !archived
-      ? h("button", { type: "button", class: "day quick-archive", title: "Move to archive", "aria-label": "Move to archive: " + t.title, onclick: () => askArchive(t.id) }, svg(ICON.archive, 17))
+      ? h("button", { type: "button", class: "day", title: "Move to archive", "aria-label": "Move to archive: " + t.title, onclick: () => askArchive(t.id) }, svg(ICON.archive, 17))
       : h("span"),
     canWrite() && !archived && !flat && status !== "done"
       ? h("button", { type: "button", class: "add", title: "Add subtask", "aria-label": "Add subtask under " + t.title, onclick: () => openEditor(null, t.id) }, "+")
