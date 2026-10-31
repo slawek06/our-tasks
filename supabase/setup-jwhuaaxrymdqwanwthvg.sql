@@ -614,6 +614,13 @@ do $$ begin
   alter publication supabase_realtime add table public.thanks;
 exception when duplicate_object then null; end $$;
 
+-- ======== 018_task_icons.sql ========
+-- Task icons: a small emoji next to a task's title, picked by Claude Haiku on the 5-minute timer.
+-- Empty (null) means none picked yet; '' means Claude's answer wasn't an emoji, so the timer leaves it alone. Private
+-- tasks are never sent to Claude, so they have none. Access is the task's own, so nothing else changes.
+-- Run once: Supabase dashboard > SQL Editor > New query > paste > Run. Safe to run more than once.
+alter table public.tasks add column if not exists icon text;
+
 -- ======== permissions ========
 -- Only signed-in users (subject to the access rules above) and the server functions may use these tables.
 -- Anonymous visitors get nothing. push_config stays server-only.

@@ -288,6 +288,7 @@ body.shop-mode .fab { display: none; }
 .remind-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .remind-pick button { border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 9px 8px; font-size: 14px; }
 .remind-pick button[aria-pressed=true] { background: var(--accent-soft); border-color: var(--accent); font-weight: 600; }
+.t-icon { display: inline-block; margin-right: 6px; }
 .thanks-pick { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
 .thanks-pick button { border: 1px solid var(--line); background: var(--bg); border-radius: 9px; min-height: 44px; padding: 0; font-size: 21px; line-height: 1; }
 .thanks-pick button[aria-pressed=true] { background: var(--accent-soft); border-color: var(--accent); }
@@ -756,7 +757,7 @@ let byParent = new Map(), byParentAll = new Map(), commentsBy = new Map(), attac
 let editingId = null;
 let view = (() => { try { return localStorage.getItem("view") || "today"; } catch { return "today"; } })();
 let searchMode = false, searchSnippets = new Map(), flashId = null;
-let todayPins = {}, pinsSupported = true, perListSupported = true, areasSupported = true, privateListsSupported = true, followUpsSupported = true, dueTimeSupported = true, photosSupported = true, editingArea = false;
+let todayPins = {}, pinsSupported = true, perListSupported = true, areasSupported = true, privateListsSupported = true, followUpsSupported = true, dueTimeSupported = true, iconsSupported = true, photosSupported = true, editingArea = false;
 // New tasks are due tomorrow unless you pick another date (or clear it).
 const defaultDue = () => addDays(todayStr(), 1);
 const filter = { who: "all", hideDone: false, q: "" };
@@ -1053,6 +1054,7 @@ const store = {
     sb.client.from("tasks").select("follow_up_of").limit(1).then(({ error }) => { followUpsSupported = !error || isNetworkError(error); });
     // Reminders at a time of day need supabase/migrations/013_reminders.sql; until then the editor has no time field and says so.
     sb.client.from("tasks").select("remind_by").limit(1).then(({ error }) => { dueTimeSupported = !error || isNetworkError(error); });
+    sb.client.from("tasks").select("icon").limit(1).then(({ error }) => { iconsSupported = !error || isNetworkError(error); });
     // Photos of shopping items need supabase/migrations/015_item_photos.sql; until then the item editor says so.
     sb.client.from("items").select("photo").limit(1).then(({ error }) => { photosSupported = !error || isNetworkError(error); if (editingItem) renderItemPhoto(); });
     // Per-list frequent items need supabase/migrations/003_catalog_per_list.sql; until then Frequent is shared.
@@ -1588,7 +1590,7 @@ function renderTask(t, depth) {
       ? h("button", { type: "button", class: "st", "data-s": status, disabled: true, title: STATUS[status], "aria-label": "Status: " + STATUS[status] }, svg(ICON[status]))
       : h("button", { type: "button", class: "st", "data-s": status, title: STATUS[status] + " (click to change)", "aria-label": "Status: " + STATUS[status] + ". Change to " + STATUS[NEXT_STATUS[status]],
           onclick: () => canWrite() && changeStatus(t, NEXT_STATUS[status]) }, svg(ICON[status])),
-    h("button", { type: "button", class: "main", onclick: () => openEditor(t.id) }, h("span", { class: "title" }, t.title || "Untitled"), meta),
+    h("button", { type: "button", class: "main", onclick: () => openEditor(t.id) }, h("span", { class: "title" }, t.icon && h("span", { class: "t-icon" }, t.icon), t.title || "Untitled"), meta),
     canWrite() && !archived && status !== "done"
       ? h("button", { type: "button", class: "day", title: "My day or postpone", "aria-label": "Add to My day or postpone: " + t.title, onclick: () => openDayMenu(t) }, svg(ICON.clock, 17))
       : canWrite() && !archived
@@ -2442,7 +2444,7 @@ $("#ed-form").addEventListener("submit", async (e) => {
         toast(data.private ? "Now private: only you can see it" : "Now shared with " + (slotName(mySlot() === "a" ? "b" : "a") || "the other person"));
       } else {
         const { private: _p, ...patch } = data;
-        await updTask(id, patch);
+        await updTask(id, { ...patch, ...(iconsSupported && data.title !== before.title ? { icon: null } : {}) }); // a new name gets a new icon on the timer's next run
       }
       if (assigneeOf(before) !== data.assignee && data.assignee) notifyEvent("assigned", id);
       if (data.status === "done" && before.status !== "done") notifyEvent("closed", id);

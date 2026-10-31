@@ -47,7 +47,7 @@ There is no own server: GitHub hosts the files, Supabase holds data, sign-in and
 | Live updates | Supabase Realtime (`postgres_changes`) | Access rules also filter what each person receives |
 | Sign-in | Supabase Auth | Sign-ups off; email + password, or email code / link |
 | Server code | Supabase Edge Functions (Deno, TypeScript) | `claude`, `notify` |
-| AI | Claude API, model `claude-opus-5-5` | Effort `low`, server-side fallback beta; key only in Supabase |
+| AI | Claude API, model `claude-opus-5-5`; `claude-haiku-5-5` for task icons | Effort `low`, server-side fallback beta on Opus; key only in Supabase |
 | Push | Web Push, own implementation (RFC 8291 encryption, RFC 8292 VAPID) on WebCrypto | Keys created on first use, stored in `push_config` |
 | Timer | `pg_cron` + `pg_net` | Calls `notify` with `action: tick` every 5 minutes |
 | Hosting | GitHub Pages, published by GitHub Actions | Repository `slawek06/our-tasks` (public) |
@@ -100,7 +100,7 @@ Field names: the app uses camelCase, the database snake_case (`parentId` ↔ `pa
 checklists (008), `privateListsSupported` (009), seen markers (011: no marks until it runs), `followUpsSupported`
 (012: a next step is a plain new task, without the link, and the form says which file to run), `dueTimeSupported`
 (013, checks `remind_by`: no time field in the editor, which says which file to run; quick add leaves "10:30" in the title), `photosSupported`
-(015: the item editor's Photo field says which file to run), `attachmentsSupported` (016: the task editor's Files field says which file to run), `thanksSupported` (017: no thanks until it runs). 010 only tightens access rules; the app works the same before it.
+(015: the item editor's Photo field says which file to run), `attachmentsSupported` (016: the task editor's Files field says which file to run), `thanksSupported` (017: no thanks until it runs), `iconsSupported` (018: a rename leaves the field alone; the timer picks none). 010 only tightens access rules; the app works the same before it.
 
 **Views.** Today · Tasks (Inbox + areas) · Upcoming · Lists (Shopping | Checklists) · Activity · Archive.
 Panels: task editor, People (names, password, notifications, data), Briefing, From text, Ideas, Sort into areas,
@@ -110,6 +110,8 @@ shopping list editor.
 `seen_marks` the first time (`markOpened`, only while the app is visible, never for private tasks). The editor shows
 the other person's marks: "Assigned by … · Wiola saw it 10:42" on tasks for them, and "Wiola saw it …" on your
 comments. You never see your own marks.
+
+**Task icons.** `tasks.icon`: null = none yet, `""` = Claude's answer wasn't an emoji, else an emoji shown before the title on rows (`.t-icon`). The server picks them (see §7), with no way to change them in the app; renaming a task in the editor sets it back to null, so it gets a new one. Private tasks and areas never go to Claude.
 
 **Thanks.** On a shared closed task whose last closer was the other person (`closerOf`, from `history`), the editor offers the `THANKS` pictures under Status. `sendThanks` saves one row per person per task: another picture replaces it, the same one removes it, and only the first asks `notify` for a push. Thanks show on the task's row, in the editor and in Activity (`feed`, built from the rows like comments, so a removed one disappears); one that arrives while the app is open also gets a toast. Adding a picture only needs a change to `THANKS`.
 
@@ -255,6 +257,7 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 **`notify`.** Body `{action, …}`:
 - `vapid`: public push key (keys are created and stored in `push_config` on first use)
 - `test`: push to the caller's devices
+- `tick` also runs `pickIcons`: up to 40 shared, unarchived tasks with no icon go to Claude Haiku 5.5 as id and title; an answer that isn't an emoji saves as none, so it isn't paid for again; it only fills empty icons.
 - `event` (`assigned`, `comment`, `closed`, `file`, `thanks`): instant push to the other person, respecting their switches and quiet hours.
   `assigned` pushes only when the task is theirs by name, never for Both. This is the one place that rule lives: the app calls
   `notifyEvent("assigned", …)` on every assignment and `notify` decides
@@ -320,6 +323,7 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 | 015 photos of shopping items (`items.photo`, bucket `item-photos`, its rules, `stale_item_photos`) | ✅ 30 Oct 2026, privacy check 53 lines all PASS | ✅ privacy check all PASS (30 Oct 2026) |
 | 016 files on tasks (`attachments`, bucket `task-files`, its rules, `stale_task_files`) | ✅ 30 Oct 2026, privacy check 53 lines all PASS | ✅ privacy check all PASS (30 Oct 2026) |
 | 017 thanks (`thanks`, its rules) | ✅ 30 Oct 2026 (ahead of the rest of Release 3), privacy check all PASS | ✅ privacy check all PASS (30 Oct 2026) |
+| 018 task icons (`tasks.icon`) | ⬜ Release 3 | ✅ privacy check all PASS (31 Oct 2026) |
 
 ## 10. Configuration reference
 
