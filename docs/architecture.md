@@ -54,7 +54,7 @@ There is no own server: GitHub hosts the files, Supabase holds data, sign-in and
 | Mail | Gmail SMTP (app password) in Supabase Auth | Sign-in codes and invitations |
 | Voice | Browser speech synthesis and recognition | Free, on the device |
 | Fonts | Google Fonts: Bricolage Grotesque, Figtree, JetBrains Mono | |
-| Library | `@supabase/supabase-js@2.45.4` from jsDelivr | Loaded at start |
+| Library | `@supabase/supabase-js@2.45.4` from jsDelivr | Loaded at start, checked against a fingerprint (`SUPABASE_JS_SRI`, in `index.html` and `sw.js`; a new version needs a new value in both) |
 
 ## 3. Code layout
 
@@ -319,7 +319,7 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 | 014 every task has an owner (open shared tasks with nobody assigned become Both) | ✅ 30 Oct 2026, privacy check 53 lines all PASS | ✅ privacy check all PASS (30 Oct 2026) |
 | 015 photos of shopping items (`items.photo`, bucket `item-photos`, its rules, `stale_item_photos`) | ✅ 30 Oct 2026, privacy check 53 lines all PASS | ✅ privacy check all PASS (30 Oct 2026) |
 | 016 files on tasks (`attachments`, bucket `task-files`, its rules, `stale_task_files`) | ✅ 30 Oct 2026, privacy check 53 lines all PASS | ✅ privacy check all PASS (30 Oct 2026) |
-| 017 thanks (`thanks`, its rules) | ✅ 30 Oct 2026 (Release 3), privacy check all PASS | ✅ privacy check all PASS (30 Oct 2026) |
+| 017 thanks (`thanks`, its rules) | ✅ 30 Oct 2026 (ahead of the rest of Release 3), privacy check all PASS | ✅ privacy check all PASS (30 Oct 2026) |
 
 ## 10. Configuration reference
 
@@ -367,7 +367,7 @@ Secrets are never stored in this repository or sent in chats. They live only whe
 - Collect several items, then **release**: run `python3 scripts/make-release-sql.py <first migration of the release>`, try `supabase/release-our-tasks.sql` in development, merge `dev` into `main`,
   run `supabase/release-our-tasks-prod.sql` in production (it ends with the privacy check), deploy changed functions to production, update §9.
   The file stops with "STOP: this is the wrong Supabase project" in the other project, before changing anything.
-- Releases are numbered, starting with Release 3 (30 Oct 2026; earlier releases go by their date).
+- Releases are numbered, starting with Release 3 (begun 30 Oct 2026; earlier releases go by their date).
 - Record decisions and status in `docs/backlog.md`; structure and settings here.
 - Commit messages explain why; no secrets, no personal data in the repository.
 

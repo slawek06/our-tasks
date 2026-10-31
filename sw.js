@@ -1,13 +1,14 @@
 // Our Tasks service worker: keeps the app's files on the device so it opens without internet.
 // Data is not handled here: the app keeps its own copy of the data and syncs it with Supabase.
 // Bump VERSION when the list of files below changes.
-const VERSION = "v5";
+const VERSION = "v6";
 // Production (/our-tasks/) and development (/our-tasks/dev/) share one website, so each keeps its own cache.
 const SCOPE = new URL(self.registration.scope).pathname;
 const CACHE = "our-tasks-" + VERSION + "-" + SCOPE;
 const SUPABASE_JS = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js";
+const SUPABASE_JS_SRI = "sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o"; // the same value as in index.html
 const FILES = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-32.png", "./icons/icon-192.png",
-  "./icons/icon-512.png", "./icons/apple-touch-icon.png", SUPABASE_JS];
+  "./icons/icon-512.png", "./icons/apple-touch-icon.png", new Request(SUPABASE_JS, { integrity: SUPABASE_JS_SRI })];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
