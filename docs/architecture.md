@@ -111,6 +111,8 @@ shopping list editor.
 the other person's marks: "Assigned by … · Wiola saw it 10:42" on tasks for them, and "Wiola saw it …" on your
 comments. You never see your own marks.
 
+**Remembered photos.** `catalog.photo` (019) points at the same file as the item: `rememberPhoto` sets it when a photo is added on a shared list, `rememberedPhoto` brings it back in `addEntries`, `removeItemPhoto` forgets it. Before 019 (`rememberedPhotosSupported`) nothing is remembered. Files stay until nothing points at them.
+
 **Task icons.** `tasks.icon`: null = none yet, `""` = Claude's answer wasn't an emoji, else an emoji shown before the title on rows (`.t-icon`). The server picks them (see §7), with no way to change them in the app; renaming a task in the editor sets it back to null, so it gets a new one. Private tasks and areas never go to Claude.
 
 **Thanks.** On a shared closed task whose last closer was the other person (`closerOf`, from `history`), the editor offers the `THANKS` pictures under Status. `sendThanks` saves one row per person per task: another picture replaces it, the same one removes it, and only the first asks `notify` for a push. Thanks show on the task's row, in the editor and in Activity (`feed`, built from the rows like comments, so a removed one disappears); one that arrives while the app is open also gets a toast. Adding a picture only needs a change to `THANKS`.
@@ -238,6 +240,7 @@ on the device).
 - `follow_up_of` (012) is a plain column on `tasks` and adds no rule: a task's link to the other person's private task
   shows them nothing, because they can't read that row.
 - `thanks` (017): everyone writes only their own rows (the id must match), only on shared tasks; both read them, except on the other person's private tasks.
+- Item photos (019): a file is readable while an item or a remembered photo points at it, never while one is on the other person's private list; adding a file still needs a real item.
 - `seen_marks` (011): everyone writes only their own rows (the id must match what they mark); both read them, except
   marks on the other person's private task.
 - `user_state`, `push_subscriptions`, `notify_prefs`, `briefings`: own rows only.
@@ -324,6 +327,7 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 | 016 files on tasks (`attachments`, bucket `task-files`, its rules, `stale_task_files`) | ✅ 30 Oct 2026, privacy check 53 lines all PASS | ✅ privacy check all PASS (30 Oct 2026) |
 | 017 thanks (`thanks`, its rules) | ✅ 30 Oct 2026 (ahead of the rest of Release 3), privacy check all PASS | ✅ privacy check all PASS (30 Oct 2026) |
 | 018 task icons (`tasks.icon`) | ⬜ Release 3 | ✅ privacy check all PASS (31 Oct 2026) |
+| 019 remembered photos (`catalog.photo`, rules and `stale_item_photos` changed) | ⬜ Release 3 | ✅ privacy check 63 lines all PASS (31 Oct 2026) |
 
 ## 10. Configuration reference
 
