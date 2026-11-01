@@ -4240,7 +4240,7 @@ async function saveNotifyPrefs(quiet) {
     ...(dueTimeSupported ? { on_reminder: $("#n-reminder").checked } : {}),
   };
   const { error } = await sb.client.from("notify_prefs").upsert(row);
-  if (error) toast(/notify_prefs|42P01|schema cache/i.test(error.message + error.code) ? NEEDS_UPDATE : "Couldn't save the notification settings: " + error.message);
+  if (error) toast(/42P01|PGRST205/.test(error.code) ? NEEDS_UPDATE : "Couldn't save the notification settings: " + error.message); // only a missing table means that update
   else if (!quiet) toast("Notification settings saved");
   return !error;
 }

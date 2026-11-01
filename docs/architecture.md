@@ -328,7 +328,7 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 | 017 thanks (`thanks`, its rules) | ✅ 30 Oct 2026 (Release 3), privacy check all PASS | ✅ privacy check all PASS (30 Oct 2026) |
 | 018 task icons (`tasks.icon`) | ✅ 1 Nov 2026 (Release 3), privacy check no FAIL | ✅ privacy check all PASS (31 Oct 2026) |
 | 019 remembered photos (`catalog.photo`, rules and `stale_item_photos` changed) | ✅ 1 Nov 2026 (Release 3), privacy check 63 lines, no FAIL | ✅ privacy check 63 lines, no FAIL (1 Nov 2026; the first run refused new photos, rule fixed) |
-| 020 midday briefing (`notify_prefs.midday`, `midday_sent`) | ⬜ Release 3 | ⬜ |
+| 020 midday briefing (`notify_prefs.midday`, `midday_sent`) | ⬜ Release 3 | ✅ 1 Nov 2026 (005's `lang` was missing here, added the same day) |
 
 ## 10. Configuration reference
 
