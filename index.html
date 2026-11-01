@@ -289,6 +289,7 @@ body.shop-mode .fab { display: none; }
 .remind-pick button { border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 9px 8px; font-size: 14px; }
 .remind-pick button[aria-pressed=true] { background: var(--accent-soft); border-color: var(--accent); font-weight: 600; }
 .t-icon { display: inline-block; margin-right: 6px; }
+.brief-time { display: grid; grid-template-columns: minmax(0, 1fr) 96px; gap: 8px; align-items: center; }
 .thanks-pick { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
 .thanks-pick button { border: 1px solid var(--line); background: var(--bg); border-radius: 9px; min-height: 44px; padding: 0; font-size: 21px; line-height: 1; }
 .thanks-pick button[aria-pressed=true] { background: var(--accent-soft); border-color: var(--accent); }
@@ -555,10 +556,9 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
         </div>
         <div class="field"><label for="n-lang">Briefing language</label>
           <select id="n-lang"><option value="en">English</option><option value="pl">Polski</option></select></div>
-        <div class="two">
-          <div class="field"><label for="n-morning">Morning briefing</label><input type="time" id="n-morning"></div>
-          <div class="field"><label for="n-evening">Evening check</label><input type="time" id="n-evening"></div>
-        </div>
+        <div class="field"><label for="n-morning">Morning briefing</label><div class="brief-time"><input type="time" id="n-morning"><button class="btn small" type="button" data-off="#n-morning"></button></div></div>
+        <div class="field" id="n-midday-wrap"><label for="n-midday">Midday briefing</label><div class="brief-time"><input type="time" id="n-midday"><button class="btn small" type="button" data-off="#n-midday"></button></div></div>
+        <div class="field"><label for="n-evening">Evening check</label><div class="brief-time"><input type="time" id="n-evening"><button class="btn small" type="button" data-off="#n-evening"></button></div></div>
         <label class="check"><input type="checkbox" id="n-assigned"> When a task is assigned to me by name</label>
         <label class="check"><input type="checkbox" id="n-comment"> New comments and files</label>
         <label class="check"><input type="checkbox" id="n-closed"> When the other person closes a task</label>
@@ -568,7 +568,7 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
           <div class="field"><label for="n-quiet-to">Quiet hours until</label><input type="time" id="n-quiet-to" value="07:00"></div>
         </div>
         <p class="hint" id="n-quiet-hint"></p>
-        <p class="hint">Settings are per person and apply to all your devices. Clear a briefing's time to skip that briefing.</p>
+        <p class="hint">Settings are per person and apply to all your devices. Each briefing can be on or off separately. Midday and evening only come if something is still open today, unless midday is your first of the day.</p>
       </div>
       <div class="field" id="data-tools" hidden>
         <span class="lbl">Your data</span>
@@ -757,7 +757,7 @@ let byParent = new Map(), byParentAll = new Map(), commentsBy = new Map(), attac
 let editingId = null;
 let view = (() => { try { return localStorage.getItem("view") || "today"; } catch { return "today"; } })();
 let searchMode = false, searchSnippets = new Map(), flashId = null;
-let todayPins = {}, pinsSupported = true, perListSupported = true, areasSupported = true, privateListsSupported = true, followUpsSupported = true, dueTimeSupported = true, iconsSupported = true, photosSupported = true, rememberedPhotosSupported = true, editingArea = false;
+let todayPins = {}, pinsSupported = true, perListSupported = true, areasSupported = true, privateListsSupported = true, followUpsSupported = true, dueTimeSupported = true, iconsSupported = true, middaySupported = true, photosSupported = true, rememberedPhotosSupported = true, editingArea = false;
 // New tasks are due tomorrow unless you pick another date (or clear it).
 const defaultDue = () => addDays(todayStr(), 1);
 const filter = { who: "all", hideDone: false, q: "" };
@@ -1055,6 +1055,7 @@ const store = {
     // Reminders at a time of day need supabase/migrations/013_reminders.sql; until then the editor has no time field and says so.
     sb.client.from("tasks").select("remind_by").limit(1).then(({ error }) => { dueTimeSupported = !error || isNetworkError(error); });
     sb.client.from("tasks").select("icon").limit(1).then(({ error }) => { iconsSupported = !error || isNetworkError(error); });
+    sb.client.from("notify_prefs").select("midday").limit(1).then(({ error }) => { middaySupported = !error || isNetworkError(error); renderBriefTimes(); });
     // Photos of shopping items need supabase/migrations/015_item_photos.sql; until then the item editor says so.
     sb.client.from("items").select("photo").limit(1).then(({ error }) => { photosSupported = !error || isNetworkError(error); if (editingItem) renderItemPhoto(); });
     // Per-list frequent items need supabase/migrations/003_catalog_per_list.sql; until then Frequent is shared.
@@ -4208,13 +4209,20 @@ async function loadNotifyPrefs() {
   const p = data || { morning: "07:30", evening: "20:00", quiet_from: "22:00", quiet_to: "07:00", on_assigned: true, on_comment: true, on_closed: true, on_reminder: true };
   $("#n-lang").value = p.lang === "pl" ? "pl" : "en";
   $("#n-morning").value = p.morning || "";
+  $("#n-midday").value = p.midday || "";
   $("#n-evening").value = p.evening || "";
+  renderBriefTimes();
   $("#n-quiet-from").value = p.quiet_from || "";
   $("#n-quiet-to").value = p.quiet_to || "";
   renderQuietHint();
   try { if (!localStorage.getItem("voiceLang")) { voiceLang = p.lang === "pl" ? "pl-PL" : "en-GB"; $("#voice-lang").value = voiceLang; } } catch {}
   $("#n-assigned").checked = p.on_assigned; $("#n-comment").checked = p.on_comment; $("#n-closed").checked = p.on_closed;
   $("#n-reminder").checked = p.on_reminder !== false; $("#n-reminder-wrap").hidden = !dueTimeSupported;
+}
+// A cleared time means that briefing is off. iPhones offer no obvious way to clear a time, so each has a button.
+function renderBriefTimes() {
+  $("#n-midday-wrap").hidden = !middaySupported;
+  for (const b of document.querySelectorAll("[data-off]")) { const on = !!$(b.dataset.off).value; b.textContent = on ? "Turn off" : "Off"; b.disabled = !on; }
 }
 // Says what the two times mean, the same way notify reads them: a cleared time or the same time twice means none.
 function renderQuietHint() {
@@ -4226,13 +4234,13 @@ function renderQuietHint() {
 async function saveNotifyPrefs(quiet) {
   const row = {
     user_id: meId, tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Warsaw",
-    lang: $("#n-lang").value, morning: $("#n-morning").value, evening: $("#n-evening").value,
+    lang: $("#n-lang").value, morning: $("#n-morning").value, evening: $("#n-evening").value, ...(middaySupported ? { midday: $("#n-midday").value } : {}),
     quiet_from: $("#n-quiet-from").value, quiet_to: $("#n-quiet-to").value,
     on_assigned: $("#n-assigned").checked, on_comment: $("#n-comment").checked, on_closed: $("#n-closed").checked,
     ...(dueTimeSupported ? { on_reminder: $("#n-reminder").checked } : {}),
   };
   const { error } = await sb.client.from("notify_prefs").upsert(row);
-  if (error) toast(/notify_prefs|42P01|schema cache/i.test(error.message + error.code) ? NEEDS_UPDATE : "Couldn't save the notification settings: " + error.message);
+  if (error) toast(/42P01|PGRST205/.test(error.code) ? NEEDS_UPDATE : "Couldn't save the notification settings: " + error.message); // only a missing table means that update
   else if (!quiet) toast("Notification settings saved");
   return !error;
 }
@@ -4277,7 +4285,9 @@ $("#notify-test").addEventListener("click", async () => {
   const { data, error } = await sb.client.functions.invoke("notify", { body: { action: "test" } });
   toast(error ? await fnErrorText(error) : data?.sent ? "Test sent: it should appear in a few seconds." : "No device received it. Turn notifications on again on this device.");
 });
-for (const id of ["#n-lang", "#n-morning", "#n-evening", "#n-quiet-from", "#n-quiet-to", "#n-assigned", "#n-comment", "#n-closed", "#n-reminder"]) $(id).addEventListener("change", () => saveNotifyPrefs());
+for (const b of document.querySelectorAll("[data-off]")) b.addEventListener("click", () => { $(b.dataset.off).value = ""; renderBriefTimes(); saveNotifyPrefs(); });
+for (const id of ["#n-morning", "#n-midday", "#n-evening"]) $(id).addEventListener("input", renderBriefTimes);
+for (const id of ["#n-lang", "#n-morning", "#n-midday", "#n-evening", "#n-quiet-from", "#n-quiet-to", "#n-assigned", "#n-comment", "#n-closed", "#n-reminder"]) $(id).addEventListener("change", () => saveNotifyPrefs());
 for (const id of ["#n-quiet-from", "#n-quiet-to"]) $(id).addEventListener("input", renderQuietHint);
 
 // ---- briefing and the conversation about it ----
@@ -4301,7 +4311,7 @@ function renderBriefing(thinking) {
   const when = (r) => new Date(r.created_at).toLocaleString(undefined, { weekday: "short", hour: "2-digit", minute: "2-digit" });
   if (!briefRows.length) out.push(h("p", { class: "hint" }, "No briefing yet. Your morning briefing arrives at the time set under People, or tap Brief me now. You can also just ask, e.g. “What should I do first?”"));
   for (const r of briefRows) {
-    const label = r.kind === "morning" ? "Briefing" : r.kind === "evening" ? "Evening check" : "";
+    const label = r.kind === "morning" ? "Briefing" : r.kind === "midday" ? "Midday check" : r.kind === "evening" ? "Evening check" : "";
     out.push(h("div", { class: "bubble " + (r.role === "assistant" ? "assistant" : "user") },
       h("span", { class: "when" }, (label ? label + " · " : "") + when(r)), r.text,
       r.role === "assistant" && synth && h("button", { type: "button", class: "listen-btn", "data-text": r.text,
