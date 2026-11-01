@@ -4,7 +4,7 @@ Status: ✅ done · 🔶 partly done · ⬜ open · ➖ dropped. Effort: S (one 
 
 **The owner's plan (31 Oct 2026):** 1) finish and close Release 3; 2) detail the Assistant and build it; 3) then decide the way forward: native route, new look, own server.
 
-Release in progress: **Release 3**, still open: most of it is in production since 1 Nov 2026 (Thanks, Wrap up all areas, supabase-js checksum, an icon on every task, Remember an item's photo); Midday briefing built on dev. Numbering decided 30 Oct 2026; earlier releases go by their date.
+Release in progress: **Release 3**, still open: most of it is in production since 1 Nov 2026 (Thanks, Wrap up all areas, supabase-js checksum, an icon on every task, Remember an item's photo, Midday briefing). Numbering decided 30 Oct 2026; earlier releases go by their date.
 
 ## Notifications, briefings, voice
 
@@ -13,7 +13,7 @@ Release in progress: **Release 3**, still open: most of it is in production sinc
 | ✅ | Push notifications on iPhone and Mac | | Own Web Push code in the `notify` function |
 | ✅ | Instant: assigned to me, comments, closed by the other | | Per-person switches |
 | ✅ | Morning briefing 7:30, evening check 20:00, written by Claude | | Times per person |
-| 🔶 | **Midday briefing, up to 3 a day**: each person chooses morning, midday and evening, each on or off separately | S | Built on dev for Release 3 (Wiola's request; migration 020, notify changed). Midday is off until a time is set, and uses Claude Sonnet 5.5 to keep the cost down. It says what's still open and what changed since morning, and comes only if something is open today; if it's that person's first of the day, it covers the whole day like a morning briefing. Each time under People has a Turn off button, since iPhones offer no obvious way to clear a time. Check real usage against the $5 limit |
+| ✅ | **Midday briefing, up to 3 a day**: each person chooses morning, midday and evening, each on or off separately | S | Released in Release 3, 1 Nov 2026 (Wiola's request; migration 020, notify changed). The owner saw a real push in production. Midday is off until a time is set, and uses Claude Sonnet 5.5 to keep the cost down. It says what's still open and what changed since morning, and comes only if something is open today; if it's that person's first of the day, it covers the whole day like a morning briefing. Each time under People has a Turn off button, since iPhones offer no obvious way to clear a time. Check real usage against the $5 limit |
 | ✅ | Briefing chat with suggested changes, applied on confirm | | |
 | ✅ | Listen button and Talk (voice conversation) in the app | | |
 | ✅ | Briefing language English / Polski | | |
