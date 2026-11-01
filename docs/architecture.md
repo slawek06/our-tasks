@@ -47,7 +47,7 @@ There is no own server: GitHub hosts the files, Supabase holds data, sign-in and
 | Live updates | Supabase Realtime (`postgres_changes`) | Access rules also filter what each person receives |
 | Sign-in | Supabase Auth | Sign-ups off; email + password, or email code / link |
 | Server code | Supabase Edge Functions (Deno, TypeScript) | `claude`, `notify` |
-| AI | Claude API, model `claude-opus-5-5`; `claude-haiku-5-5` for task icons | Effort `low`, server-side fallback beta on Opus; key only in Supabase |
+| AI | Claude API, model `claude-opus-5-5`; `claude-haiku-5-5` for task icons, `claude-sonnet-5-5` for the midday briefing | Effort `low`, server-side fallback beta except on Haiku; key only in Supabase |
 | Push | Web Push, own implementation (RFC 8291 encryption, RFC 8292 VAPID) on WebCrypto | Keys created on first use, stored in `push_config` |
 | Timer | `pg_cron` + `pg_net` | Calls `notify` with `action: tick` every 5 minutes |
 | Hosting | GitHub Pages, published by GitHub Actions | Repository `slawek06/our-tasks` (public) |
@@ -100,7 +100,7 @@ Field names: the app uses camelCase, the database snake_case (`parentId` ↔ `pa
 checklists (008), `privateListsSupported` (009), seen markers (011: no marks until it runs), `followUpsSupported`
 (012: a next step is a plain new task, without the link, and the form says which file to run), `dueTimeSupported`
 (013, checks `remind_by`: no time field in the editor, which says which file to run; quick add leaves "10:30" in the title), `photosSupported`
-(015: the item editor's Photo field says which file to run), `attachmentsSupported` (016: the task editor's Files field says which file to run), `thanksSupported` (017: no thanks until it runs), `iconsSupported` (018: a rename leaves the field alone; the timer picks none). 010 only tightens access rules; the app works the same before it.
+(015: the item editor's Photo field says which file to run), `attachmentsSupported` (016: the task editor's Files field says which file to run), `thanksSupported` (017: no thanks until it runs), `iconsSupported` (018: a rename leaves the field alone; the timer picks none), `middaySupported` (020: no Midday time under People). 010 only tightens access rules; the app works the same before it.
 
 **Views.** Today · Tasks (Inbox + areas) · Upcoming · Lists (Shopping | Checklists) · Activity · Archive.
 Panels: task editor, People (names, password, notifications, data), Briefing, From text, Ideas, Sort into areas,
@@ -202,7 +202,7 @@ on the device).
 | `user_state` | Per person: "new for you" and Activity/Shopping read markers, My day pins | `user_id`, `seen`, `activity_at`, `shopping_at`, `today` | schema, 002 |
 | `push_subscriptions` | Devices that get push | `user_id`, `endpoint`, `p256dh`, `auth`, `device` | 004 |
 | `thanks` | A thank-you for a closed task | `id` (`<user>:<task>`), `user_id`, `task_id` (deleted with the task), `emoji`, `at` | 017 |
-| `notify_prefs` | Notification settings per person | `lang`, `tz`, `morning`, `evening`, `quiet_from/to`, `on_assigned/comment/closed`, `on_reminder`, `morning_sent`, `evening_sent` | 004, 005, 013 |
+| `notify_prefs` | Notification settings per person | `lang`, `tz`, `morning`, `midday`, `evening`, `quiet_from/to`, `on_assigned/comment/closed`, `on_reminder`, `morning_sent`, `evening_sent` | 004, 005, 013 |
 | `briefings` | Briefings and chat messages | `user_id`, `kind`, `role`, `text`, `actions` (json), `applied` | 004 |
 | `push_config` | Server only: VAPID keys, timer password | `vapid`, `cron_secret` | 004 |
 | `reminders_sent` | Server only: each reminder that went out, so it goes out once | `id` (`<user>:<task>:<date> <time>:<minutes before>`), `user_id`, `task_id` (deleted with the task), `at` | 013 |
@@ -279,7 +279,7 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 
 - The app subscribes the device with the VAPID public key and stores the subscription in `push_subscriptions`.
 - On iPhone, push works only in the home-screen app (iOS 16.4+).
-- Briefings: morning (default 07:30) and evening (20:00) per person, in English or Polish, friendly and short,
+- Briefings: morning (default 07:30), midday (off until set; Claude Sonnet 5.5) and evening (20:00) per person, each on or off separately (an empty time = off), in English or Polish, friendly and short,
   written to sound natural when read aloud. They go out at the time the person chose, even inside their quiet hours.
 - Quiet hours: per person, set under People (`quiet_from`, `quiet_to`, default 22:00 to 07:00), on that person's own clock
   (`tz`). They may cross midnight; the same time twice, or a cleared time, means no quiet hours (`inQuiet` in `notify`).
@@ -328,6 +328,7 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 | 017 thanks (`thanks`, its rules) | ✅ 30 Oct 2026 (Release 3), privacy check all PASS | ✅ privacy check all PASS (30 Oct 2026) |
 | 018 task icons (`tasks.icon`) | ✅ 1 Nov 2026 (Release 3), privacy check no FAIL | ✅ privacy check all PASS (31 Oct 2026) |
 | 019 remembered photos (`catalog.photo`, rules and `stale_item_photos` changed) | ✅ 1 Nov 2026 (Release 3), privacy check 63 lines, no FAIL | ✅ privacy check 63 lines, no FAIL (1 Nov 2026; the first run refused new photos, rule fixed) |
+| 020 midday briefing (`notify_prefs.midday`, `midday_sent`) | ⬜ Release 3 | ⬜ |
 
 ## 10. Configuration reference
 

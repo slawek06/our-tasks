@@ -122,7 +122,7 @@ const mentions = (text: string, name: string) => {
   const n = name.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return !!n && new RegExp(`@${n}(?![\\p{L}\\p{N}])`, "iu").test(text);
 };
-const PREF_DEFAULTS = { lang: "en", tz: "Europe/Warsaw", morning: "07:30", evening: "20:00", quiet_from: "22:00", quiet_to: "07:00", on_assigned: true, on_comment: true, on_closed: true, on_reminder: true, morning_sent: "", evening_sent: "" };
+const PREF_DEFAULTS = { lang: "en", tz: "Europe/Warsaw", morning: "07:30", midday: "", evening: "20:00", quiet_from: "22:00", quiet_to: "07:00", on_assigned: true, on_comment: true, on_closed: true, on_reminder: true, morning_sent: "", midday_sent: "", evening_sent: "" };
 async function prefsOf(uid: string) {
   const { data } = await db.from("notify_prefs").select("*").eq("user_id", uid).maybeSingle();
   return { ...PREF_DEFAULTS, ...(data ?? {}), user_id: uid };
@@ -204,7 +204,7 @@ async function askClaude(system: string, messages: Turn[], schema: Record<string
     system,
     messages,
     output_config: { effort: "low", format: { type: "json_schema", schema } },
-    ...(model === "claude-opus-5-5" ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" } : {}),
+    ...(model !== "claude-haiku-5-5" ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" } : {}),
   });
   if (response.stop_reason === "refusal") throw new Error("refused");
   return JSON.parse(response.content.filter((b) => b.type === "text").map((b) => b.text).join(""));
@@ -225,18 +225,23 @@ const BRIEFING_SCHEMA = {
   properties: { push: { type: "string" }, briefing: { type: "string" } },
   required: ["push", "briefing"], additionalProperties: false,
 };
-async function writeBriefing(uid: string, kind: "morning" | "evening") {
+async function writeBriefing(uid: string, kind: "morning" | "midday" | "evening") {
   const s = await snapshot(uid);
   const todayOpen = s.open.filter((t) => (t.due && t.due <= s.now.date) || false);
-  if (kind === "evening" && !todayOpen.length) return null; // nothing left today: no evening message
+  // Without a morning briefing today, midday is this person's first of the day, so it covers the whole day.
+  const first = kind === "midday" && s.prefs.morning_sent !== s.now.date;
+  if ((kind === "evening" || (kind === "midday" && !first)) && !todayOpen.length) return null; // nothing left today: no message
   const system = `You are the friendly assistant inside "Our Tasks", a shared task and shopping app for ${s.ppl.a} and ${s.ppl.b}. ` +
-    `You write ${s.myName}'s ${kind === "morning" ? "morning briefing" : "evening check"}.`;
-  const ask = `${s.text}\n\n` + (kind === "morning"
+    `You write ${s.myName}'s ${kind === "morning" || first ? "briefing for the day" : kind === "midday" ? "midday check" : "evening check"}.`;
+  const ask = `${s.text}\n\n` + (kind === "midday" && !first
+    ? `Write ${s.myName}'s midday check: friendly and short, 2-3 sentences. Say what's still open for today and what has changed since the morning (recent activity); don't repeat a whole briefing.`
+    : kind === "morning" || first
     ? `Write ${s.myName}'s morning briefing: friendly and short, 2-4 sentences, like a helpful partner. Lead with what matters most today for ${s.myName} (overdue first, then due today and MY DAY picks), and give one practical tip, for example combining an errand with an open shopping list or a related task. Mention ${s.me === "a" ? s.ppl.b : s.ppl.a}'s day only if it helps coordinate.`
     : `Write ${s.myName}'s evening check: friendly and short, 2-3 sentences. Say what's still open for today and suggest what to move or do first tomorrow.`) +
     ` Use task titles as written (they may be Polish), but you may inflect them to fit the sentence; never invent tasks. Write in ${LANGUAGE[s.prefs.lang] || "English"}. Don't start with a greeting line of its own. ${SPOKEN_STYLE}` +
     ` Also write "push": a one-line summary for the lock screen, at most 110 characters.`;
-  const out = await askClaude(system, [{ role: "user", content: ask }], BRIEFING_SCHEMA);
+  // Midday uses a cheaper model: it's a shorter job, and it's what pushes the day's count up.
+  const out = await askClaude(system, [{ role: "user", content: ask }], BRIEFING_SCHEMA, kind === "midday" ? "claude-sonnet-5-5" : undefined);
   const briefing = String(out.briefing || "").trim(), push = String(out.push || "").trim().slice(0, 140);
   if (!briefing) return null;
   const { data: row } = await db.from("briefings").insert({ user_id: uid, kind, role: "assistant", text: briefing }).select().single();
@@ -414,8 +419,8 @@ Deno.serve(async (req) => {
         const { count } = await db.from("push_subscriptions").select("id", { count: "exact", head: true }).eq("user_id", uid);
         if (!count) continue; // nobody to notify on this person's devices
         const p = await prefsOf(uid), now = localNow(p.tz);
-        for (const kind of ["morning", "evening"] as const) {
-          const at = p[kind], sentKey = kind === "morning" ? "morning_sent" : "evening_sent";
+        for (const kind of ["morning", "midday", "evening"] as const) {
+          const at = p[kind], sentKey = `${kind}_sent`;
           // Due when the time has passed today and it hasn't gone out; skip if more than 3 hours late (timer was down).
           if (!at || p[sentKey] === now.date || now.time < at) continue;
           const [h, m] = at.split(":").map(Number), [nh, nm] = now.time.split(":").map(Number);
@@ -424,7 +429,7 @@ Deno.serve(async (req) => {
           const b = await writeBriefing(uid, kind);
           if (!b) continue;
           const pl = p.lang === "pl";
-          const title = kind === "morning" ? (pl ? `Dzień dobry, ${b.name}` : `Good morning, ${b.name}`) : (pl ? "Wieczorne podsumowanie" : "Evening check");
+          const title = kind === "morning" ? (pl ? `Dzień dobry, ${b.name}` : `Good morning, ${b.name}`) : kind === "midday" ? (pl ? "W południe" : "Midday check") : (pl ? "Wieczorne podsumowanie" : "Evening check");
           await pushTo(uid, { title, body: b.push || b.row.text.slice(0, 120), url: APP_URL + "?briefing=1", tag: "briefing" });
           done.push(`${kind}:${uid}`);
         }
