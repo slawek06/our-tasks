@@ -19,10 +19,11 @@ revoke all on function private.item_photo_allowed(text) from public, anon;
 grant execute on function private.item_photo_allowed(text) to authenticated;
 
 -- Adding goes by the item alone: pointing a suggestion at a path must not make a new file possible there.
+-- objects.name, because items has a column called name too: a bare name in the inner query would mean the item's.
 drop policy if exists "item photos: add like their item" on storage.objects;
 create policy "item photos: add like their item" on storage.objects for insert to authenticated
   with check (bucket_id = 'item-photos' and name ~ '^[^/]+/[^/]+\.jpg$' and private.item_photo_allowed(name)
-              and exists (select 1 from public.items i where i.id = split_part(name, '/', 1)));
+              and exists (select 1 from public.items i where i.id = split_part(objects.name, '/', 1)));
 
 -- Files nothing points at any more, for notify to remove. A remembered photo stays.
 create or replace function public.stale_item_photos() returns table (name text)

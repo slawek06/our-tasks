@@ -327,7 +327,7 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 | 016 files on tasks (`attachments`, bucket `task-files`, its rules, `stale_task_files`) | ✅ 30 Oct 2026, privacy check 53 lines all PASS | ✅ privacy check all PASS (30 Oct 2026) |
 | 017 thanks (`thanks`, its rules) | ✅ 30 Oct 2026 (ahead of the rest of Release 3), privacy check all PASS | ✅ privacy check all PASS (30 Oct 2026) |
 | 018 task icons (`tasks.icon`) | ⬜ Release 3 | ✅ privacy check all PASS (31 Oct 2026) |
-| 019 remembered photos (`catalog.photo`, rules and `stale_item_photos` changed) | ⬜ Release 3 | ✅ privacy check 63 lines all PASS (31 Oct 2026) |
+| 019 remembered photos (`catalog.photo`, rules and `stale_item_photos` changed) | ⬜ Release 3 | ✅ privacy check 63 lines, no FAIL (1 Nov 2026; the first run refused new photos, rule fixed) |
 
 ## 10. Configuration reference
 
