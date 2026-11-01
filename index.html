@@ -142,7 +142,7 @@ h1 { font: 700 34px/1.05 var(--f-display); letter-spacing: -.02em; margin: 0; te
 .row.area .title { font: 600 16.5px var(--f-display); }
 .area-ico { width: 28px; display: flex; justify-content: center; color: var(--accent); }
 .areas-foot { display: flex; gap: 8px; padding: 14px 10px 4px; }
-.group-head .linkish { margin-left: auto; border: 0; background: none; padding: 0; font: 600 12.5px var(--f-body, inherit); letter-spacing: 0; text-transform: none; color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.group-head .linkish { margin: -10px 0 -10px auto; border: 0; background: none; padding: 10px 0; font: 600 12.5px var(--f-body, inherit); letter-spacing: 0; text-transform: none; color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
 .sort-row { display: flex; flex-direction: column; gap: 6px; border-bottom: 1px solid var(--line); padding: 10px 0; }
 .sort-row b { font-weight: 600; overflow-wrap: anywhere; }
 .sort-row .hint { font-size: 12.5px; }
@@ -288,6 +288,7 @@ body.shop-mode .fab { display: none; }
 .remind-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .remind-pick button { border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 9px 8px; font-size: 14px; }
 .remind-pick button[aria-pressed=true] { background: var(--accent-soft); border-color: var(--accent); font-weight: 600; }
+.t-icon { display: inline-block; margin-right: 6px; }
 .thanks-pick { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
 .thanks-pick button { border: 1px solid var(--line); background: var(--bg); border-radius: 9px; min-height: 44px; padding: 0; font-size: 21px; line-height: 1; }
 .thanks-pick button[aria-pressed=true] { background: var(--accent-soft); border-color: var(--accent); }
@@ -756,7 +757,7 @@ let byParent = new Map(), byParentAll = new Map(), commentsBy = new Map(), attac
 let editingId = null;
 let view = (() => { try { return localStorage.getItem("view") || "today"; } catch { return "today"; } })();
 let searchMode = false, searchSnippets = new Map(), flashId = null;
-let todayPins = {}, pinsSupported = true, perListSupported = true, areasSupported = true, privateListsSupported = true, followUpsSupported = true, dueTimeSupported = true, photosSupported = true, editingArea = false;
+let todayPins = {}, pinsSupported = true, perListSupported = true, areasSupported = true, privateListsSupported = true, followUpsSupported = true, dueTimeSupported = true, iconsSupported = true, photosSupported = true, rememberedPhotosSupported = true, editingArea = false;
 // New tasks are due tomorrow unless you pick another date (or clear it).
 const defaultDue = () => addDays(todayStr(), 1);
 const filter = { who: "all", hideDone: false, q: "" };
@@ -811,6 +812,9 @@ const ENVIRONMENTS = {
 };
 const { url: SUPABASE_URL, key: SUPABASE_KEY } = ENVIRONMENTS[IS_DEV ? "dev" : "prod"];
 const SUPABASE_JS = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js";
+// The browser refuses the file if it isn't exactly this version. A new version needs a new value, here and in sw.js:
+// curl -sL <address> | openssl dgst -sha384 -binary | openssl base64 -A
+const SUPABASE_JS_SRI = "sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o";
 
 // Database columns are snake_case; the app's fields are camelCase. BY and ORDER are reserved words in SQL.
 const COLUMN_FOR = { by: "author", order: "sort_order" };
@@ -839,7 +843,7 @@ const sb = {
   async load() {
     await new Promise((resolve, reject) => {
       const s = document.createElement("script");
-      s.src = SUPABASE_JS; s.onload = resolve; s.onerror = reject;
+      s.src = SUPABASE_JS; s.integrity = SUPABASE_JS_SRI; s.crossOrigin = "anonymous"; s.onload = resolve; s.onerror = reject;
       document.head.append(s);
     });
     this.client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -1050,10 +1054,12 @@ const store = {
     sb.client.from("tasks").select("follow_up_of").limit(1).then(({ error }) => { followUpsSupported = !error || isNetworkError(error); });
     // Reminders at a time of day need supabase/migrations/013_reminders.sql; until then the editor has no time field and says so.
     sb.client.from("tasks").select("remind_by").limit(1).then(({ error }) => { dueTimeSupported = !error || isNetworkError(error); });
+    sb.client.from("tasks").select("icon").limit(1).then(({ error }) => { iconsSupported = !error || isNetworkError(error); });
     // Photos of shopping items need supabase/migrations/015_item_photos.sql; until then the item editor says so.
     sb.client.from("items").select("photo").limit(1).then(({ error }) => { photosSupported = !error || isNetworkError(error); if (editingItem) renderItemPhoto(); });
     // Per-list frequent items need supabase/migrations/003_catalog_per_list.sql; until then Frequent is shared.
     sb.client.from("catalog").select("list_counts").limit(1).then(({ error }) => { perListSupported = !error || isNetworkError(error); if (view === "shopping") renderChips(); });
+    sb.client.from("catalog").select("photo").limit(1).then(({ error }) => { rememberedPhotosSupported = !error || isNetworkError(error); });
   },
   async initArtifact() {
     const [db, user] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
@@ -1585,7 +1591,7 @@ function renderTask(t, depth) {
       ? h("button", { type: "button", class: "st", "data-s": status, disabled: true, title: STATUS[status], "aria-label": "Status: " + STATUS[status] }, svg(ICON[status]))
       : h("button", { type: "button", class: "st", "data-s": status, title: STATUS[status] + " (click to change)", "aria-label": "Status: " + STATUS[status] + ". Change to " + STATUS[NEXT_STATUS[status]],
           onclick: () => canWrite() && changeStatus(t, NEXT_STATUS[status]) }, svg(ICON[status])),
-    h("button", { type: "button", class: "main", onclick: () => openEditor(t.id) }, h("span", { class: "title" }, t.title || "Untitled"), meta),
+    h("button", { type: "button", class: "main", onclick: () => openEditor(t.id) }, h("span", { class: "title" }, t.icon && h("span", { class: "t-icon" }, t.icon), t.title || "Untitled"), meta),
     canWrite() && !archived && status !== "done"
       ? h("button", { type: "button", class: "day", title: "My day or postpone", "aria-label": "Add to My day or postpone: " + t.title, onclick: () => openDayMenu(t) }, svg(ICON.clock, 17))
       : canWrite() && !archived
@@ -1603,7 +1609,7 @@ function renderTask(t, depth) {
 function renderArea(t, depth) {
   const archived = view === "archive" || (searchMode && !!t.archived), flat = view === "upcoming" || view === "today" || searchMode;
   const kids = kidsInView(t.id), shown = sortTasks(kids.filter(visible));
-  const isCollapsed = !filterActive() && collapsed.has(t.id), today = todayStr();
+  const isCollapsed = !filter.q && collapsed.has(t.id), today = todayStr(); // stays wrapped up under Hide done or a person's filter, not in a search
   const open = openTasksIn(t.id), over = open.filter((d) => d.due && d.due < today).length;
   const meta = h("span", { class: "meta" });
   if (t.private) meta.append(h("span", { class: "chip private", title: "Only you can see this area" }, "Private"));
@@ -1709,10 +1715,18 @@ function render() {
         h("div", { class: "group-head" }, "Inbox", h("span", { class: "n" }, String(inbox.length)),
           canWrite() && areasSupported && !filterActive() && h("button", { type: "button", class: "linkish", onclick: openSortPanel }, "Sort into areas")),
         h("div", { class: "inbox-list" }, inbox.map((t) => renderTask(t, 0)))),
+      areas.length > 1 && !filter.q && h("div", { class: "group-head" }, "Areas", h("span", { class: "n" }, String(areas.length)),
+        h("button", { type: "button", class: "linkish", onclick: () => wrapAreas(areas) }, areas.every((t) => collapsed.has(t.id)) ? "Open all" : "Wrap up all")),
       areas.length > 0 && h("div", { class: "areas" }, areas.map((t) => renderTask(t, 0))),
       newArea && !filterActive() && h("div", { class: "areas-foot" }, newArea),
       !areasSupported && inboxAll > 0 && h("p", { class: "hint", style: "padding: 8px 10px" }, "Areas need the database update: run supabase/migrations/007_areas.sql in Supabase."));
   }
+}
+// One tap closes every area, so you can open just the one you want; if all are closed, it opens them again.
+function wrapAreas(areas) {
+  const open = areas.every((t) => collapsed.has(t.id));
+  for (const t of areas) open ? collapsed.delete(t.id) : collapsed.add(t.id);
+  saveCollapsed(); render();
 }
 function clearFilters() { filter.who = "all"; filter.hideDone = false; filter.q = ""; $("#hide-done").checked = false; $("#search").value = ""; render(); }
 
@@ -2431,7 +2445,7 @@ $("#ed-form").addEventListener("submit", async (e) => {
         toast(data.private ? "Now private: only you can see it" : "Now shared with " + (slotName(mySlot() === "a" ? "b" : "a") || "the other person"));
       } else {
         const { private: _p, ...patch } = data;
-        await updTask(id, patch);
+        await updTask(id, { ...patch, ...(iconsSupported && data.title !== before.title ? { icon: null } : {}) }); // a new name gets a new icon on the timer's next run
       }
       if (assigneeOf(before) !== data.assignee && data.assignee) notifyEvent("assigned", id);
       if (data.status === "done" && before.status !== "done") notifyEvent("closed", id);
@@ -3109,9 +3123,11 @@ async function addEntries(entries, listId, taskId = "") {
         else if (isNum(existing.qty || "1") && isNum(e.qty || "1")) patch.qty = String(Math.round((toNum(existing.qty || "1") + toNum(e.qty || "1")) * 100) / 100);
         else { toast(`${existing.name} is already on the list`); continue; }
         if (taskId && !existing.taskId) patch.taskId = taskId;
+        if (!existing.photo && rememberedPhoto(e.name, listId)) patch.photo = rememberedPhoto(e.name, listId);
         await store.update("items", existing.id, patch);
       } else {
         await store.add("items", { listId, name: e.name, qty: e.qty, section: pickSection(e), checked: false, bought: false, taskId,
+          ...(rememberedPhoto(e.name, listId) ? { photo: rememberedPhoto(e.name, listId) } : {}),
           addedBy: mySlot() || "", addedByUser: meId || "", addedAt: Date.now() });
       }
       added.push(e.name);
@@ -3122,7 +3138,7 @@ async function addEntries(entries, listId, taskId = "") {
       const before = c?.listCounts && Object.keys(c.listCounts).length ? c.listCounts : c?.count ? { groceries: c.count } : {};
       const listCounts = { ...before, [listId]: (before[listId] || 0) + 1 };
       store.put("catalog", cid, { name: e.name, section: pickSection(e), manual: !!c?.manual, count: (c?.count || 0) + 1, lastAt: Date.now(),
-        ...(perListSupported ? { listCounts } : {}) }).catch(() => {});
+        ...(c?.photo ? { photo: c.photo } : {}), ...(perListSupported ? { listCounts } : {}) }).catch(() => {});
       if (taskId) log(taskId, `added “${e.name}”${e.qty ? " (" + e.qty + ")" : ""} to the ${listName(listId)} list`);
     }
   } catch (err) { writeFailed(err); }
@@ -3200,7 +3216,7 @@ function renderChips() {
 // column holds that path. A path is never reused, so a copy is always right. Who may read a file follows the item
 // (migration 015). Files are fetched with the person's sign-in, so there are no shareable links. Each person's phone keeps a
 // copy (for shops without signal) in its own Cache Storage, removed when the item goes and on signing out.
-// The app never deletes files: notify removes the ones no item points at, once a day.
+// The app never deletes files: notify removes the ones nothing points at, once a day.
 const PHOTO_BUCKET = "item-photos", PHOTO_SIDE = 1280, PHOTO_MAX_BYTES = 900 * 1024;
 const photos = {
   urls: new Map(), // path -> address of the picture in this session's memory
@@ -3288,8 +3304,24 @@ const photos = {
     (await this.box())?.put(this.key(path), new Response(blob, { headers: { "Content-Type": "image/jpeg" } })).catch(() => {});
     this.remember(path, blob);
     await store.update("items", item.id, { photo: path });
+    rememberPhoto(item, path);
   },
 };
+// The suggestion for this item's name remembers its photo, so adding the item again brings it back (migration 019).
+// Shared lists only: a photo on a private list is never remembered, and never comes back on one.
+function rememberedPhoto(name, listId) {
+  return lists.get(listId)?.private ? "" : catalog.get(catalogId(name))?.photo || "";
+}
+function rememberPhoto(item, path) {
+  if (!rememberedPhotosSupported || lists.get(item.listId)?.private) return;
+  const cid = catalogId(item.name), c = catalog.get(cid);
+  (c ? store.update("catalog", cid, { photo: path }) : store.put("catalog", cid, { name: item.name, section: item.section || "Other", manual: false, count: 1, lastAt: Date.now(), photo: path })).catch(() => {});
+}
+function removeItemPhoto(i) {
+  const cid = catalogId(i.name);
+  store.update("items", i.id, { photo: "" }).catch(writeFailed);
+  if (rememberedPhotosSupported && catalog.get(cid)?.photo) store.update("catalog", cid, { photo: "" }).catch(() => {});
+}
 // The small picture on a row: tap to see it large. Shows a camera sign until the picture is there.
 function photoImage(path) {
   const url = photos.urls.get(path);
@@ -3322,7 +3354,7 @@ function renderItemPhoto() {
   fill(box,
     i.photo && h("button", { type: "button", class: "photo-thumb", "aria-label": "See the photo of " + i.name, onclick: () => showPhoto(i) }, photoImage(i.photo)),
     h("button", { type: "button", class: "btn", onclick: pick }, i.photo ? "Replace photo" : "Add photo"),
-    i.photo && h("button", { type: "button", class: "btn danger", onclick: () => store.update("items", i.id, { photo: "" }).catch(writeFailed) }, "Remove photo"));
+    i.photo && h("button", { type: "button", class: "btn danger", onclick: () => removeItemPhoto(i) }, "Remove photo"));
 }
 $("#it-photo-file").addEventListener("change", async (e) => {
   const file = e.target.files[0], i = items.get(editingItem);
@@ -3859,8 +3891,9 @@ $("#it-form").addEventListener("submit", async (e) => {
     if (patch.section !== i.section) {
       const cid = catalogId(name), c = catalog.get(cid);
       store.put("catalog", cid, { name, section: patch.section, manual: true, count: c?.count || 1, lastAt: Date.now(),
-        ...(perListSupported && c?.listCounts ? { listCounts: c.listCounts } : {}) }).catch(() => {});
+        ...(c?.photo ? { photo: c.photo } : {}), ...(perListSupported && c?.listCounts ? { listCounts: c.listCounts } : {}) }).catch(() => {});
     }
+    if (i.photo && patch.name !== i.name) rememberPhoto({ ...i, ...patch }, i.photo); // a new name remembers the photo under it
     if (patch.taskId && patch.taskId !== (i.taskId || "")) log(patch.taskId, `linked “${name}” from the ${listName(patch.listId)} list`);
   } catch (err) { writeFailed(err); }
 });

@@ -1,7 +1,7 @@
 -- Privacy check: can each person see only what they should?
 -- Run any time: Supabase dashboard > SQL Editor > New query > paste this whole file > Run.
 -- It adds a few test rows, looks at them as each of the two people, then undoes everything, so nothing is left.
--- The result is a table with PASS or FAIL per line. Needs migrations 009, 010, 011, 013, 015, 016 and 017.
+-- The result is a table with PASS or FAIL per line. Needs migrations 009, 010, 011, 013, 015, 016, 017 and 019.
 --
 -- "A" is the person who owns the private test task and list (the first account), "B" is the other person.
 -- Works with a single account, so also in a development project with only one user.
@@ -284,7 +284,22 @@ begin
     got := pg_temp.sees_file('item-photos', ua, 'privacy-check-i1/a.jpg');
     res := res || jsonb_build_object('n', i + 2, 'who', 'A', 'what', 'sees a photo whose item was deleted',
       'expected', 'no', 'actual', case when got then 'yes' else 'no' end, 'result', case when got then 'FAIL' else 'PASS' end);
-    i := i + 2;
+    -- A remembered photo: hidden while its item is on A's private list, whatever points at it; then readable by both, never by outsiders.
+    insert into public.catalog (id, name, photo) values ('privacy-check-p', 'Privacy check', 'privacy-check-i2/a.jpg');
+    got := pg_temp.sees_file('item-photos', ub, 'privacy-check-i2/a.jpg');
+    res := res || jsonb_build_object('n', i + 3, 'who', 'B', 'what', 'sees a remembered photo while its item is on A''s private list',
+      'expected', 'no', 'actual', case when got then 'yes' else 'no' end, 'result', case when got then 'FAIL' else 'PASS' end);
+    delete from public.items where id = 'privacy-check-i2';
+    got := pg_temp.sees_file('item-photos', ub, 'privacy-check-i2/a.jpg');
+    res := res || jsonb_build_object('n', i + 4, 'who', 'B', 'what', 'sees a remembered photo after its item is gone',
+      'expected', 'yes', 'actual', case when got then 'yes' else 'no' end, 'result', case when got then 'PASS' else 'FAIL' end);
+    got := pg_temp.sees_file('item-photos', null, 'privacy-check-i2/a.jpg');
+    res := res || jsonb_build_object('n', i + 5, 'who', 'Nobody', 'what', 'anonymous visitor sees a remembered photo',
+      'expected', 'no', 'actual', case when got then 'yes' else 'no' end, 'result', case when got then 'FAIL' else 'PASS' end);
+    got := pg_temp.can_add_file('item-photos', ub, 'privacy-check-i2', 'b.jpg');
+    res := res || jsonb_build_object('n', i + 6, 'who', 'B', 'what', 'can add a photo for an item that is gone but remembered',
+      'expected', 'no', 'actual', case when got then 'yes' else 'no' end, 'result', case when got then 'FAIL' else 'PASS' end);
+    i := i + 6;
     -- An attachment follows its task: turned private by A, the file and its name disappear for B.
     update public.tasks set private = true where id = 'privacy-check-t1';
     got := pg_temp.sees_file('task-files', ub, 'privacy-check-t1/a.pdf');

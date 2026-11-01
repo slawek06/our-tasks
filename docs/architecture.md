@@ -47,14 +47,14 @@ There is no own server: GitHub hosts the files, Supabase holds data, sign-in and
 | Live updates | Supabase Realtime (`postgres_changes`) | Access rules also filter what each person receives |
 | Sign-in | Supabase Auth | Sign-ups off; email + password, or email code / link |
 | Server code | Supabase Edge Functions (Deno, TypeScript) | `claude`, `notify` |
-| AI | Claude API, model `claude-opus-5-5` | Effort `low`, server-side fallback beta; key only in Supabase |
+| AI | Claude API, model `claude-opus-5-5`; `claude-haiku-5-5` for task icons | Effort `low`, server-side fallback beta on Opus; key only in Supabase |
 | Push | Web Push, own implementation (RFC 8291 encryption, RFC 8292 VAPID) on WebCrypto | Keys created on first use, stored in `push_config` |
 | Timer | `pg_cron` + `pg_net` | Calls `notify` with `action: tick` every 5 minutes |
 | Hosting | GitHub Pages, published by GitHub Actions | Repository `slawek06/our-tasks` (public) |
 | Mail | Gmail SMTP (app password) in Supabase Auth | Sign-in codes and invitations |
 | Voice | Browser speech synthesis and recognition | Free, on the device |
 | Fonts | Google Fonts: Bricolage Grotesque, Figtree, JetBrains Mono | |
-| Library | `@supabase/supabase-js@2.45.4` from jsDelivr | Loaded at start |
+| Library | `@supabase/supabase-js@2.45.4` from jsDelivr | Loaded at start, checked against a fingerprint (`SUPABASE_JS_SRI`, in `index.html` and `sw.js`; a new version needs a new value in both) |
 
 ## 3. Code layout
 
@@ -100,7 +100,7 @@ Field names: the app uses camelCase, the database snake_case (`parentId` ↔ `pa
 checklists (008), `privateListsSupported` (009), seen markers (011: no marks until it runs), `followUpsSupported`
 (012: a next step is a plain new task, without the link, and the form says which file to run), `dueTimeSupported`
 (013, checks `remind_by`: no time field in the editor, which says which file to run; quick add leaves "10:30" in the title), `photosSupported`
-(015: the item editor's Photo field says which file to run), `attachmentsSupported` (016: the task editor's Files field says which file to run), `thanksSupported` (017: no thanks until it runs). 010 only tightens access rules; the app works the same before it.
+(015: the item editor's Photo field says which file to run), `attachmentsSupported` (016: the task editor's Files field says which file to run), `thanksSupported` (017: no thanks until it runs), `iconsSupported` (018: a rename leaves the field alone; the timer picks none). 010 only tightens access rules; the app works the same before it.
 
 **Views.** Today · Tasks (Inbox + areas) · Upcoming · Lists (Shopping | Checklists) · Activity · Archive.
 Panels: task editor, People (names, password, notifications, data), Briefing, From text, Ideas, Sort into areas,
@@ -111,10 +111,16 @@ shopping list editor.
 the other person's marks: "Assigned by … · Wiola saw it 10:42" on tasks for them, and "Wiola saw it …" on your
 comments. You never see your own marks.
 
+**Remembered photos.** `catalog.photo` (019) points at the same file as the item: `rememberPhoto` sets it when a photo is added on a shared list, `rememberedPhoto` brings it back in `addEntries`, `removeItemPhoto` forgets it. Before 019 (`rememberedPhotosSupported`) nothing is remembered. Files stay until nothing points at them.
+
+**Task icons.** `tasks.icon`: null = none yet, `""` = Claude's answer wasn't an emoji, else an emoji shown before the title on rows (`.t-icon`). The server picks them (see §7), with no way to change them in the app; renaming a task in the editor sets it back to null, so it gets a new one. Private tasks and areas never go to Claude.
+
 **Thanks.** On a shared closed task whose last closer was the other person (`closerOf`, from `history`), the editor offers the `THANKS` pictures under Status. `sendThanks` saves one row per person per task: another picture replaces it, the same one removes it, and only the first asks `notify` for a push. Thanks show on the task's row, in the editor and in Activity (`feed`, built from the rows like comments, so a removed one disappears); one that arrives while the app is open also gets a toast. Adding a picture only needs a change to `THANKS`.
 
 **Mentions.** Typing `@` in a comment offers the other person's name (`#mention-pick`); `@Name` is shown in that
 person's colour (`withMentions`). The push is decided by `notify` (see §7).
+
+**Wrap up all areas.** A link above the areas (`wrapAreas`) adds every area shown to `collapsed`, or takes them out if all are already in it; `collapsed` is kept on the device (`localStorage`). An area stays closed under Hide done and a person's filter, and only a search opens it.
 
 **Quick archive.** A closed task's row has an archive button where an open task has its My day button (`askArchive`): one tap with an Undo, and it asks first only if a subtask is still open.
 
@@ -234,6 +240,7 @@ on the device).
 - `follow_up_of` (012) is a plain column on `tasks` and adds no rule: a task's link to the other person's private task
   shows them nothing, because they can't read that row.
 - `thanks` (017): everyone writes only their own rows (the id must match), only on shared tasks; both read them, except on the other person's private tasks.
+- Item photos (019): a file is readable while an item or a remembered photo points at it, never while one is on the other person's private list; adding a file still needs a real item.
 - `seen_marks` (011): everyone writes only their own rows (the id must match what they mark); both read them, except
   marks on the other person's private task.
 - `user_state`, `push_subscriptions`, `notify_prefs`, `briefings`: own rows only.
@@ -253,6 +260,7 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 **`notify`.** Body `{action, …}`:
 - `vapid`: public push key (keys are created and stored in `push_config` on first use)
 - `test`: push to the caller's devices
+- `tick` also runs `pickIcons`: up to 40 shared, unarchived tasks with no icon go to Claude Haiku 5.5 as id and title; an answer that isn't an emoji saves as none, so it isn't paid for again; it only fills empty icons.
 - `event` (`assigned`, `comment`, `closed`, `file`, `thanks`): instant push to the other person, respecting their switches and quiet hours.
   `assigned` pushes only when the task is theirs by name, never for Both. This is the one place that rule lives: the app calls
   `notifyEvent("assigned", …)` on every assignment and `notify` decides
@@ -317,7 +325,9 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 | 014 every task has an owner (open shared tasks with nobody assigned become Both) | ✅ 30 Oct 2026, privacy check 53 lines all PASS | ✅ privacy check all PASS (30 Oct 2026) |
 | 015 photos of shopping items (`items.photo`, bucket `item-photos`, its rules, `stale_item_photos`) | ✅ 30 Oct 2026, privacy check 53 lines all PASS | ✅ privacy check all PASS (30 Oct 2026) |
 | 016 files on tasks (`attachments`, bucket `task-files`, its rules, `stale_task_files`) | ✅ 30 Oct 2026, privacy check 53 lines all PASS | ✅ privacy check all PASS (30 Oct 2026) |
-| 017 thanks (`thanks`, its rules) | ⬜ Release 3 | ✅ privacy check all PASS (30 Oct 2026) |
+| 017 thanks (`thanks`, its rules) | ✅ 30 Oct 2026 (ahead of the rest of Release 3), privacy check all PASS | ✅ privacy check all PASS (30 Oct 2026) |
+| 018 task icons (`tasks.icon`) | ⬜ Release 3 | ✅ privacy check all PASS (31 Oct 2026) |
+| 019 remembered photos (`catalog.photo`, rules and `stale_item_photos` changed) | ⬜ Release 3 | ✅ privacy check 63 lines, no FAIL (1 Nov 2026; the first run refused new photos, rule fixed) |
 
 ## 10. Configuration reference
 
