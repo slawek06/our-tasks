@@ -290,6 +290,10 @@ body.shop-mode .fab { display: none; }
 .remind-pick button[aria-pressed=true] { background: var(--accent-soft); border-color: var(--accent); font-weight: 600; }
 .t-icon { display: inline-block; margin-right: 6px; }
 .brief-time { display: grid; grid-template-columns: minmax(0, 1fr) 96px; gap: 8px; align-items: center; }
+.usage-bar { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; margin: 6px 0; }
+.usage-bar i { display: block; height: 100%; background: var(--accent); }
+.usage-bar.near i { background: var(--doing); }
+.usage-big { font-size: 15px; } .usage-big b { font-size: 20px; }
 .thanks-pick { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
 .thanks-pick button { border: 1px solid var(--line); background: var(--bg); border-radius: 9px; min-height: 44px; padding: 0; font-size: 21px; line-height: 1; }
 .thanks-pick button[aria-pressed=true] { background: var(--accent-soft); border-color: var(--accent); }
@@ -568,6 +572,11 @@ details.history li span { color: var(--muted); font-size: 12px; white-space: now
           <div class="field"><label for="n-quiet-to">Quiet hours until</label><input type="time" id="n-quiet-to" value="07:00"></div>
         </div>
         <p class="hint" id="n-quiet-hint"></p>
+        <div class="field" id="ai-usage" hidden>
+          <span class="lbl">Claude this month</span>
+          <div id="ai-usage-body"></div>
+          <div class="brief-time"><label for="ai-limit">Monthly limit set at Anthropic ($)</label><input type="number" id="ai-limit" min="1" step="1" inputmode="decimal"></div>
+        </div>
         <p class="hint">Settings are per person and apply to all your devices. Each briefing can be on or off separately. Midday and evening only come if something is still open today, unless midday is your first of the day.</p>
       </div>
       <div class="field" id="data-tools" hidden>
@@ -2930,7 +2939,7 @@ $("#sort-suggest").addEventListener("click", async () => {
     "- \"\" when unsure.\n" +
     'Reply with only JSON: {"choices":[{"id":"task id","to":"area id, new:<name>, area, or empty"}]}';
   try {
-    const r = await sampleFn.json(prompt, { modelTier: "quick" });
+    const r = await sampleFn.json(prompt, { modelTier: "quick", feature: "sort_areas" });
     const ids = new Set(rows.map((t) => t.id)), byName = new Map(areas.map((a) => [norm(a.title), a.id]));
     let n = 0;
     for (const c of Array.isArray(r?.choices) ? r.choices : []) {
@@ -3570,14 +3579,14 @@ function parseJsonReply(text) {
   return undefined;
 }
 const supabaseClaude = {
-  async json(prompt) {
+  async json(prompt, opts = {}) {
     if (!navigator.onLine) throw { code: "offline" };
-    const { data, error } = await sb.client.functions.invoke("claude", { body: { prompt } });
+    const { data, error } = await sb.client.functions.invoke("claude", { body: { prompt, feature: opts.feature } });
     if (error) {
       const status = error.context?.status;
       let body = null;
       try { body = await error.context?.json(); } catch {}
-      const code = body?.error === "rate_limited" || status === 429 ? "rate_limited"
+      const code = body?.error === "limit_reached" ? "limit_reached" : body?.error === "rate_limited" || status === 429 ? "rate_limited"
         : body?.error === "not_configured" || status === 404 || status === 503 ? "not_configured"
         : isNetworkError(error) ? "offline" : "upstream_error";
       throw { code, message: error.message };
@@ -3622,6 +3631,7 @@ function sampleFailed(e, what) {
   else if (e?.code === "offline") toast(`${what} needs an internet connection. Your text is still there.`);
   else if (e?.code === "not_configured") toast(`${what} isn't set up yet on this address: the Claude function or its API key is missing in Supabase.`);
   else if (e?.code === "rate_limited") toast("Too many requests right now. Try again in a minute.");
+  else if (e?.code === "limit_reached") toast(LIMIT_TEXT);
   else if (e?.code !== "cancelled") toast(`${what} didn't work this time. Your text is still there, so you can try again.`);
 }
 
@@ -3680,7 +3690,7 @@ async function suggestTasks() {
     "- Return empty arrays where there is nothing.\n\n" +
     `Text:\n"""\n${text.slice(0, 30000)}\n"""`;
   try {
-    const r = await sampleFn.json(prompt, { modelTier: "quick" });
+    const r = await sampleFn.json(prompt, { modelTier: "quick", feature: "from_text" });
     const listIds = allLists().map((l) => l.id);
     const validParent = (id) => { const p = tasks.get(id); return p && !p.archived && p.status !== "done" ? id : ""; };
     const rawTasks = Array.isArray(r?.tasks) ? r.tasks.slice(0, 40) : [];
@@ -3824,7 +3834,7 @@ $("#smart-btn").addEventListener("click", async () => {
       "- section: exactly one of: " + SECTIONS.join(", ") + ".\n" +
       "Reply with only a JSON array, for example [{\"name\":\"Milk\",\"qty\":\"2\",\"section\":\"Dairy & eggs\"}].\n\n" +
       "Request: \"\"\"" + text + "\"\"\"",
-      { modelTier: "quick" });
+      { modelTier: "quick", feature: "smart_add" });
     const entries = (Array.isArray(reply) ? reply : [])
       .filter((e) => e && typeof e.name === "string" && e.name.trim())
       .map((e) => ({ name: e.name.trim().slice(0, 120), qty: String(e.qty ?? "").trim().slice(0, 20), section: String(e.section || "") }));
@@ -3995,7 +4005,7 @@ $("#people-btn").addEventListener("click", () => {
   $("#signout-btn").hidden = store.mode !== "supabase";
   $("#password-tools").hidden = store.mode !== "supabase";
   $("#notify-tools").hidden = store.mode !== "supabase";
-  if (store.mode === "supabase") { loadNotifyPrefs(); updateNotifyStatus(); }
+  if (store.mode === "supabase") { loadNotifyPrefs(); updateNotifyStatus(); loadAiUsage(); }
   $("#new-password").value = "";
   // Moving from claude.ai: export your private tasks there, import the file on your own hosting.
   const onClaude = store.mode === "remote", onOwn = store.mode === "supabase";
@@ -4194,6 +4204,39 @@ const isStandalone = () => matchMedia("(display-mode: standalone)").matches || n
 const keyBytes = (s) => { s = s.replace(/-/g, "+").replace(/_/g, "/"); while (s.length % 4) s += "="; return Uint8Array.from(atob(s), (c) => c.charCodeAt(0)); };
 const deviceName = () => /iPhone/.test(navigator.userAgent) ? "iPhone" : /iPad/.test(navigator.userAgent) ? "iPad" : /Macintosh/.test(navigator.userAgent) ? "Mac" : "Browser";
 const NEEDS_UPDATE = "Notifications need the database update: run supabase/migrations/004_notifications.sql in Supabase.";
+// ---- Claude usage: this month's estimated cost against the limit you set at Anthropic (migration 021) ----
+// Totals by feature only; the server keeps the single requests and never says who made them.
+const USAGE_NAMES = { briefing: "Briefings", chat: "Chat", icons: "Icons", smart_add: "Smart add", from_text: "From text", sort_areas: "Sort into areas", other: "Other" };
+let aiConfig = {};
+async function loadAiUsage() {
+  const [{ data: rows, error }, { data: cfg }] = await Promise.all([sb.client.rpc("ai_usage_summary"), sb.client.from("config").select("value").eq("key", "ai").maybeSingle()]);
+  aiConfig = cfg?.value || {};
+  renderAiUsage(error ? null : rows || [], error);
+}
+function renderAiUsage(rows, error) {
+  const el = $("#ai-usage"), body = $("#ai-usage-body");
+  el.hidden = false;
+  if (!rows) { $("#ai-limit").closest(".brief-time").hidden = true; return fill(body, h("p", { class: "hint" }, isNetworkError(error) ? "Claude usage needs a connection." : "Claude usage needs the database update: run supabase/migrations/021_ai_usage.sql in Supabase.")); }
+  $("#ai-limit").closest(".brief-time").hidden = false;
+  const month = new Date().toISOString().slice(0, 7), last = new Date(Date.UTC(+month.slice(0, 4), +month.slice(5) - 2, 1)).toISOString().slice(0, 7);
+  const limit = Number(aiConfig.limit) || 5, now = rows.filter((r) => r.month === month), spent = now.reduce((n, r) => n + Number(r.cost), 0);
+  const before = rows.filter((r) => r.month === last).reduce((n, r) => n + Number(r.cost), 0), share = Math.min(100, Math.round(100 * spent / limit));
+  const since = rows[0]?.since && new Date(rows[0].since), money = (n) => "$" + n.toFixed(2);
+  $("#ai-limit").value = String(limit);
+  fill(body,
+    h("div", { class: "usage-big" }, h("b", {}, money(spent)), ` of ${money(limit)} · ${share}%`),
+    h("div", { class: "usage-bar" + (share >= 80 ? " near" : ""), role: "img", "aria-label": `${share}% of the monthly limit used` }, h("i", { style: `width:${share}%` })),
+    h("p", { class: "hint" }, now.length ? now.sort((a, b) => b.cost - a.cost).map((r) => `${USAGE_NAMES[r.feature] || r.feature} ${money(Number(r.cost))}`).join(" · ") : "Nothing used yet this month."),
+    h("p", { class: "hint" }, (before ? `Last month: ${money(before)}. ` : "") + "An estimate from what each request used" +
+      (since ? `, counted since ${since.toLocaleDateString(undefined, { day: "numeric", month: "short" })}` : "") + ". Your bill at console.anthropic.com is exact. At 80% you each get one push."));
+}
+$("#ai-limit").addEventListener("change", async (e) => {
+  const limit = Math.max(1, Math.round(Number(e.target.value) || 5));
+  const { error } = await sb.client.from("config").upsert({ key: "ai", value: { ...aiConfig, limit } });
+  if (error) return toast("Couldn't save the limit: " + error.message);
+  toast("Limit saved. Change it here too if you change it at Anthropic."); loadAiUsage();
+});
+const LIMIT_TEXT = "Claude's monthly spending limit is used up, so the AI features rest until next month. You can raise it at console.anthropic.com → Settings → Limits.";
 // Explains a failed call to the notify function in plain words.
 async function fnErrorText(error) {
   let code = "";
@@ -4201,6 +4244,7 @@ async function fnErrorText(error) {
   if (!navigator.onLine || isNetworkError(error)) return "This needs an internet connection.";
   if (code === "not_configured" || error.context?.status === 404) return "Not set up on the server yet: the notify function, its API key, or the database update is missing.";
   if (code === "rate_limited") return "Too many requests just now. Try again in a minute.";
+  if (code === "limit_reached") return LIMIT_TEXT;
   return "Something went wrong on the server. Try again in a moment.";
 }
 async function loadNotifyPrefs() {

@@ -1,7 +1,7 @@
 -- Privacy check: can each person see only what they should?
 -- Run any time: Supabase dashboard > SQL Editor > New query > paste this whole file > Run.
 -- It adds a few test rows, looks at them as each of the two people, then undoes everything, so nothing is left.
--- The result is a table with PASS or FAIL per line. Needs migrations 009, 010, 011, 013, 015, 016, 017 and 019.
+-- The result is a table with PASS or FAIL per line. Needs migrations 009, 010, 011, 013, 015, 016, 017, 019 and 021.
 --
 -- "A" is the person who owns the private test task and list (the first account), "B" is the other person.
 -- Works with a single account, so also in a development project with only one user.
@@ -187,7 +187,8 @@ declare
     ["A", "attachments", "privacy-check-a2", true,  "attachment of own private task"],
     ["B", "thanks", "privacy-check-n1", true,  "A''s thanks on a shared task"],
     ["B", "thanks", "privacy-check-n2", false, "A''s thanks on A''s private task"],
-    ["A", "thanks", "privacy-check-n2", true,  "own thanks on own private task"]
+    ["A", "thanks", "privacy-check-n2", true,  "own thanks on own private task"],
+    ["A", "ai_usage", "privacy-check-u1", false, "single Claude usage records (server only; the app sees totals)"]
   ]';
   c jsonb; got boolean; i int := 0; ph jsonb := '[]';
 begin
@@ -214,6 +215,7 @@ begin
       ('privacy-check-a1', 'privacy-check-t1', 'shared.pdf', 'privacy-check-t1/a.pdf'), ('privacy-check-a2', 'privacy-check-t2', 'private.pdf', 'privacy-check-t2/a.pdf');
     insert into public.thanks (id, user_id, task_id, emoji) values
       ('privacy-check-n1', ua, 'privacy-check-t1', '🌻'), ('privacy-check-n2', ua, 'privacy-check-t2', '🌻');
+    insert into public.ai_usage (id, feature, model) values ('privacy-check-u1', 'chat', 'test');
 
     for c in select * from jsonb_array_elements(checks) loop
       i := i + 1;

@@ -113,6 +113,8 @@ comments. You never see your own marks.
 
 **Remembered photos.** `catalog.photo` (019) points at the same file as the item: `rememberPhoto` sets it when a photo is added on a shared list, `rememberedPhoto` brings it back in `addEntries`, `removeItemPhoto` forgets it. Before 019 (`rememberedPhotosSupported`) nothing is remembered. Files stay until nothing points at them.
 
+**Claude usage.** Under People (`loadAiUsage`, `renderAiUsage`): this UTC month's estimated cost against the limit you enter (`config` key `ai`, default $5), by feature, and last month's total. Before 021 it says which file to run.
+
 **Task icons.** `tasks.icon`: null = none yet, `""` = Claude's answer wasn't an emoji, else an emoji shown before the title on rows (`.t-icon`). The server picks them (see §7), with no way to change them in the app; renaming a task in the editor sets it back to null, so it gets a new one. Private tasks and areas never go to Claude.
 
 **Thanks.** On a shared closed task whose last closer was the other person (`closerOf`, from `history`), the editor offers the `THANKS` pictures under Status. `sendThanks` saves one row per person per task: another picture replaces it, the same one removes it, and only the first asks `notify` for a push. Thanks show on the task's row, in the editor and in Activity (`feed`, built from the rows like comments, so a removed one disappears); one that arrives while the app is open also gets a toast. Adding a picture only needs a change to `THANKS`.
@@ -202,6 +204,7 @@ on the device).
 | `user_state` | Per person: "new for you" and Activity/Shopping read markers, My day pins | `user_id`, `seen`, `activity_at`, `shopping_at`, `today` | schema, 002 |
 | `push_subscriptions` | Devices that get push | `user_id`, `endpoint`, `p256dh`, `auth`, `device` | 004 |
 | `thanks` | A thank-you for a closed task | `id` (`<user>:<task>`), `user_id`, `task_id` (deleted with the task), `emoji`, `at` | 017 |
+| `ai_usage` | What each call to Claude cost (estimate); server only, the app reads totals through `ai_usage_summary()` | `id`, `at`, `feature`, `model`, `input_tokens`, `output_tokens`, `cost` (US dollars) | 021 |
 | `notify_prefs` | Notification settings per person | `lang`, `tz`, `morning`, `midday`, `evening`, `quiet_from/to`, `on_assigned/comment/closed`, `on_reminder`, `morning_sent`, `evening_sent` | 004, 005, 013 |
 | `briefings` | Briefings and chat messages | `user_id`, `kind`, `role`, `text`, `actions` (json), `applied` | 004 |
 | `push_config` | Server only: VAPID keys, timer password | `vapid`, `cron_secret` | 004 |
@@ -260,6 +263,7 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 **`notify`.** Body `{action, …}`:
 - `vapid`: public push key (keys are created and stored in `push_config` on first use)
 - `test`: push to the caller's devices
+- Every call to Claude, in `notify` and `claude`, records its cost (`recordUsage`, `PRICES` per million tokens; the app passes `feature` to `claude`). `tick` also runs `warnNearLimit`: past 80% of the limit in `config` key `ai`, one push per person per month, outside quiet hours. A used-up spending limit at Anthropic answers `limit_reached` (402), shown in plain words.
 - `tick` also runs `pickIcons`: up to 40 shared, unarchived tasks with no icon go to Claude Haiku 5.5 as id and title; an answer that isn't an emoji saves as none, so it isn't paid for again; it only fills empty icons.
 - `event` (`assigned`, `comment`, `closed`, `file`, `thanks`): instant push to the other person, respecting their switches and quiet hours.
   `assigned` pushes only when the task is theirs by name, never for Both. This is the one place that rule lives: the app calls
@@ -329,6 +333,7 @@ From text, Sort into areas. Errors: `not_signed_in` 401, `not_configured`, `rate
 | 018 task icons (`tasks.icon`) | ✅ 1 Nov 2026 (Release 3), privacy check no FAIL | ✅ privacy check all PASS (31 Oct 2026) |
 | 019 remembered photos (`catalog.photo`, rules and `stale_item_photos` changed) | ✅ 1 Nov 2026 (Release 3), privacy check 63 lines, no FAIL | ✅ privacy check 63 lines, no FAIL (1 Nov 2026; the first run refused new photos, rule fixed) |
 | 020 midday briefing (`notify_prefs.midday`, `midday_sent`; also adds 005's `lang` if missing) | ✅ 1 Nov 2026 (Release 3), no FAIL | ✅ 1 Nov 2026 (005's `lang` was missing here, added the same day) |
+| 021 Claude usage (`ai_usage`, `ai_usage_summary`) | ⬜ Release 3 | ⬜ |
 
 ## 10. Configuration reference
 
